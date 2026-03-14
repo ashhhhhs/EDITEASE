@@ -1,0 +1,8 @@
+flask
+pymongo
+streamlit
+opencv-python
+requests
+numpy
+celery
+redis

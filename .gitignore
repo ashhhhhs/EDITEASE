@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Project specific
+data/
+exports/
+scene_indexes/
+thumbnails/
+*.mp4
+*.mkv
+*.avi
+*.mov
+
+# IDEs
+.vscode/
+.idea/

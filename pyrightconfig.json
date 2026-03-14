@@ -1,0 +1,5 @@
+{
+  "extraPaths": ["."],
+  "reportMissingImports": "warning",
+  "pythonVersion": "3.10"
+}
