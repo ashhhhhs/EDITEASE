@@ -1,0 +1,16 @@
+flask
+pymongo
+streamlit
+opencv-python
+requests
+numpy
+scenedetect
+deepface
+celery
+redis
+flasgger
+
+[dev]
+pytest
+black
+flake8

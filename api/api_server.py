@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, g
 from flask_cors import CORS
 from flasgger import Swagger
 
@@ -9,12 +9,85 @@ from utils.logger import setup_logger
 from services import clip_service
 from services import task_service
 from services import export_service
+from services import auth_service
+from functools import wraps
 
 logger = setup_logger("api_server")
 
 app = Flask(__name__)
 CORS(app)
 swagger = Swagger(app)
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.headers.get("Authorization")
+        if token and token.startswith("Bearer "):
+            token = token.split(" ")[1]
+        
+        user = auth_service.get_user_by_token(token)
+        if not user:
+            return jsonify({"error": "Unauthorized", "status": 401}), 401
+            
+        g.user = user
+        return f(*args, **kwargs)
+    return decorated_function
+
+def role_required(allowed_roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            token = request.headers.get("Authorization")
+            if token and token.startswith("Bearer "):
+                token = token.split(" ")[1]
+            
+            user = auth_service.get_user_by_token(token)
+            if not user:
+                return jsonify({"error": "Unauthorized", "status": 401}), 401
+                
+            if user.get("role") not in allowed_roles:
+                return jsonify({"error": "Forbidden: insufficient role", "status": 403}), 403
+                
+            g.user = user
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+@app.post("/register")
+def register():
+    data = request.get_json(force=True) or {}
+    username = data.get("username")
+    password = data.get("password")
+    name = data.get("name")
+    email = data.get("email")
+    
+    res = auth_service.register_user(username, password, name, email)
+    if "error" in res:
+        return jsonify(res), res.get("status", 400)
+    return jsonify(res)
+
+@app.post("/login")
+def login():
+    data = request.get_json(force=True) or {}
+    username = data.get("username")
+    password = data.get("password")
+    
+    res = auth_service.login_user(username, password)
+    if "error" in res:
+        return jsonify(res), res.get("status", 401)
+    return jsonify(res)
+
+@app.post("/logout")
+@login_required
+def logout():
+    token = request.headers.get("Authorization").split(" ")[1]
+    res = auth_service.logout_user(token)
+    return jsonify(res)
+
+@app.get("/me")
+@login_required
+def get_me():
+    return jsonify({"user": g.user})
 
 @app.get("/health")
 def health():
@@ -49,6 +122,7 @@ def serve_video_clip(clip_id):
     return send_file(path, mimetype="video/mp4")
 
 @app.get("/search")
+@login_required
 def search_scenes():
     """
     Search and filter scenes in the database.
@@ -63,6 +137,7 @@ def search_scenes():
     return jsonify(res)
 
 @app.post("/update_scene")
+@role_required(['admin', 'reviewer'])
 def update_scene():
     """
     JSON body:
@@ -88,6 +163,7 @@ def update_scene():
     return jsonify(res)
 
 @app.post("/export")
+@role_required(['admin', 'editor'])
 def export_scene():
     data = request.get_json(force=True) or {}
     video = data.get("video")
@@ -99,12 +175,14 @@ def export_scene():
     return jsonify(res)
 
 @app.post("/export_batch")
+@role_required(['admin', 'editor'])
 def export_batch():
     filters = request.get_json(force=True) or {}
     res = export_service.export_batch(filters)
     return jsonify(res)
 
 @app.post("/upload")
+@role_required(['admin', 'editor'])
 def upload_video():
     """
     Upload a video which will be processed by Celery in the background.
@@ -137,10 +215,12 @@ def upload_video():
     })
 
 @app.get("/task_status/<task_id>")
+@login_required
 def get_task_status(task_id):
     return jsonify(task_service.get_task_status(task_id))
 
 @app.post("/auto_organize")
+@role_required(['admin', 'editor'])
 def auto_organize():
     """
     One-click Editor mode: upload → process → export organized clips.
@@ -173,6 +253,7 @@ def auto_organize():
     })
 
 @app.post("/open_folder")
+@login_required
 def open_folder():
     """Open a local folder in the system file explorer. [Desktop Only]
     ---

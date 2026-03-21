@@ -1,125 +1,89 @@
-import React, { useState } from 'react';
-import { LayoutDashboard, UploadCloud, Grid, Wand2, Shield } from 'lucide-react';
-import EditorView from './EditorView';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import axios from 'axios';
+import { API_BASE } from './config';
+
+import Login from './Login';
+import Register from './Register';
+import AppShell from './AppShell';
+
 import Dashboard from './Dashboard';
-import Upload from './Upload';
 import Inspector from './Inspector';
+import Upload from './Upload';
+import EditorView from './EditorView';
 
-function App() {
-  const [mode, setMode] = useState('editor'); // 'editor' or 'admin'
-  const [currentView, setCurrentView] = useState('auto_organize'); // editor views vs admin views
+export default function App() {
+  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(!!token);
 
-  const switchMode = (newMode) => {
-    setMode(newMode);
-    setCurrentView(newMode === 'editor' ? 'auto_organize' : 'dashboard');
+  useEffect(() => {
+    if (token) {
+      axios.get(`${API_BASE}/me`)
+        .then(res => {
+          setCurrentUser(res.data.user);
+          setIsAuthLoading(false);
+        })
+        .catch(() => {
+          handleLogout();
+          setIsAuthLoading(false);
+        });
+    } else {
+      setIsAuthLoading(false);
+    }
+  }, [token]);
+
+  const handleLogin = (newToken, userData) => {
+    localStorage.setItem('token', newToken);
+    setToken(newToken);
+    if (userData && userData.username) {
+        setCurrentUser(userData);
+    }
   };
 
+  const handleLogout = async () => {
+    if (token) {
+      try {
+        await axios.post(`${API_BASE}/logout`);
+      } catch (e) {
+        // ignore
+      }
+    }
+    localStorage.removeItem('token');
+    setToken(null);
+    setCurrentUser(null);
+  };
+
+  const RoleGuard = ({ allowedRoles, children }) => {
+    if (!currentUser) return <Navigate to="/login" replace />;
+    const role = currentUser.role || 'editor';
+    if (!allowedRoles.includes(role)) return <Navigate to="/app/dashboard" replace />;
+    return children;
+  };
+
+  if (isAuthLoading) {
+    return <div style={{height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-color)', color: '#fff'}}>Loading...</div>;
+  }
+
   return (
-    <div className="app-container">
-      {/* Sidebar */}
-      <div className="sidebar">
-        <h1><Wand2 size={24} color="#58a6ff" /> EditEase</h1>
-
-        {/* Mode Toggle */}
-        <div style={{
-          display: 'flex',
-          background: 'var(--bg-color)',
-          borderRadius: '8px',
-          padding: '3px',
-          marginBottom: '1.5rem',
-          border: '1px solid var(--border-color)'
-        }}>
-          <button
-            onClick={() => switchMode('editor')}
-            style={{
-              flex: 1,
-              padding: '0.5rem',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '0.8rem',
-              transition: 'all 0.2s',
-              background: mode === 'editor' ? 'var(--accent)' : 'transparent',
-              color: mode === 'editor' ? '#fff' : 'var(--text-muted)',
-            }}
-          >
-            Editor
-          </button>
-          <button
-            onClick={() => switchMode('admin')}
-            style={{
-              flex: 1,
-              padding: '0.5rem',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '0.8rem',
-              transition: 'all 0.2s',
-              background: mode === 'admin' ? 'var(--accent)' : 'transparent',
-              color: mode === 'admin' ? '#fff' : 'var(--text-muted)',
-            }}
-          >
-            Admin
-          </button>
-        </div>
-
-        {/* Editor Nav */}
-        {mode === 'editor' && (
-          <div
-            className={`nav-item ${currentView === 'auto_organize' ? 'active' : ''}`}
-            onClick={() => setCurrentView('auto_organize')}
-          >
-            <Wand2 size={20} /> Auto-Organize
-          </div>
-        )}
-
-        {/* Admin Nav */}
-        {mode === 'admin' && (
-          <>
-            <div style={{color: 'var(--text-muted)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '0.5rem 1rem', marginBottom: '0.25rem'}}>
-              AI Calibration
-            </div>
-            <div
-              className={`nav-item ${currentView === 'dashboard' ? 'active' : ''}`}
-              onClick={() => setCurrentView('dashboard')}
-            >
-              <LayoutDashboard size={20} /> Dashboard
-            </div>
-            <div
-              className={`nav-item ${currentView === 'upload' ? 'active' : ''}`}
-              onClick={() => setCurrentView('upload')}
-            >
-              <UploadCloud size={20} /> Upload
-            </div>
-            <div
-              className={`nav-item ${currentView === 'inspector' ? 'active' : ''}`}
-              onClick={() => setCurrentView('inspector')}
-            >
-              <Grid size={20} /> Inspector
-            </div>
-          </>
-        )}
-
-        {/* Bottom info */}
-        <div style={{marginTop: 'auto', padding: '1rem 0', borderTop: '1px solid var(--border-color)'}}>
-          <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem'}}>
-            <Shield size={14} />
-            {mode === 'editor' ? 'Editor Mode' : 'Admin / AI Calibrator'}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content — components stay mounted to preserve state */}
-      <div className="main-content">
-        <div style={{display: currentView === 'auto_organize' ? 'block' : 'none'}}><EditorView /></div>
-        <div style={{display: currentView === 'dashboard' ? 'block' : 'none'}}><Dashboard /></div>
-        <div style={{display: currentView === 'upload' ? 'block' : 'none'}}><Upload /></div>
-        <div style={{display: currentView === 'inspector' ? 'block' : 'none'}}><Inspector /></div>
-      </div>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={token && currentUser ? <Navigate to="/app/dashboard" replace /> : <Navigate to="/login" replace />} />
+        
+        <Route path="/login" element={!token ? <Login onLogin={handleLogin} /> : <Navigate to="/app/dashboard" replace />} />
+        
+        <Route path="/register" element={!token ? <Register onLogin={handleLogin} /> : <Navigate to="/app/dashboard" replace />} />
+        
+        <Route path="/app" element={token && currentUser ? <AppShell currentUser={currentUser} onLogout={handleLogout} /> : <Navigate to="/login" replace />}>
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="review" element={<RoleGuard allowedRoles={['admin', 'reviewer']}><Inspector /></RoleGuard>} />
+          <Route path="uploads" element={<RoleGuard allowedRoles={['admin', 'editor']}><Upload /></RoleGuard>} />
+          <Route path="exports" element={<RoleGuard allowedRoles={['admin', 'editor']}><EditorView /></RoleGuard>} />
+          <Route path="*" element={<Navigate to="dashboard" replace />} />
+        </Route>
+        
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
-
-export default App;
