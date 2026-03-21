@@ -12,6 +12,7 @@ import Upload from './Upload';
 import EditorView from './EditorView';
 import UserManagement from './UserManagement';
 import JobMonitor from './JobMonitor';
+import Landing from './Landing';
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
@@ -69,7 +70,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={token && currentUser ? <Navigate to="/app/dashboard" replace /> : <Navigate to="/login" replace />} />
+        <Route path="/" element={<Landing />} />
         
         <Route path="/login" element={!token ? <Login onLogin={handleLogin} /> : <Navigate to="/app/dashboard" replace />} />
         

@@ -1,0 +1,204 @@
+/* landing.css - Styles exclusively for the public marketing homepage */
+
+.landing-page {
+  /* Scope all landing styles so they don't leak into the app */
+  background-color: var(--surface-base);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+  /* Darken the background slightly more for that cinematic feel, if needed, but var(--surface-base) is already `#0d1117` which is great. */
+}
+
+/* ── Typography Scale overrides for Landing ── */
+.landing-page .display-h1 {
+  font-family: var(--font-sans);
+  font-size: clamp(3rem, 8vw, 7.5rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.landing-page .display-h2 {
+  font-family: var(--font-sans);
+  font-size: clamp(2rem, 5vw, 4.5rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.landing-page .display-h3 {
+  font-family: var(--font-sans);
+  font-size: clamp(1.5rem, 3vw, 2.5rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.landing-page .body-large {
+  font-family: var(--font-sans);
+  font-size: clamp(1.125rem, 1.5vw, 1.5rem);
+  line-height: 1.6;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.landing-page .mono-caps {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* ── Container ── */
+.landing-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 var(--space-40);
+}
+
+@media (max-width: 768px) {
+  .landing-container {
+    padding: 0 var(--space-20);
+  }
+}
+
+/* ── Navigation ── */
+.landing-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: var(--space-24) 0;
+  z-index: 100;
+  mix-blend-mode: difference; /* Optional cinematic touch, makes text readable over any background */
+}
+
+.landing-nav-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.landing-logo {
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  color: #fff;
+  text-decoration: none;
+}
+
+.landing-links {
+  display: flex;
+  gap: var(--space-32);
+  align-items: center;
+}
+
+.landing-nav-link {
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* ── Section Rhythm ── */
+.landing-section {
+  padding: 120px 0;
+  position: relative;
+}
+
+.landing-section.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 120px;
+}
+
+/* ── Marquee ── */
+.marquee-wrapper {
+  overflow: hidden;
+  white-space: nowrap;
+  padding: var(--space-64) 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+}
+
+.marquee-content {
+  display: inline-block;
+  font-size: clamp(3rem, 10vw, 8rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--border-strong);
+  animation: marquee 30s linear infinite;
+  padding-right: 2rem;
+}
+
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+
+/* ── Workspace Preview (Act II) ── */
+.preview-window {
+  background: var(--panel-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.preview-header {
+  display: flex;
+  gap: 6px;
+  padding: var(--space-12) var(--space-16);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-base);
+}
+
+.preview-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.preview-body {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--surface-base);
+  border-radius: 0 0 calc(var(--radius-lg) - 4px) calc(var(--radius-lg) - 4px);
+  overflow: hidden;
+}
+
+/* ── Utility ── */
+.btn-launch {
+  background: #fff;
+  color: #000;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: transform 0.2s, opacity 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-launch:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+}
