@@ -98,3 +98,60 @@ def get_user_by_token(token):
             "last_login_at": user.get("last_login_at")
         }
     return None
+
+def get_paginated_users(page=1, limit=20):
+    page = max(1, int(page))
+    limit = max(1, min(int(limit), 200))
+    skip = (page - 1) * limit
+    cursor = users_col.find({}, {"password_hash": 0, "token": 0}).sort("created_at", -1).skip(skip).limit(limit)
+    users = []
+    for u in cursor:
+        u["_id"] = str(u["_id"])
+        users.append(u)
+    total = users_col.count_documents({})
+    return {"users": users, "total": total, "page": page, "limit": limit}
+
+def _get_admin_count():
+    return users_col.count_documents({"role": "admin", "is_active": True})
+
+def update_user_role(target_id, new_role, requester_id):
+    from bson import ObjectId
+    if target_id == requester_id:
+        return {"error": "Cannot change your own role", "status": 403}
+    
+    try:
+        target_obj_id = ObjectId(target_id)
+    except:
+        return {"error": "Invalid user ID", "status": 400}
+        
+    user = users_col.find_one({"_id": target_obj_id})
+    if not user:
+        return {"error": "User not found", "status": 404}
+        
+    if user.get("role") == "admin" and new_role != "admin":
+        if _get_admin_count() <= 1:
+            return {"error": "Cannot downgrade the last active admin", "status": 403}
+            
+    users_col.update_one({"_id": target_obj_id}, {"$set": {"role": new_role}})
+    return {"ok": True, "new_role": new_role}
+
+def update_user_status(target_id, is_active, requester_id):
+    from bson import ObjectId
+    if target_id == requester_id:
+        return {"error": "Cannot deactivate your own account", "status": 403}
+        
+    try:
+        target_obj_id = ObjectId(target_id)
+    except:
+        return {"error": "Invalid user ID", "status": 400}
+        
+    user = users_col.find_one({"_id": target_obj_id})
+    if not user:
+        return {"error": "User not found", "status": 404}
+        
+    if user.get("role") == "admin" and not is_active:
+        if _get_admin_count() <= 1:
+            return {"error": "Cannot deactivate the last active admin", "status": 403}
+            
+    users_col.update_one({"_id": target_obj_id}, {"$set": {"is_active": is_active}})
+    return {"ok": True, "is_active": is_active}

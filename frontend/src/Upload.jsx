@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { UploadCloud, CheckCircle } from 'lucide-react';
+import { UploadCloud, CheckCircle, FileVideo } from 'lucide-react';
 import { API_BASE } from './config';
+import PageHeader from './components/PageHeader';
+import ContentSection from './components/ContentSection';
 
 export default function Upload() {
   const [file, setFile] = useState(null);
@@ -52,7 +54,6 @@ export default function Upload() {
     }
   };
 
-  // Poll for task status
   useEffect(() => {
     let interval;
     if (taskId && taskStatus !== 'SUCCESS' && taskStatus !== 'FAILURE') {
@@ -75,65 +76,77 @@ export default function Upload() {
 
   return (
     <div>
-      <h2>Upload New Video</h2>
-      <p style={{color: 'var(--text-muted)', marginBottom: '2rem'}}>
-        Powered by Celery. Your video will be processed in the background, extracting scenes and thumbnails automatically.
-      </p>
+      <PageHeader 
+        title="Upload Video" 
+        description="Videos will be automatically split into scenes and loaded into the Review Queue for moderation."
+      />
 
-      <div 
-        className={`upload-zone ${file ? 'active' : ''}`}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current.click()}
-      >
-        <UploadCloud size={64} color="var(--accent)" style={{marginBottom: '1rem'}} />
-        {file ? (
-          <h3>{file.name}</h3>
-        ) : (
-          <h3>Drag and drop a video, or click to browse</h3>
+      <ContentSection>
+        <div 
+            className={`upload-zone ${file ? 'active' : ''}`}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current.click()}
+        >
+            <UploadCloud size={48} color="var(--accent)" style={{marginBottom: 'var(--space-16)'}} />
+            {file ? (
+                <div>
+                    <h3 style={{ margin: '0 0 var(--space-8) 0', color: 'var(--accent)' }}>{file.name}</h3>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 'var(--font-small)' }}>{(file.size / 1024 / 1024).toFixed(1)} MB</p>
+                </div>
+            ) : (
+                <div>
+                    <h3 style={{ margin: '0 0 var(--space-8) 0' }}>Drag and drop a video, or click to browse</h3>
+                    <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 'var(--font-small)' }}>Supports MP4, MOV, AVI, MKV formats up to 2GB</p>
+                </div>
+            )}
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                style={{display: 'none'}} 
+                accept="video/mp4,video/x-m4v,video/*"
+                onChange={handleFileChange}
+            />
+        </div>
+
+        {file && !isUploading && taskStatus !== 'SUCCESS' && (
+            <div style={{marginTop: 'var(--space-24)', textAlign: 'center'}}>
+                <button className="btn btn-primary" onClick={uploadVideo} style={{ padding: 'var(--space-12) var(--space-32)', fontSize: '1rem' }}>
+                    Upload & Process Automatically
+                </button>
+            </div>
         )}
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          style={{display: 'none'}} 
-          accept="video/mp4,video/x-m4v,video/*"
-          onChange={handleFileChange}
-        />
-      </div>
 
-      {file && !isUploading && taskStatus !== 'SUCCESS' && (
-        <div style={{marginTop: '2rem', textAlign: 'center'}}>
-          <button className="btn btn-primary" onClick={uploadVideo}>Upload & Process</button>
-        </div>
-      )}
+        {error && <div style={{color: 'var(--danger)', marginTop: 'var(--space-16)', padding: 'var(--space-16)', background: 'rgba(218, 54, 51, 0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(218, 54, 51, 0.2)'}}>{error}</div>}
 
-      {error && <div style={{color: 'var(--danger)', marginTop: '1rem', padding: '1rem', background: 'rgba(218, 54, 51, 0.1)', borderRadius: '8px'}}>{error}</div>}
-
-      {(isUploading || taskStatus) && (
-        <div className="panel" style={{marginTop: '2rem'}}>
-          <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
-            <span style={{fontWeight: '600'}}>
-              {taskStatus === 'SUCCESS' ? 'Completed!' : 'Processing...'}
-            </span>
-            <span style={{color: 'var(--text-muted)'}}>{taskStatus || 'UPLOADING'}</span>
-          </div>
-          
-          <div className="progress-container">
-            <div 
-              className="progress-bar" 
-              style={{
-                width: taskStatus === 'SUCCESS' ? '100%' : (isUploading ? '50%' : '0%'),
-                backgroundColor: taskStatus === 'SUCCESS' ? 'var(--success)' : 'var(--accent)'
-              }}
-            ></div>
-          </div>
-          {taskStatus === 'SUCCESS' && (
-            <p style={{color: 'var(--text-muted)', marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-              <CheckCircle size={18} color="var(--success)" /> Scenes extracted successfully. Go to Inspector to review them.
-            </p>
-          )}
-        </div>
-      )}
+        {(isUploading || taskStatus) && (
+            <div className="panel" style={{marginTop: 'var(--space-24)'}}>
+                <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-8)'}}>
+                    <span style={{fontWeight: '600', color: 'var(--text-primary)'}}>
+                        {taskStatus === 'SUCCESS' ? 'Processing Complete!' : 'Extracting Scenes...'}
+                    </span>
+                    <span style={{color: 'var(--text-secondary)', fontSize: 'var(--font-small)'}}>{taskStatus || 'UPLOADING'}</span>
+                </div>
+                
+                <div className="progress-container">
+                    <div 
+                        className="progress-bar" 
+                        style={{
+                            width: taskStatus === 'SUCCESS' ? '100%' : (isUploading ? '50%' : '0%'),
+                            backgroundColor: taskStatus === 'SUCCESS' ? 'var(--success)' : 'var(--accent)'
+                        }}
+                    ></div>
+                </div>
+                
+                {taskStatus === 'SUCCESS' && (
+                    <div style={{color: 'var(--text-secondary)', marginTop: 'var(--space-16)', display: 'flex', alignItems: 'center', gap: 'var(--space-8)', fontSize: 'var(--font-body)'}}>
+                        <CheckCircle size={18} color="var(--success)" /> 
+                        Scenes extracted successfully. They are now available in the Review Queue.
+                    </div>
+                )}
+            </div>
+        )}
+      </ContentSection>
     </div>
   );
 }

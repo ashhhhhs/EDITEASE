@@ -11,6 +11,8 @@ import Dashboard from './Dashboard';
 import Inspector from './Inspector';
 import Upload from './Upload';
 import EditorView from './EditorView';
+import UserManagement from './UserManagement';
+import JobMonitor from './JobMonitor';
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
@@ -75,8 +77,10 @@ export default function App() {
         <Route path="/register" element={!token ? <Register onLogin={handleLogin} /> : <Navigate to="/app/dashboard" replace />} />
         
         <Route path="/app" element={token && currentUser ? <AppShell currentUser={currentUser} onLogout={handleLogout} /> : <Navigate to="/login" replace />}>
-          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="dashboard" element={<Dashboard currentUser={currentUser} />} />
           <Route path="review" element={<RoleGuard allowedRoles={['admin', 'reviewer']}><Inspector /></RoleGuard>} />
+          <Route path="admin/users" element={<RoleGuard allowedRoles={['admin']}><UserManagement currentUser={currentUser} /></RoleGuard>} />
+          <Route path="admin/jobs" element={<RoleGuard allowedRoles={['admin']}><JobMonitor /></RoleGuard>} />
           <Route path="uploads" element={<RoleGuard allowedRoles={['admin', 'editor']}><Upload /></RoleGuard>} />
           <Route path="exports" element={<RoleGuard allowedRoles={['admin', 'editor']}><EditorView /></RoleGuard>} />
           <Route path="*" element={<Navigate to="dashboard" replace />} />

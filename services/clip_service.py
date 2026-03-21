@@ -71,10 +71,18 @@ def search_clips(filters, limit=100):
     reviewed = filters.get("reviewed")
     if reviewed is not None:
         if isinstance(reviewed, str):
-            if reviewed.lower() in ("true", "false"):
-                q["reviewed"] = (reviewed.lower() == "true")
+            if reviewed.lower() in ("true", "false", "1", "0"):
+                q["reviewed"] = reviewed.lower() in ("true", "1")
         elif isinstance(reviewed, bool):
             q["reviewed"] = reviewed
+
+    uncertain = filters.get("uncertain")
+    if uncertain is not None:
+        if isinstance(uncertain, str):
+            if uncertain.lower() in ("true", "false", "1", "0"):
+                q["uncertain"] = uncertain.lower() in ("true", "1")
+        elif isinstance(uncertain, bool):
+            q["uncertain"] = uncertain
 
     min_duration = filters.get("min_duration")
     max_duration = filters.get("max_duration")
@@ -84,10 +92,47 @@ def search_clips(filters, limit=100):
             q["duration_sec"]["$gte"] = float(min_duration)
         if max_duration is not None:
             q["duration_sec"]["$lte"] = float(max_duration)
+            
+    # Pagination
+    page = max(1, int(filters.get("page", 1)))
+    limit = max(1, min(int(limit), 200)) # Default max 200 via param
+    skip = (page - 1) * limit
 
-    cursor = col.find(q).sort("duration_sec", -1).limit(limit)
+    total = col.count_documents(q)
+    cursor = col.find(q).sort("duration_sec", -1).skip(skip).limit(limit)
     results = [clean_doc(d) for d in cursor]
-    return {"count": len(results), "query": q, "results": results}
+    return {"count": len(results), "total": total, "page": page, "limit": limit, "query": q, "results": results}
+
+def bulk_update_clips(keys, update_data):
+    if not keys:
+        return {"error": "no keys provided"}
+        
+    allowed = {
+        "scene_label",
+        "dominant_emotion_overall",
+        "reviewed",
+        "notes",
+        "manual_scene_label",
+        "manual_emotion",
+        "uncertain",
+    }
+    
+    update_fields = {}
+    for k, v in update_data.items():
+        if k in allowed:
+            if k in ("reviewed", "uncertain") and not isinstance(v, bool):
+                if isinstance(v, str):
+                    update_fields[k] = v.lower() == "true"
+                else:
+                    return {"error": f"{k} must be boolean"}
+            else:
+                update_fields[k] = v
+                
+    if not update_fields:
+        return {"error": "No valid fields provided to update."}
+        
+    res = col.update_many({"_key": {"$in": keys}}, {"$set": update_fields})
+    return {"ok": True, "updated_count": res.modified_count, "fields": update_fields}
 
 def update_clip(video, scene_id, data):
     if not video or scene_id is None:

@@ -122,19 +122,22 @@ def serve_video_clip(clip_id):
     return send_file(path, mimetype="video/mp4")
 
 @app.get("/search")
-@login_required
-def search_scenes():
-    """
-    Search and filter scenes in the database.
-    ---
-    responses:
-      200:
-        description: A list of scenes matching the filters
-    """
-    limit = request.args.get("limit", 100)
-    filters = request.args.to_dict()
-    res = clip_service.search_clips(filters, limit)
-    return jsonify(res)
+@role_required(["admin", "reviewer", "editor"])
+def search():
+    filters = {
+        "scene_label": request.args.get("scene_label"),
+        "emotion": request.args.get("emotion"),
+        "video": request.args.get("video"),
+        "reviewed": request.args.get("reviewed"),
+        "uncertain": request.args.get("uncertain"),
+        "min_duration": request.args.get("min_duration"),
+        "max_duration": request.args.get("max_duration"),
+        "page": request.args.get("page", 1, type=int)
+    }
+    filters = {k: v for k, v in filters.items() if v is not None}
+    limit = request.args.get("limit", 100, type=int)
+    results = clip_service.search_clips(filters, limit=limit)
+    return jsonify(results)
 
 @app.post("/update_scene")
 @role_required(['admin', 'reviewer'])
@@ -253,26 +256,108 @@ def auto_organize():
     })
 
 @app.post("/open_folder")
-@login_required
+@role_required(['admin'])
 def open_folder():
-    """Open a local folder in the system file explorer. [Desktop Only]
-    ---
-    parameters:
-      - name: path
-        in: body
-        type: string
-        required: true
-    responses:
-      200:
-        description: Folder opened
-    """
-    data = request.get_json(force=True)
-    folder_path = data.get("path", "")
+    """Opens a local folder strictly for testing on Windows. Remove in prod."""
+    data = request.get_json(force=True) or {}
+    path = data.get("path")
+    if not path or not os.path.exists(path):
+        return jsonify({"error": "invalid path"}), 400
+    os.startfile(path)
+    return jsonify({"ok": True, "opened": path})
+
+# --- Phase 3 Admin & Operational Endpoints ---
+
+@app.get("/admin/overview")
+@role_required(["admin"])
+def admin_overview():
+    total_users = auth_service.users_col.count_documents({})
+    active_users = auth_service.users_col.count_documents({"is_active": True})
     
-    res = export_service.open_local_folder(folder_path)
+    total_videos = len(clip_service.col.distinct("video"))
+    total_clips = clip_service.col.count_documents({})
+    
+    pending_review = clip_service.col.count_documents({"reviewed": False})
+    uncertain_clips = clip_service.col.count_documents({"uncertain": True})
+    
+    from services.task_service import tasks_col
+    tasks_running = tasks_col.count_documents({"status": {"$in": ["PENDING", "STARTED"]}})
+    tasks_failed = tasks_col.count_documents({"status": "FAILURE"})
+    
+    return jsonify({
+        "total_users": total_users,
+        "active_users": active_users,
+        "total_videos": total_videos,
+        "total_clips": total_clips,
+        "pending_review": pending_review,
+        "uncertain_clips": uncertain_clips,
+        "tasks_running": tasks_running,
+        "tasks_failed": tasks_failed
+    })
+
+@app.get("/admin/users")
+@role_required(["admin"])
+def get_users():
+    page = request.args.get("page", 1, type=int)
+    limit = request.args.get("limit", 20, type=int)
+    return jsonify(auth_service.get_paginated_users(page, limit))
+
+@app.patch("/admin/users/<target_id>/role")
+@role_required(["admin"])
+def update_user_role_ep(target_id):
+    data = request.get_json(force=True) or {}
+    new_role = data.get("role")
+    if new_role not in ["admin", "editor", "reviewer"]:
+        return jsonify({"error": "Invalid role"}), 400
+    
+    res = auth_service.update_user_role(target_id, new_role, str(g.user["id"]))
     if "error" in res:
-        return jsonify(res), 400
+        return jsonify(res), res.get("status", 400)
     return jsonify(res)
 
+@app.patch("/admin/users/<target_id>/status")
+@role_required(["admin"])
+def update_user_status_ep(target_id):
+    data = request.get_json(force=True) or {}
+    is_active = data.get("is_active")
+    if is_active is None:
+        return jsonify({"error": "is_active boolean required"}), 400
+    
+    res = auth_service.update_user_status(target_id, bool(is_active), str(g.user["id"]))
+    if "error" in res:
+        return jsonify(res), res.get("status", 400)
+    return jsonify(res)
+
+@app.get("/admin/jobs")
+@role_required(["admin"])
+def get_jobs():
+    page = request.args.get("page", 1, type=int)
+    limit = request.args.get("limit", 20, type=int)
+    status_filter = request.args.get("status")
+    type_filter = request.args.get("type")
+    
+    from services.task_service import get_paginated_jobs
+    return jsonify(get_paginated_jobs(page, limit, status_filter, type_filter))
+
+@app.get("/admin/jobs/<task_id>")
+@role_required(["admin"])
+def get_job_detail_ep(task_id):
+    from services.task_service import get_job_by_task_id
+    job = get_job_by_task_id(task_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    return jsonify(job)
+
+@app.post("/review/bulk-update")
+@role_required(["admin", "reviewer"])
+def bulk_update_ep():
+    data = request.get_json(force=True) or {}
+    keys = data.get("scene_keys", [])
+    update_data = data.get("update_data", {})
+    
+    if not keys or not update_data:
+        return jsonify({"error": "scene_keys and update_data required"}), 400
+        
+    return jsonify(clip_service.bulk_update_clips(keys, update_data))
 if __name__ == "__main__":
     app.run(host=config.API_HOST, port=config.API_PORT, debug=config.API_DEBUG)

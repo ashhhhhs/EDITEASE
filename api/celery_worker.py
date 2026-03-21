@@ -1,10 +1,19 @@
 import os
 from celery import Celery
+from pymongo import MongoClient
+import datetime
 
 import config
 from utils.logger import setup_logger
 
 logger = setup_logger("celery_worker")
+
+db_client = MongoClient(config.MONGO_URI)
+tasks_col = db_client[config.DB_NAME]["tasks"]
+
+def _update_task(task_id, **kwargs):
+    kwargs["updated_at"] = datetime.datetime.utcnow().isoformat()
+    tasks_col.update_one({"task_id": task_id}, {"$set": kwargs})
 
 # Initialize Celery app
 celery_app = Celery(
@@ -30,15 +39,16 @@ def process_video_task(self, video_path_str: str, base_dir_str: str):
     """
     from pipeline.processing.run_pipeline import process_video
     logger.info(f"Starting Celery task for video: {video_path_str}")
+    _update_task(self.request.id, status="STARTED", progress_step="processing")
     
     try:
-        # In a more advanced setup, you'd report progress back to celery
-        # self.update_state(state='PROGRESS', meta={'current': 10, 'total': 100})
         process_video(video_path_str, base_dir_str)
         logger.info(f"Finished Celery task for video: {video_path_str}")
+        _update_task(self.request.id, status="SUCCESS", progress_step="done")
         return {"status": "success", "video_path": video_path_str}
     except Exception as e:
         logger.error(f"Celery task failed for {video_path_str}: {e}", exc_info=True)
+        _update_task(self.request.id, status="FAILURE", error_message=str(e), progress_step="error")
         raise e
 
 
@@ -56,17 +66,21 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str):
     
     # Step 1: Process video (detect scenes, classify, etc.)
     self.update_state(state='PROGRESS', meta={'step': 'processing', 'message': 'Analyzing video...'})
+    _update_task(self.request.id, status="STARTED", progress_step="processing")
     from pipeline.processing.run_pipeline import process_video
     try:
         process_video(video_path_str, base_dir_str)
     except Exception as e:
         logger.error(f"Processing failed: {e}", exc_info=True)
+        _update_task(self.request.id, status="FAILURE", error_message=str(e), progress_step="error")
         raise e
     
     # Step 2: Read the generated scene index
     self.update_state(state='PROGRESS', meta={'step': 'exporting', 'message': 'Organizing clips...'})
+    _update_task(self.request.id, progress_step="exporting")
     index_path = os.path.join(base_dir_str, "scene_indexes", f"{video_name}_scene_index.json")
     if not os.path.exists(index_path):
+        _update_task(self.request.id, status="FAILURE", error_message="Scene index not generated", progress_step="error")
         return {"status": "error", "message": "Scene index not generated"}
     
     with open(index_path, "r", encoding="utf-8") as f:
@@ -95,8 +109,10 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str):
         logger.info(f"Auto-organize: Copied full video {video_name} to {out_path}")
     except Exception as e:
         logger.error(f"Copy failed for {video_name}: {e}")
+        _update_task(self.request.id, status="FAILURE", error_message=str(e), progress_step="error")
         return {"status": "error", "message": "Failed to copy video"}
     
+    _update_task(self.request.id, status="SUCCESS", progress_step="done", output_path=str(out_path))
     return {
         "status": "success",
         "video": video_name,

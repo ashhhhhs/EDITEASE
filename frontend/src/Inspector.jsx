@@ -1,298 +1,263 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ChevronLeft, ChevronRight, Download, Save, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckSquare, Search, Save, Settings2, Video, Square, CheckSquare as CheckSquareIcon, ListFilter } from 'lucide-react';
 import { API_BASE } from './config';
 import { SCENE_LABELS, EMOTIONS } from './constants';
-
-const PAGE_SIZE = 9;
+import PageHeader from './components/PageHeader';
+import LoadingState from './components/LoadingState';
+import EmptyState from './components/EmptyState';
 
 export default function Inspector() {
   const [clips, setClips] = useState([]);
-  const [selectedClip, setSelectedClip] = useState(null);
   const [page, setPage] = useState(1);
-  const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [total, setTotal] = useState(0);
+  const limit = 24;
+  const [loading, setLoading] = useState(true);
   
   // Filters
-  const [labelFilter, setLabelFilter] = useState('');
-  const [reviewedFilter, setReviewedFilter] = useState('');
-  const [videoFilter, setVideoFilter] = useState('');
-
-  // Editing state
-  const [editLabel, setEditLabel] = useState('');
-  const [editEmotion, setEditEmotion] = useState('');
-  const [editReviewed, setEditReviewed] = useState(false);
-  const [editNotes, setEditNotes] = useState('');
+  const [fLabel, setFLabel] = useState('');
+  const [fEmotion, setFEmotion] = useState('');
+  const [fReviewed, setFReviewed] = useState('false'); // default to unreviewed
+  const [fUncertain, setFUncertain] = useState('');
+  
+  // Selection
+  const [selectedKeys, setSelectedKeys] = useState(new Set());
+  
+  // Bulk Actions form
+  const [bLabel, setBLabel] = useState('');
+  const [bEmotion, setBEmotion] = useState('');
+  const [bReviewed, setBReviewed] = useState('');
+  const [bUncertain, setBUncertain] = useState('');
 
   const fetchClips = async () => {
+    setLoading(true);
     try {
-      let url = `${API_BASE}/search?limit=500`;
-      if (labelFilter) url += `&scene_label=${labelFilter}`;
-      if (reviewedFilter) url += `&reviewed=${reviewedFilter}`;
-      if (videoFilter.trim()) url += `&video=${videoFilter.trim()}`;
+      let url = `${API_BASE}/search?page=${page}&limit=${limit}`;
+      if (fLabel) url += `&scene_label=${fLabel}`;
+      if (fEmotion) url += `&emotion=${fEmotion}`;
+      if (fReviewed) url += `&reviewed=${fReviewed}`;
+      if (fUncertain) url += `&uncertain=${fUncertain}`;
 
       const res = await axios.get(url);
       setClips(res.data.results || []);
+      setTotal(res.data.total || 0);
+      setSelectedKeys(new Set());
+    } catch (err) {
+      console.error(err);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchClips(); }, [page]);
+
+  const handleSearchClick = () => {
       setPage(1);
-    } catch (err) {
-      console.error(err);
+      fetchClips();
+  };
+
+  const toggleSelect = (key) => {
+    const newKeys = new Set(selectedKeys);
+    if (newKeys.has(key)) newKeys.delete(key);
+    else newKeys.add(key);
+    setSelectedKeys(newKeys);
+  };
+  
+  const toggleAll = () => {
+    if (selectedKeys.size === clips.length && clips.length > 0) {
+        setSelectedKeys(new Set());
+    } else {
+        setSelectedKeys(new Set(clips.map(c => `${c.video}::${c.scene_id}`)));
     }
   };
 
-  useEffect(() => { fetchClips(); }, []);
-
-  const totalPages = Math.max(1, Math.ceil(clips.length / PAGE_SIZE));
-  const pageClips = clips.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const selectClip = (clip) => {
-    setSelectedClip(clip);
-    setEditLabel(clip.scene_label || 'other');
-    setEditEmotion(clip.dominant_emotion_overall || 'null');
-    setEditReviewed(clip.reviewed || false);
-    setEditNotes(clip.notes || '');
-    setSaveSuccess(false);
-  };
-
-  const saveClip = async () => {
-    if (!selectedClip) return;
-    setSaving(true);
-    setSaveSuccess(false);
-    try {
-      const payload = {
-        video: selectedClip.video,
-        scene_id: selectedClip.scene_id,
-        scene_label: editLabel,
-        dominant_emotion_overall: editEmotion === 'null' ? null : editEmotion,
-        reviewed: editReviewed,
-        notes: editNotes
-      };
-      await axios.post(`${API_BASE}/update_scene`, payload);
+  const handleBulkUpdate = async () => {
+      if (selectedKeys.size === 0) return alert('No clips selected');
+      const updateData = {};
+      if (bLabel) updateData.scene_label = bLabel;
+      if (bEmotion) updateData.dominant_emotion_overall = bEmotion === 'null' ? null : bEmotion;
+      if (bReviewed) updateData.reviewed = bReviewed === 'true';
+      if (bUncertain) updateData.uncertain = bUncertain === 'true';
       
-      setClips(prev => prev.map(c => {
-        if (c.video === selectedClip.video && c.scene_id === selectedClip.scene_id) {
-          return { ...c, ...payload };
-        }
-        return c;
-      }));
-      setSelectedClip({ ...selectedClip, ...payload });
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
-    } catch (err) {
-      console.error(err);
-      alert('Save failed: ' + (err.response?.data?.error || err.message));
-    }
-    setSaving(false);
+      if (Object.keys(updateData).length === 0) return alert('Select an action to apply');
+      
+      try {
+          await axios.post(`${API_BASE}/review/bulk-update`, {
+              scene_keys: Array.from(selectedKeys),
+              update_data: updateData
+          });
+          setBLabel(''); setBEmotion(''); setBReviewed(''); setBUncertain('');
+          fetchClips();
+      } catch (err) {
+          alert('Bulk update failed: ' + (err.response?.data?.error || err.message));
+      }
   };
 
-  const exportClip = async () => {
-    if (!selectedClip) return;
-    try {
-      const res = await axios.post(`${API_BASE}/export`, {
-        video: selectedClip.video,
-        scene_id: selectedClip.scene_id
-      });
-      alert(`Exported full video to: ${res.data.output_path}\nDominant scene type: ${res.data.scene_label}`);
-    } catch (err) {
-      alert('Export failed');
-    }
-  };
-
-  const handleBulkExport = async () => {
-    let query = {};
-    if (labelFilter) query.scene_label = labelFilter;
-    if (reviewedFilter) query.reviewed = reviewedFilter;
-    try {
-      const res = await axios.post(`${API_BASE}/export_batch`, query);
-      alert(`Export Done! ${res.data.exported_count} success, ${res.data.failed_count} failed.`);
-    } catch (err) {
-      alert('Export failed.');
-    }
-  };
-
-  const thumbUrl = (clip) => {
-    if (!clip?._id) return null;
-    return `${API_BASE}/thumbnail/${clip._id}`;
-  };
-
-  const videoUrl = (clip) => {
-    if (!clip?._id) return null;
-    return `${API_BASE}/video_clip/${clip._id}`;
-  };
+  const totalPages = Math.ceil(total / limit) || 1;
+  const thumbUrl = (clip) => clip?._id ? `${API_BASE}/thumbnail/${clip._id}` : null;
 
   return (
-    <div className="inspector-layout">
-      
-      {/* Grid Area */}
-      <div className="inspector-grid">
-        {/* Filter Bar */}
-        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '140px' }}>
-            <label style={{fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem', display: 'block'}}>Scene Type</label>
-            <select value={labelFilter} onChange={e => setLabelFilter(e.target.value)}>
-              <option value="">All Types</option>
-              {SCENE_LABELS.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
-          </div>
-          <div style={{ flex: 1, minWidth: '140px' }}>
-            <label style={{fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem', display: 'block'}}>Review Status</label>
-            <select value={reviewedFilter} onChange={e => setReviewedFilter(e.target.value)}>
-              <option value="">All</option>
-              <option value="true">Reviewed</option>
-              <option value="false">Unreviewed</option>
-            </select>
-          </div>
-          <div style={{ flex: 1, minWidth: '140px' }}>
-            <label style={{fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem', display: 'block'}}>Video Name</label>
-            <input value={videoFilter} onChange={e => setVideoFilter(e.target.value)} placeholder="Filter..." />
-          </div>
-          <button className="btn btn-primary" onClick={fetchClips} style={{height: '38px'}}>
-            <Search size={16} /> Search
-          </button>
-          <button className="btn" onClick={handleBulkExport} style={{height: '38px'}}>
-            <Download size={16} /> Export All
-          </button>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <PageHeader 
+        title="Moderation Queue" 
+        description="Filter entirely through extracted scenes to classify, approve, or mark uncertain batches of data directly from the system."
+      />
 
-        {/* Stats Bar */}
-        <div style={{display: 'flex', gap: '1.5rem', marginBottom: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem'}}>
-          <span><strong style={{color: 'var(--text-main)'}}>{clips.length}</strong> clips</span>
-          <span><strong style={{color: 'var(--success)'}}>{clips.filter(c => c.reviewed).length}</strong> reviewed</span>
-          <span>Page <strong style={{color: 'var(--text-main)'}}>{page}/{totalPages}</strong></span>
-        </div>
-
-        {/* Clip Grid */}
-        <div className="clip-grid">
-          {pageClips.map(clip => {
-            const isSelected = selectedClip?.video === clip.video && selectedClip?.scene_id === clip.scene_id;
-            const thumb = thumbUrl(clip);
-            return (
-              <div 
-                key={`${clip.video}_${clip.scene_id}`} 
-                className={`clip-card ${isSelected ? 'selected' : ''}`}
-                onClick={() => selectClip(clip)}
-              >
-                {thumb ? (
-                  <img 
-                    src={thumb} 
-                    alt={`${clip.video} scene ${clip.scene_id}`} 
-                    className="clip-thumb"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="clip-thumb" style={{display: 'flex', alignItems: 'center', justifyContent:'center', color: '#555', fontSize: '0.85rem'}}>
-                    No Thumbnail
-                  </div>
-                )}
-                <div className="clip-info">
-                  <div className="clip-title">{clip.video}</div>
-                  <div className="clip-meta">Scene {clip.scene_id} • {clip.duration_sec?.toFixed(1)}s</div>
-                  {clip.reviewed && <span className="badge reviewed">✓ Reviewed</span>}
-                  <span className="badge">{clip.scene_label || 'other'}</span>
-                  {clip.dominant_emotion_overall && <span className="badge">{clip.dominant_emotion_overall}</span>}
+      <div style={{ display: 'flex', gap: 'var(--space-32)', flex: 1, overflow: 'hidden' }}>
+        
+        {/* Sidebar Controls */}
+        <div className="panel" style={{ width: '320px', padding: 'var(--space-24)', display: 'flex', flexDirection: 'column', gap: 'var(--space-32)', flexShrink: 0, overflowY: 'auto' }}>
+            
+            {/* Filters Section */}
+            <div>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)', marginBottom: 'var(--space-16)', fontSize: 'var(--font-body)', fontWeight: 600 }}><ListFilter size={18} color="var(--text-secondary)" /> Search Filters</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-16)' }}>
+                    <div>
+                        <label style={{ display: 'block', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>Review Status</label>
+                        <select className="styled-input" value={fReviewed} onChange={e => setFReviewed(e.target.value)}>
+                            <option value="">All</option>
+                            <option value="true">Reviewed</option>
+                            <option value="false">Unreviewed (Pending)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>Uncertainty</label>
+                        <select className="styled-input" value={fUncertain} onChange={e => setFUncertain(e.target.value)}>
+                            <option value="">All</option>
+                            <option value="true">Flagged Uncertain</option>
+                            <option value="false">Confident</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>Scene Type</label>
+                        <select className="styled-input" value={fLabel} onChange={e => setFLabel(e.target.value)}>
+                            <option value="">All Types</option>
+                            {SCENE_LABELS.map(l => <option key={l} value={l}>{l}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>Emotion</label>
+                        <select className="styled-input" value={fEmotion} onChange={e => setFEmotion(e.target.value)}>
+                            <option value="">All Emotions</option>
+                            {EMOTIONS.map(e => <option key={e} value={e}>{e === 'null' ? 'None' : e}</option>)}
+                        </select>
+                    </div>
+                    <button className="btn btn-primary" onClick={handleSearchClick} style={{ marginTop: 'var(--space-8)' }}><Search size={16} /> Apply Filters</button>
                 </div>
-              </div>
-            );
-          })}
+            </div>
+
+            <hr style={{ border: 0, borderTop: '1px solid var(--border-subtle)', margin: 0 }} />
+
+            {/* Bulk Actions Section */}
+            <div style={{ opacity: selectedKeys.size > 0 ? 1 : 0.5, pointerEvents: selectedKeys.size > 0 ? 'auto' : 'none', transition: 'opacity 0.2s' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)', marginBottom: 'var(--space-16)', fontSize: 'var(--font-body)', fontWeight: 600, color: selectedKeys.size > 0 ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                    <Settings2 size={18} /> Batch Actions {selectedKeys.size > 0 && <span className="badge info" style={{ padding: '2px 6px', fontSize: '0.65rem' }}>{selectedKeys.size}</span>}
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-12)' }}>
+                    <div>
+                        <label style={{ display: 'block', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>Override Status</label>
+                        <select className="styled-input" value={bReviewed} onChange={e => setBReviewed(e.target.value)}>
+                            <option value="">-- No Change --</option>
+                            <option value="true">Mark as Reviewed</option>
+                            <option value="false">Mark as Unreviewed</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>Override Uncertainty</label>
+                        <select className="styled-input" value={bUncertain} onChange={e => setBUncertain(e.target.value)}>
+                            <option value="">-- No Change --</option>
+                            <option value="true">Flag as Uncertain</option>
+                            <option value="false">Remove Flag</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>Assign Scene Type</label>
+                        <select className="styled-input" value={bLabel} onChange={e => setBLabel(e.target.value)}>
+                            <option value="">-- No Change --</option>
+                            {SCENE_LABELS.map(l => <option key={l} value={l}>{l}</option>)}
+                        </select>
+                    </div>
+                    <button className="styled-button" onClick={handleBulkUpdate} style={{ marginTop: 'var(--space-8)', background: 'var(--accent)', color: '#fff', borderColor: 'transparent' }}>
+                        <Save size={16} /> Execute Batch Update
+                    </button>
+                </div>
+            </div>
+
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '2rem'}}>
-            <button className="btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>
-              <ChevronLeft size={18} /> Prev
-            </button>
-            <span style={{color: 'var(--text-muted)'}}>
-              {page} / {totalPages}
-            </span>
-            <button className="btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
-              Next <ChevronRight size={18} />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Inspector Panel */}
-      <div className="inspector-panel">
-        {selectedClip ? (
-          <>
-            <h3 style={{marginBottom: '0.25rem'}}>{selectedClip.video}</h3>
-            <p style={{color: 'var(--text-muted)', marginBottom: '0.75rem', fontSize: '0.9rem'}}>
-              Scene {selectedClip.scene_id} • {selectedClip.start_sec?.toFixed(2)}s → {selectedClip.end_sec?.toFixed(2)}s • {selectedClip.duration_sec?.toFixed(1)}s
-            </p>
-
-            {/* Thumbnail Preview */}
-            {thumbUrl(selectedClip) && (
-              <img 
-                src={thumbUrl(selectedClip)} 
-                alt="Scene thumbnail" 
-                style={{width: '100%', borderRadius: '8px', marginBottom: '1rem', border: '1px solid var(--border-color)'}}
-              />
-            )}
-
-            {/* Video Preview */}
-            {videoUrl(selectedClip) && (
-              <video 
-                src={`${videoUrl(selectedClip)}#t=${selectedClip.start_sec},${selectedClip.end_sec}`}
-                controls 
-                style={{width: '100%', borderRadius: '8px', marginBottom: '1rem', border: '1px solid var(--border-color)'}}
-              />
-            )}
-
-            <div className="form-group">
-              <label>Scene Type</label>
-              <select value={editLabel} onChange={e => setEditLabel(e.target.value)}>
-                {SCENE_LABELS.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
+        {/* Main Grid Area */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-20)', paddingBottom: 'var(--space-16)', borderBottom: '1px solid var(--border-subtle)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-16)' }}>
+                    <button onClick={toggleAll} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 'var(--space-8)', fontWeight: 500 }}>
+                        {selectedKeys.size === clips.length && clips.length > 0 ? <CheckSquareIcon size={20} color="var(--accent)" /> : <Square size={20} color="var(--text-secondary)" />} Select All
+                    </button>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-small)' }}>{total} results found</span>
+                </div>
+                
+                <div style={{ display: 'flex', gap: 'var(--space-16)', alignItems: 'center' }}>
+                    <button className="btn" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+                        <ChevronLeft size={16} /> Prev
+                    </button>
+                    <span style={{ fontSize: 'var(--font-small)', color: 'var(--text-secondary)' }}>Page {page} of {totalPages}</span>
+                    <button className="btn" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+                        Next <ChevronRight size={16} />
+                    </button>
+                </div>
             </div>
 
-            <div className="form-group">
-              <label>Emotion</label>
-              <select value={editEmotion} onChange={e => setEditEmotion(e.target.value)}>
-                {EMOTIONS.map(e => <option key={e} value={e}>{e === 'null' ? 'None' : e}</option>)}
-              </select>
+            <div style={{ flex: 1, overflowY: 'auto', paddingRight: 'var(--space-8)', paddingBottom: 'var(--space-32)' }}>
+                {loading ? (
+                    <LoadingState type="grid" />
+                ) : clips.length === 0 ? (
+                    <EmptyState icon={Search} title="No Clips Found" message="Try adjusting your filters or search terms." />
+                ) : (
+                    <div className="clip-grid">
+                        {clips.map(clip => {
+                            const key = `${clip.video}::${clip.scene_id}`;
+                            const isSelected = selectedKeys.has(key);
+                            const thumb = thumbUrl(clip);
+                            
+                            return (
+                                <div 
+                                    key={key} 
+                                    className={`clip-card ${isSelected ? 'selected' : ''}`}
+                                    onClick={() => toggleSelect(key)}
+                                >
+                                    <div style={{ position: 'absolute', top: 'var(--space-8)', left: 'var(--space-8)', zIndex: 10 }}>
+                                        {isSelected ? <CheckSquareIcon size={22} color="var(--accent)" fill="var(--surface-base)" /> : <Square size={22} color="#fff" style={{filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))'}} />}
+                                    </div>
+                                    {thumb ? (
+                                        <img src={thumb} alt={key} className="clip-thumb" loading="lazy" />
+                                    ) : (
+                                        <div className="clip-thumb" style={{display: 'flex', alignItems: 'center', justifyContent:'center', color: 'var(--text-muted)'}}><Video size={32} /></div>
+                                    )}
+                                    <div className="clip-info">
+                                        <div className="clip-title">{clip.video}</div>
+                                        <div className="clip-meta" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-4)' }}>
+                                            <span>Scene {clip.scene_id}</span>
+                                            <span>{clip.duration_sec?.toFixed(1)}s</span>
+                                        </div>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: 'var(--space-12)' }}>
+                                            <span className="badge" style={{ padding: '2px 8px', fontSize: '0.65rem' }}>{clip.scene_label || 'other'}</span>
+                                            {clip.reviewed ? (
+                                                <span className="badge success" style={{ padding: '2px 8px', fontSize: '0.65rem' }}>Reviewed</span>
+                                            ) : (
+                                                <span className="badge danger" style={{ padding: '2px 8px', fontSize: '0.65rem' }}>Pending</span>
+                                            )}
+                                            {clip.uncertain && (
+                                                <span className="badge warning" style={{ padding: '2px 8px', fontSize: '0.65rem' }}>Uncertain</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
-            <div className="form-group" style={{display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer'}}>
-              <input 
-                type="checkbox" 
-                id="rev"
-                checked={editReviewed} 
-                onChange={e => setEditReviewed(e.target.checked)} 
-                style={{width: 'auto'}}
-              />
-              <label htmlFor="rev" style={{margin: 0, cursor: 'pointer'}}>Reviewed & Approved</label>
-            </div>
-
-            <div className="form-group" style={{flex: 1}}>
-              <label>Notes</label>
-              <textarea 
-                value={editNotes} 
-                onChange={e => setEditNotes(e.target.value)} 
-                style={{height: '80px'}}
-                placeholder="Add notes about this scene..."
-              />
-            </div>
-
-            <div style={{display: 'flex', gap: '0.75rem', marginTop: 'auto'}}>
-              <button 
-                className={`btn ${saveSuccess ? 'btn-success' : 'btn-primary'}`} 
-                onClick={saveClip} 
-                disabled={saving}
-                style={{flex: 1}}
-              >
-                <Save size={16} /> {saving ? 'Saving...' : saveSuccess ? 'Saved ✓' : 'Save'}
-              </button>
-              <button className="btn" onClick={exportClip} style={{flex: 1}}>
-                <Download size={16} /> Export Full Video
-              </button>
-            </div>
-          </>
-        ) : (
-          <div style={{color: 'var(--text-muted)', textAlign: 'center', marginTop: '5rem'}}>
-            <p style={{fontSize: '1.1rem', marginBottom: '0.5rem'}}>No clip selected</p>
-            <p>Click a card to inspect and review it.</p>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
