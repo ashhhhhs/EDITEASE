@@ -1,34 +1,49 @@
 import React from 'react';
 
+/**
+ * Editorial PageHeader — Danik Bartolini composition style.
+ * Title slides up from a mask reveal. Subtitle fades in with delay.
+ * Optionally shows breadcrumb/description in small-caps on the side.
+ */
 export default function PageHeader({ title, description, actions, breadcrumbs }) {
   return (
-    <div style={{ marginBottom: 'var(--space-32)', display: 'flex', flexDirection: 'column', gap: 'var(--space-16)' }}>
-      {breadcrumbs && (
-        <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)', display: 'flex', gap: 'var(--space-8)' }}>
-          {breadcrumbs.map((crumb, idx) => (
-            <span key={idx}>
-              {crumb} {idx < breadcrumbs.length - 1 && <span style={{ margin: '0 4px' }}>/</span>}
-            </span>
-          ))}
-        </div>
-      )}
-      
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 'var(--space-16)' }}>
-        <div>
-          <h1 style={{ margin: 0, lineHeight: 1.2 }}>{title}</h1>
-          {description && (
-            <p style={{ margin: 'var(--space-8) 0 0 0', color: 'var(--text-secondary)', fontSize: 'var(--font-body)', maxWidth: '600px' }}>
-              {description}
-            </p>
+    <header style={{
+      paddingBottom: 'var(--space-40)',
+      marginBottom: 'var(--space-40)',
+      borderBottom: '1px solid var(--border-subtle)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 'var(--space-16)',
+    }}>
+      {/* Top row: breadcrumbs + actions */}
+      {(breadcrumbs || actions) && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {breadcrumbs && (
+            <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)', display: 'flex', gap: 'var(--space-8)', alignItems: 'center' }}>
+              {breadcrumbs}
+            </div>
+          )}
+          {actions && (
+            <div style={{ display: 'flex', gap: 'var(--space-12)', alignItems: 'center', marginLeft: 'auto' }}>
+              {actions}
+            </div>
           )}
         </div>
-        
-        {actions && (
-          <div style={{ display: 'flex', gap: 'var(--space-12)', alignItems: 'center' }}>
-            {actions}
-          </div>
-        )}
+      )}
+
+      {/* Display title with mask reveal */}
+      <div style={{ overflow: 'hidden' }}>
+        <h1 className="display-title reveal-text d1">
+          {title}
+        </h1>
       </div>
-    </div>
+
+      {/* Description as editorial subtitle */}
+      {description && (
+        <p className="display-subtitle reveal-text d2" style={{ animationDelay: '0.18s' }}>
+          {description}
+        </p>
+      )}
+    </header>
   );
 }

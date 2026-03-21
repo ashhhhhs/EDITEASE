@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import axios from 'axios';
-import { API_BASE } from './config';
+import api from './lib/api';
 
 import Login from './Login';
 import Register from './Register';
@@ -21,7 +20,7 @@ export default function App() {
 
   useEffect(() => {
     if (token) {
-      axios.get(`${API_BASE}/me`)
+      api.get('/me')
         .then(res => {
           setCurrentUser(res.data.user);
           setIsAuthLoading(false);
@@ -46,7 +45,7 @@ export default function App() {
   const handleLogout = async () => {
     if (token) {
       try {
-        await axios.post(`${API_BASE}/logout`);
+        await api.post('/logout');
       } catch (e) {
         // ignore
       }

@@ -4,7 +4,6 @@ import { LayoutDashboard, UploadCloud, Grid, Wand2, Shield, LogOut, CheckSquare,
 
 export default function AppShell({ currentUser, onLogout }) {
   const location = useLocation();
-
   const role = currentUser?.role || 'editor';
 
   const navItems = [
@@ -17,61 +16,94 @@ export default function AppShell({ currentUser, onLogout }) {
   ];
 
   const visibleNav = navItems.filter(item => item.roles.includes(role));
+  const activeNav = visibleNav.find(n => location.pathname.startsWith(n.path));
 
   return (
     <div className="app-container">
-      {/* Sidebar */}
       <div className="sidebar">
-        <h1><Wand2 size={24} color="var(--accent)" /> EditEase</h1>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)', marginBottom: 'var(--space-32)' }}>
+          <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: 'rgba(88,166,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(88,166,255,0.2)' }}>
+            <Wand2 size={18} color="var(--accent)" />
+          </div>
+          <span style={{ fontWeight: 700, fontSize: 'var(--font-title-card)', letterSpacing: '-0.01em' }}>EditEase</span>
+        </div>
 
-        <div style={{color: 'var(--text-muted)', fontSize: 'var(--font-meta)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: 'var(--space-8) var(--space-16)', marginBottom: 'var(--space-4)'}}>
+        <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-meta)', textTransform: 'uppercase', letterSpacing: '0.07em', padding: '0 var(--space-16)', marginBottom: 'var(--space-8)' }}>
           Navigation
         </div>
 
-        {visibleNav.map(item => (
-          <Link 
-            to={item.path} 
-            key={item.path} 
-            className={`nav-item ${location.pathname.startsWith(item.path) ? 'active' : ''}`}
-          >
-            <item.icon size={20} /> {item.name}
-          </Link>
-        ))}
+        <nav style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          {visibleNav.map((item, idx) => {
+            const isActive = location.pathname.startsWith(item.path);
+            return (
+              <Link
+                to={item.path}
+                key={item.path}
+                className={`nav-item stagger-item link-draw ${isActive ? 'active' : ''}`}
+                style={{ position: 'relative', overflow: 'hidden', animationDelay: `${idx * 0.06}s` }}
+              >
+                {isActive && (
+                  <span style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 3,
+                    background: 'var(--accent)',
+                    borderRadius: '0 2px 2px 0',
+                    animation: 'fadeIn 0.2s ease'
+                  }} />
+                )}
+                <item.icon size={18} />
+                {item.name}
+              </Link>
+            );
+          })}
+        </nav>
 
-        {/* Bottom account info */}
-        <div style={{marginTop: 'auto', paddingTop: 'var(--space-16)', borderTop: '1px solid var(--border-subtle)'}}>
-          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-12)'}}>
-            <div style={{display: 'flex', alignItems: 'center', gap: 'var(--space-8)', color: 'var(--text-secondary)', fontSize: 'var(--font-small)', textTransform: 'capitalize'}}>
-              <Shield size={16} />
-              {role}
+        {/* Bottom account */}
+        <div style={{ marginTop: 'auto', paddingTop: 'var(--space-16)', borderTop: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-12)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)', color: 'var(--text-secondary)', fontSize: 'var(--font-small)', textTransform: 'capitalize' }}>
+              <Shield size={14} /> {role}
             </div>
-            <button 
+            <button
               onClick={onLogout}
-              style={{background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', fontSize: 'var(--font-small)', padding: 'var(--space-4)', borderRadius: 'var(--radius-sm)'}}
+              style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', fontSize: 'var(--font-small)', padding: 'var(--space-4)', borderRadius: 'var(--radius-sm)', transition: 'opacity 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
-              <LogOut size={16} /> Logout
+              <LogOut size={14} /> Logout
             </button>
           </div>
-          
-          <div style={{display: 'flex', alignItems: 'center', gap: 'var(--space-12)', overflow: 'hidden', padding: 'var(--space-8)', background: 'var(--surface-base)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)'}}>
-             <div style={{minWidth: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent), #1f6feb)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 'var(--font-body)', fontWeight: '600'}}>
-               {currentUser.username.charAt(0).toUpperCase()}
-             </div>
-             <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 'var(--font-small)', fontWeight: '500', color: 'var(--text-primary)' }}>{currentUser.name || currentUser.username}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)', overflow: 'hidden', padding: 'var(--space-8)', background: 'var(--surface-base)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+            <div style={{ minWidth: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent) 0%, #1f6feb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 'var(--font-body)', flexShrink: 0 }}>
+              {currentUser.username.charAt(0).toUpperCase()}
+            </div>
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{ fontWeight: 500, fontSize: 'var(--font-small)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {currentUser.name || currentUser.username}
+              </div>
+              <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                {role}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Top bar + content */}
       <div className="main-wrapper">
-        <div style={{ height: '64px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', padding: '0 var(--space-40)', justifyContent: 'space-between', backgroundColor: 'var(--surface-panel)' }}>
-          <h2 style={{ fontSize: 'var(--font-title-card)', margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>
-            {visibleNav.find(n => location.pathname.startsWith(n.path))?.name || 'Dashboard'}
-          </h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-16)' }}>
-            <span className="badge info" style={{ margin: 0 }}>Role: {role}</span>
-          </div>
+        <div style={{ height: 56, borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', padding: '0 var(--space-40)', justifyContent: 'space-between', backgroundColor: 'var(--surface-panel)', flexShrink: 0 }}>
+          <span style={{ fontWeight: 600, fontSize: 'var(--font-title-card)', letterSpacing: '-0.01em' }}>
+            {activeNav?.name || 'Dashboard'}
+          </span>
+          <span className="badge info" style={{ margin: 0 }}>
+            {role}
+          </span>
         </div>
-        
+
         <div className="main-content">
           <Outlet />
         </div>
