@@ -1,0 +1,263 @@
+[
+  {
+    "video": "asha",
+    "video_path": "D:\\EDITEASE\\data\\asha.mp4",
+    "scene_id": 1,
+    "start_sec": 0.0,
+    "end_sec": 3.625,
+    "duration_sec": 3.625,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\asha\\asha_scene_001.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 3,
+      "largest_face_ratio": 0.0006077594521604939,
+      "motion_score": 0.04965048565722585,
+      "edge_density": 0.01296778549382716,
+      "sharpness": 32.62605095003775,
+      "text_density": 17.156153549175876
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.75
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 95.33805847167969
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 63.030046224594116
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 95.92301845550537
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      }
+    ],
+    "created_at": "2026-03-07T23:59:01.227999",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "asha",
+    "video_path": "D:\\EDITEASE\\data\\asha.mp4",
+    "scene_id": 2,
+    "start_sec": 3.625,
+    "end_sec": 8.75,
+    "duration_sec": 5.125,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\asha\\asha_scene_002.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "sad",
+    "scene_label": "other",
+    "dominant_emotion_overall": "sad",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 2,
+      "largest_face_ratio": 0.0012543402777777778,
+      "motion_score": 0.08786020334059551,
+      "edge_density": 0.00992380401234568,
+      "sharpness": 70.33878206931601,
+      "text_density": 16.89091435164821
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 65.54528289493527
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 85.0365936756134
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 53.22876572608948
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 64.3026053905487
+      }
+    ],
+    "created_at": "2026-03-07T23:59:16.275566",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "asha",
+    "video_path": "D:\\EDITEASE\\data\\asha.mp4",
+    "scene_id": 3,
+    "start_sec": 8.75,
+    "end_sec": 11.208,
+    "duration_sec": 2.458,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\asha\\asha_scene_003.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 3,
+      "largest_face_ratio": 0.0020375192901234567,
+      "motion_score": 0.060155194716775606,
+      "edge_density": 0.005089578510802469,
+      "sharpness": 13.456225646218577,
+      "text_density": 12.116608796150214
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 99.39157366752625
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 84.95738089592685
+      }
+    ],
+    "created_at": "2026-03-07T23:59:37.043545",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "asha",
+    "video_path": "D:\\EDITEASE\\data\\asha.mp4",
+    "scene_id": 4,
+    "start_sec": 11.208,
+    "end_sec": 15.25,
+    "duration_sec": 4.042,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\asha\\asha_scene_004.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-07T23:59:50.871873",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "asha",
+    "video_path": "D:\\EDITEASE\\data\\asha.mp4",
+    "scene_id": 5,
+    "start_sec": 15.25,
+    "end_sec": 19.167,
+    "duration_sec": 3.917,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\asha\\asha_scene_005.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-07T23:59:58.660190",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "asha",
+    "video_path": "D:\\EDITEASE\\data\\asha.mp4",
+    "scene_id": 6,
+    "start_sec": 19.167,
+    "end_sec": 19.208,
+    "duration_sec": 0.042,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\asha\\asha_scene_006.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-08T00:00:03.260064",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  }
+]

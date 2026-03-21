@@ -1,0 +1,60 @@
+[
+  {
+    "video": "C1347",
+    "video_path": "D:\\EDITEASE\\editease_app\\data\\C1347.MP4",
+    "scene_id": 1,
+    "start_sec": 0.0,
+    "end_sec": 3.504,
+    "duration_sec": 3.504,
+    "thumbnail": "D:\\EDITEASE\\editease_app\\thumbnails\\C1347\\C1347_scene_001.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "fear",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "fear",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 3,
+      "largest_face_ratio": 0.0029340277777777776,
+      "motion_score": 0.04461638752723311,
+      "edge_density": 0.004158468364197531,
+      "sharpness": 12.947799720062434,
+      "text_density": 26.451581789804546
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 50.07844567298889
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 99.82426166534424
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 95.56462221567367
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 58.02618014968515
+      }
+    ],
+    "created_at": "2026-02-08T12:10:19.405858",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  }
+]

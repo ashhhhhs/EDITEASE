@@ -1,0 +1,60 @@
+[
+  {
+    "video": "C4803",
+    "video_path": "D:\\EDITEASE\\editease_app\\data\\C4803.MP4",
+    "scene_id": 1,
+    "start_sec": 0.0,
+    "end_sec": 13.013,
+    "duration_sec": 13.013,
+    "thumbnail": "D:\\EDITEASE\\editease_app\\thumbnails\\C4803\\C4803_scene_001.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "angry",
+    "scene_label": "other",
+    "dominant_emotion_overall": "angry",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 1,
+      "largest_face_ratio": 0.009633058984910837,
+      "motion_score": 0.08580841503267975,
+      "edge_density": 0.007253943758573388,
+      "sharpness": 19.5451199807575,
+      "text_density": 77.16049382054523
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 99.9998927116394
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "angry",
+        "confidence": 99.99204874038696
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "angry",
+        "confidence": 99.98283982174634
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "angry",
+        "confidence": 98.16302679025807
+      }
+    ],
+    "created_at": "2026-02-08T12:21:16.954692",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  }
+]

@@ -1,0 +1,118 @@
+[
+  {
+    "video": "C0479",
+    "video_path": "D:\\EDITEASE\\editease_app\\data\\C0479.MP4",
+    "scene_id": 1,
+    "start_sec": 0.0,
+    "end_sec": 3.37,
+    "duration_sec": 3.37,
+    "thumbnail": "D:\\EDITEASE\\editease_app\\thumbnails\\C0479\\C0479_scene_001.jpg",
+    "scene_label_auto": "b-roll",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "b-roll",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.65,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.16928229393609295,
+      "edge_density": 0.0023911179698216734,
+      "sharpness": 7.284094339435139,
+      "text_density": 17.40397805063409
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.25
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 78.79593968391418
+      }
+    ],
+    "created_at": "2026-02-08T12:07:51.873392",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "C0479",
+    "video_path": "D:\\EDITEASE\\editease_app\\data\\C0479.MP4",
+    "scene_id": 2,
+    "start_sec": 3.37,
+    "end_sec": 3.537,
+    "duration_sec": 0.167,
+    "thumbnail": "D:\\EDITEASE\\editease_app\\thumbnails\\C0479\\C0479_scene_002.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "other",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 1,
+      "largest_face_ratio": 0.01075445816186557,
+      "motion_score": 0.21231345315904138,
+      "edge_density": 0.0025540123456790124,
+      "sharpness": 5.621516628667829,
+      "text_density": 15.346364882086217
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.25
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 79.48618531227112
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      }
+    ],
+    "created_at": "2026-02-08T12:07:52.991371",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  }
+]

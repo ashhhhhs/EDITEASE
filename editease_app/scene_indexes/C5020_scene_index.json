@@ -1,0 +1,60 @@
+[
+  {
+    "video": "C5020",
+    "video_path": "D:\\EDITEASE\\editease_app\\data\\C5020.MP4",
+    "scene_id": 1,
+    "start_sec": 0.0,
+    "end_sec": 4.004,
+    "duration_sec": 4.004,
+    "thumbnail": "D:\\EDITEASE\\editease_app\\thumbnails\\C5020\\C5020_scene_001.jpg",
+    "scene_label_auto": "b-roll",
+    "dominant_emotion_auto": "sad",
+    "scene_label": "b-roll",
+    "dominant_emotion_overall": "sad",
+    "scene_confidence": 0.65,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.11895795887799564,
+      "edge_density": 0.003148630401234568,
+      "sharpness": 12.510985687911472,
+      "text_density": 6.908275462879674
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.75
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 79.0986955165863
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 96.31615325019916
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 91.90386533737183
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      }
+    ],
+    "created_at": "2026-02-08T12:22:42.428421",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  }
+]

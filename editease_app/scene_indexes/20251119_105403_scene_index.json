@@ -1,0 +1,118 @@
+[
+  {
+    "video": "20251119_105403",
+    "video_path": "D:\\EDITEASE\\editease_app\\data\\20251119_105403.mp4",
+    "scene_id": 1,
+    "start_sec": 0.0,
+    "end_sec": 10.16,
+    "duration_sec": 10.16,
+    "thumbnail": "D:\\EDITEASE\\editease_app\\thumbnails\\20251119_105403\\20251119_105403_scene_001.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 12,
+      "largest_face_ratio": 0.007325695650077161,
+      "motion_score": 0.20745082153231661,
+      "edge_density": 0.007859730661651234,
+      "sharpness": 10.571513249797302,
+      "text_density": 52.454065393360416
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 90.54325762648926
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 65.76252579689026
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 91.50936007499695
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 85.95418334007263
+      }
+    ],
+    "created_at": "2026-02-08T11:58:07.122042",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "20251119_105403",
+    "video_path": "D:\\EDITEASE\\editease_app\\data\\20251119_105403.mp4",
+    "scene_id": 2,
+    "start_sec": 10.16,
+    "end_sec": 10.287,
+    "duration_sec": 0.126,
+    "thumbnail": "D:\\EDITEASE\\editease_app\\thumbnails\\20251119_105403\\20251119_105403_scene_002.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 4,
+      "largest_face_ratio": 0.0012298659336419753,
+      "motion_score": 0.09949485974945534,
+      "edge_density": 0.00153076171875,
+      "sharpness": 4.054506564509121,
+      "text_density": 12.182918595642292
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 98.0218825366357
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 72.2021222114563
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 72.2021222114563
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 99.57000022292135
+      }
+    ],
+    "created_at": "2026-02-08T11:59:03.414755",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  }
+]

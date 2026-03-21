@@ -1,0 +1,1384 @@
+[
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 1,
+    "start_sec": 0.0,
+    "end_sec": 2.0,
+    "duration_sec": 2.0,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_001.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 4,
+      "largest_face_ratio": 0.032100694444444446,
+      "motion_score": 0.08830839233841685,
+      "edge_density": 0.06842062114197531,
+      "sharpness": 295.18622953370635,
+      "text_density": 66.55092592271649
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 90.33549427986145
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 96.08902931213379
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 95.48832178115845
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 72.7751477226703
+      }
+    ],
+    "created_at": "2026-03-08T08:09:27.569373",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 2,
+    "start_sec": 2.0,
+    "end_sec": 5.208,
+    "duration_sec": 3.208,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_002.jpg",
+    "scene_label_auto": "b-roll",
+    "dominant_emotion_auto": "sad",
+    "scene_label": "b-roll",
+    "dominant_emotion_overall": "sad",
+    "scene_confidence": 0.65,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.25741512345679013,
+      "edge_density": 0.06323302469135803,
+      "sharpness": 713.7896459832324,
+      "text_density": 39.930555553629894
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.75
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 78.22882196559644
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 99.90948438644409
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 53.1829833984375
+      }
+    ],
+    "created_at": "2026-03-08T08:09:31.409610",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 3,
+    "start_sec": 5.208,
+    "end_sec": 6.125,
+    "duration_sec": 0.917,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_003.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "happy",
+    "scene_label": "other",
+    "dominant_emotion_overall": "happy",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 1,
+      "largest_face_ratio": 0.0012056327160493826,
+      "motion_score": 0.18628762708787217,
+      "edge_density": 0.07456693672839507,
+      "sharpness": 1454.344227306958,
+      "text_density": 35.39737654150282
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.5
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 99.10578738382013
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "angry",
+        "confidence": 99.52242967620073
+      }
+    ],
+    "created_at": "2026-03-08T08:09:35.686449",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 4,
+    "start_sec": 6.125,
+    "end_sec": 7.208,
+    "duration_sec": 1.083,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_004.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "surprise",
+    "scene_label": "other",
+    "dominant_emotion_overall": "surprise",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 1,
+      "largest_face_ratio": 0.003009741512345679,
+      "motion_score": 0.10901888162672475,
+      "edge_density": 0.06771701388888889,
+      "sharpness": 979.7637030760958,
+      "text_density": 29.65856481338452
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.75
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "surprise",
+        "confidence": 99.78972673416138
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "surprise",
+        "confidence": 98.22074792137767
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 99.97557997994662
+      }
+    ],
+    "created_at": "2026-03-08T08:09:40.553102",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 5,
+    "start_sec": 7.208,
+    "end_sec": 9.542,
+    "duration_sec": 2.333,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_005.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "surprise",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "surprise",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 3,
+      "largest_face_ratio": 0.011141975308641975,
+      "motion_score": 0.19885745733478574,
+      "edge_density": 0.09698206018518518,
+      "sharpness": 928.0405618373375,
+      "text_density": 72.96489197178988
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "surprise",
+        "confidence": 99.94378686621346
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "angry",
+        "confidence": 60.89183221958068
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 95.98578810691833
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 72.38243818283081
+      }
+    ],
+    "created_at": "2026-03-08T08:09:46.671884",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 6,
+    "start_sec": 9.542,
+    "end_sec": 11.417,
+    "duration_sec": 1.875,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_006.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "other",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 2,
+      "largest_face_ratio": 0.0044444444444444444,
+      "motion_score": 0.16250957697893972,
+      "edge_density": 0.10033661265432099,
+      "sharpness": 1089.9472337829009,
+      "text_density": 56.03780863927287
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 99.99903440486975
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 49.59789514541626
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 90.32466353921077
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 98.87080192565918
+      }
+    ],
+    "created_at": "2026-03-08T08:09:53.123414",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 7,
+    "start_sec": 11.417,
+    "end_sec": 14.0,
+    "duration_sec": 2.583,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_007.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "fear",
+    "scene_label": "other",
+    "dominant_emotion_overall": "fear",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 2,
+      "largest_face_ratio": 0.001458815586419753,
+      "motion_score": 0.18664515250544664,
+      "edge_density": 0.08481626157407407,
+      "sharpness": 1450.7851464748162,
+      "text_density": 37.27816357844916
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 52.52300217884792
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 99.9502420425415
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 98.46210479736328
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 89.74491357803345
+      }
+    ],
+    "created_at": "2026-03-08T08:10:00.174200",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 8,
+    "start_sec": 14.0,
+    "end_sec": 15.542,
+    "duration_sec": 1.542,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_008.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "sad",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "sad",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 6,
+      "largest_face_ratio": 0.008919753086419752,
+      "motion_score": 0.09816410221496004,
+      "edge_density": 0.1382325424382716,
+      "sharpness": 1513.5564486880612,
+      "text_density": 96.3059413533803
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 58.89060987346055
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 63.49916893253697
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 66.94355010986328
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 62.14883327484131
+      }
+    ],
+    "created_at": "2026-03-08T08:10:08.836222",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 9,
+    "start_sec": 15.542,
+    "end_sec": 16.375,
+    "duration_sec": 0.833,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_009.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "happy",
+    "scene_label": "other",
+    "dominant_emotion_overall": "happy",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 2,
+      "largest_face_ratio": 0.0022960069444444443,
+      "motion_score": 0.08215311819172112,
+      "edge_density": 0.07105179398148148,
+      "sharpness": 1239.130815849288,
+      "text_density": 30.237268517060315
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 99.99637007691682
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 99.32084687699712
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 100.0
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 43.172089079369414
+      }
+    ],
+    "created_at": "2026-03-08T08:10:17.113612",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 10,
+    "start_sec": 16.375,
+    "end_sec": 17.958,
+    "duration_sec": 1.583,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_010.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "happy",
+    "scene_label": "other",
+    "dominant_emotion_overall": "happy",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 2,
+      "largest_face_ratio": 0.0015668402777777777,
+      "motion_score": 0.11403220315904139,
+      "edge_density": 0.0759837962962963,
+      "sharpness": 1440.241378516039,
+      "text_density": 31.249999998492957
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "angry",
+        "confidence": 94.18426086714993
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 100.0
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 83.4155023097992
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 86.62858445985133
+      }
+    ],
+    "created_at": "2026-03-08T08:10:25.988301",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 11,
+    "start_sec": 17.958,
+    "end_sec": 19.542,
+    "duration_sec": 1.583,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_011.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 4,
+      "largest_face_ratio": 0.005835262345679012,
+      "motion_score": 0.17915518336964417,
+      "edge_density": 0.10156346450617285,
+      "sharpness": 882.7756850679561,
+      "text_density": 63.89853394753575
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 99.99593496322632
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 61.820489168167114
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 47.5583553314209
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 93.53973865509033
+      }
+    ],
+    "created_at": "2026-03-08T08:10:35.086158",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 12,
+    "start_sec": 19.542,
+    "end_sec": 22.042,
+    "duration_sec": 2.5,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_012.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "other",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 1,
+      "largest_face_ratio": 0.0015123456790123457,
+      "motion_score": 0.1982556962599855,
+      "edge_density": 0.07305073302469135,
+      "sharpness": 1231.0170823005078,
+      "text_density": 27.24729938140204
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 89.51064944267273
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 98.64557997637034
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 77.97777652740479
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 80.69984797834444
+      }
+    ],
+    "created_at": "2026-03-08T08:10:44.958634",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 13,
+    "start_sec": 22.042,
+    "end_sec": 22.958,
+    "duration_sec": 0.917,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_013.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "happy",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "happy",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 4,
+      "largest_face_ratio": 0.010279706790123458,
+      "motion_score": 0.10254075889615105,
+      "edge_density": 0.10286506558641975,
+      "sharpness": 911.5822275270062,
+      "text_density": 60.81211419459818
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 98.33468198776245
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 97.97255421011994
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "angry",
+        "confidence": 75.68903259169667
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 98.09802174568176
+      }
+    ],
+    "created_at": "2026-03-08T08:10:56.585189",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 14,
+    "start_sec": 22.958,
+    "end_sec": 24.083,
+    "duration_sec": 1.125,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_014.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "happy",
+    "scene_label": "other",
+    "dominant_emotion_overall": "happy",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 2,
+      "largest_face_ratio": 0.0027854938271604937,
+      "motion_score": 0.1848641748366013,
+      "edge_density": 0.07370707947530865,
+      "sharpness": 769.7254461079162,
+      "text_density": 56.80941357750726
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 83.72756838798523
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "angry",
+        "confidence": 40.25014042854309
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 99.63727591259932
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 98.72392996834874
+      }
+    ],
+    "created_at": "2026-03-08T08:11:07.445348",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 15,
+    "start_sec": 24.083,
+    "end_sec": 25.208,
+    "duration_sec": 1.125,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_015.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": "fear",
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": "fear",
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.050522512708787215,
+      "edge_density": 0.0028134645061728396,
+      "sharpness": 90.34947620279642,
+      "text_density": 56.13425925655216
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.25
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 86.18447698262197
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      }
+    ],
+    "created_at": "2026-03-08T08:11:17.280358",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 16,
+    "start_sec": 25.208,
+    "end_sec": 26.042,
+    "duration_sec": 0.833,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_016.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.002554579702251271,
+      "edge_density": 0.00695408950617284,
+      "sharpness": 231.28948398919752,
+      "text_density": 0.5304783950361459
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      }
+    ],
+    "created_at": "2026-03-08T08:11:26.961962",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 17,
+    "start_sec": 26.042,
+    "end_sec": 27.542,
+    "duration_sec": 1.5,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_017.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.000215890522875817,
+      "edge_density": 0.006942997685185185,
+      "sharpness": 250.2520920138889,
+      "text_density": 0.5304783950361459
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      }
+    ],
+    "created_at": "2026-03-08T08:11:37.039292",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 18,
+    "start_sec": 27.542,
+    "end_sec": 30.0,
+    "duration_sec": 2.458,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_018.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-08T08:11:45.826162",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 19,
+    "start_sec": 30.0,
+    "end_sec": 31.917,
+    "duration_sec": 1.917,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_019.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-08T08:11:53.975654",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 20,
+    "start_sec": 31.917,
+    "end_sec": 33.167,
+    "duration_sec": 1.25,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_020.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-08T08:12:01.553379",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 21,
+    "start_sec": 33.167,
+    "end_sec": 34.25,
+    "duration_sec": 1.083,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_021.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-08T08:12:08.705500",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 22,
+    "start_sec": 34.25,
+    "end_sec": 35.083,
+    "duration_sec": 0.833,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_022.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-08T08:12:15.250898",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 23,
+    "start_sec": 35.083,
+    "end_sec": 35.792,
+    "duration_sec": 0.708,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_023.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-08T08:12:21.427287",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 24,
+    "start_sec": 35.792,
+    "end_sec": 36.667,
+    "duration_sec": 0.875,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_024.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-08T08:12:27.343201",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 25,
+    "start_sec": 36.667,
+    "end_sec": 38.417,
+    "duration_sec": 1.75,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_025.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-08T08:12:33.084721",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 26,
+    "start_sec": 38.417,
+    "end_sec": 40.417,
+    "duration_sec": 2.0,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_026.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-08T08:12:37.759854",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 27,
+    "start_sec": 40.417,
+    "end_sec": 42.292,
+    "duration_sec": 1.875,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_027.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-08T08:12:41.804348",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 28,
+    "start_sec": 42.292,
+    "end_sec": 45.375,
+    "duration_sec": 3.083,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_028.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-08T08:12:44.897770",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "WorldLink X KG QA video 3",
+    "video_path": "D:\\EDITEASE\\data\\WorldLink X KG QA video 3.mp4",
+    "scene_id": 29,
+    "start_sec": 45.375,
+    "end_sec": 53.667,
+    "duration_sec": 8.292,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\WorldLink X KG QA video 3\\WorldLink X KG QA video 3_scene_029.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-08T08:12:46.387012",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  }
+]

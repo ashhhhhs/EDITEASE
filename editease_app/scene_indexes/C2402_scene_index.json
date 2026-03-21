@@ -1,0 +1,60 @@
+[
+  {
+    "video": "C2402",
+    "video_path": "D:\\EDITEASE\\editease_app\\data\\C2402.MP4",
+    "scene_id": 1,
+    "start_sec": 0.0,
+    "end_sec": 5.506,
+    "duration_sec": 5.506,
+    "thumbnail": "D:\\EDITEASE\\editease_app\\thumbnails\\C2402\\C2402_scene_001.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": "fear",
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": "fear",
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0391260552832244,
+      "edge_density": 0.00028682002314814813,
+      "sharpness": 13.330402921314121,
+      "text_density": 4.5572916666117225
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.25
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 98.59613180160522
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      }
+    ],
+    "created_at": "2026-02-08T12:14:13.009966",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  }
+]

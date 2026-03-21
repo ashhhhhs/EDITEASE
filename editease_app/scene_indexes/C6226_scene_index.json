@@ -1,0 +1,60 @@
+[
+  {
+    "video": "C6226",
+    "video_path": "D:\\EDITEASE\\editease_app\\data\\C6226.MP4",
+    "scene_id": 1,
+    "start_sec": 0.0,
+    "end_sec": 2.502,
+    "duration_sec": 2.502,
+    "thumbnail": "D:\\EDITEASE\\editease_app\\thumbnails\\C6226\\C6226_scene_001.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 4,
+      "largest_face_ratio": 0.0021006944444444445,
+      "motion_score": 0.09283568218954248,
+      "edge_density": 0.005552179783950617,
+      "sharpness": 27.567375214388417,
+      "text_density": 21.002121913327038
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 91.63888692855835
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 87.91994452476501
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 75.76377084687104
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 88.55088949203491
+      }
+    ],
+    "created_at": "2026-02-08T12:23:46.666691",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  }
+]

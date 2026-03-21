@@ -1,0 +1,408 @@
+[
+  {
+    "video": "Foreign Employment Loan Final",
+    "video_path": "D:\\EDITEASE\\data\\Foreign Employment Loan Final.mp4",
+    "scene_id": 1,
+    "start_sec": 0.0,
+    "end_sec": 7.14,
+    "duration_sec": 7.14,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\Foreign Employment Loan Final\\Foreign Employment Loan Final_scene_001.jpg",
+    "scene_label_auto": "b-roll",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "b-roll",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.65,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.3194466684822077,
+      "edge_density": 0.0015084876543209876,
+      "sharpness": 69.84897955246913,
+      "text_density": 0.28935185183789774
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.5
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 67.0357386491143
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 87.52346560498867
+      }
+    ],
+    "created_at": "2026-03-08T08:01:44.596019",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "Foreign Employment Loan Final",
+    "video_path": "D:\\EDITEASE\\data\\Foreign Employment Loan Final.mp4",
+    "scene_id": 2,
+    "start_sec": 7.14,
+    "end_sec": 10.244,
+    "duration_sec": 3.103,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\Foreign Employment Loan Final\\Foreign Employment Loan Final_scene_002.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "angry",
+    "scene_label": "other",
+    "dominant_emotion_overall": "angry",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 2,
+      "largest_face_ratio": 0.005835262345679012,
+      "motion_score": 0.14866305827886708,
+      "edge_density": 0.01912133487654321,
+      "sharpness": 76.81552753393858,
+      "text_density": 37.85686728212496
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.75
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "angry",
+        "confidence": 51.205188035964966
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 42.61408448219299
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "angry",
+        "confidence": 28.25678159336934
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      }
+    ],
+    "created_at": "2026-03-08T08:01:47.498592",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "Foreign Employment Loan Final",
+    "video_path": "D:\\EDITEASE\\data\\Foreign Employment Loan Final.mp4",
+    "scene_id": 3,
+    "start_sec": 10.244,
+    "end_sec": 12.813,
+    "duration_sec": 2.569,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\Foreign Employment Loan Final\\Foreign Employment Loan Final_scene_003.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 3,
+      "largest_face_ratio": 0.014266975308641976,
+      "motion_score": 0.2130843999636892,
+      "edge_density": 0.012682773919753086,
+      "sharpness": 16.261042527395393,
+      "text_density": 34.19174382551159
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 66.72366062120669
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 52.51145362854004
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 80.99526762962341
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 83.19824934005737
+      }
+    ],
+    "created_at": "2026-03-08T08:01:50.605651",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "Foreign Employment Loan Final",
+    "video_path": "D:\\EDITEASE\\data\\Foreign Employment Loan Final.mp4",
+    "scene_id": 4,
+    "start_sec": 12.813,
+    "end_sec": 14.681,
+    "duration_sec": 1.869,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\Foreign Employment Loan Final\\Foreign Employment Loan Final_scene_004.jpg",
+    "scene_label_auto": "b-roll",
+    "dominant_emotion_auto": null,
+    "scene_label": "b-roll",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.65,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.27020708514887437,
+      "edge_density": 0.02628809799382716,
+      "sharpness": 91.44501165664295,
+      "text_density": 20.88155864096829
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      }
+    ],
+    "created_at": "2026-03-08T08:01:52.502630",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "Foreign Employment Loan Final",
+    "video_path": "D:\\EDITEASE\\data\\Foreign Employment Loan Final.mp4",
+    "scene_id": 5,
+    "start_sec": 14.681,
+    "end_sec": 17.651,
+    "duration_sec": 2.97,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\Foreign Employment Loan Final\\Foreign Employment Loan Final_scene_005.jpg",
+    "scene_label_auto": "b-roll",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "b-roll",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.65,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.16003910221496007,
+      "edge_density": 0.0052358217592592595,
+      "sharpness": 38.50307319647181,
+      "text_density": 11.52584876487626
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.5
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 73.48178029060364
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 92.46240258216858
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      }
+    ],
+    "created_at": "2026-03-08T08:01:55.149927",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "Foreign Employment Loan Final",
+    "video_path": "D:\\EDITEASE\\data\\Foreign Employment Loan Final.mp4",
+    "scene_id": 6,
+    "start_sec": 17.651,
+    "end_sec": 24.524,
+    "duration_sec": 6.874,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\Foreign Employment Loan Final\\Foreign Employment Loan Final_scene_006.jpg",
+    "scene_label_auto": "b-roll",
+    "dominant_emotion_auto": null,
+    "scene_label": "b-roll",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.65,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.26534116285403053,
+      "edge_density": 0.003463541666666667,
+      "sharpness": 5.804577546295364,
+      "text_density": 5.304783950361459
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      }
+    ],
+    "created_at": "2026-03-08T08:01:57.372547",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "Foreign Employment Loan Final",
+    "video_path": "D:\\EDITEASE\\data\\Foreign Employment Loan Final.mp4",
+    "scene_id": 7,
+    "start_sec": 24.524,
+    "end_sec": 30.03,
+    "duration_sec": 5.506,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\Foreign Employment Loan Final\\Foreign Employment Loan Final_scene_007.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "other",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 1,
+      "largest_face_ratio": 0.029184027777777777,
+      "motion_score": 0.025186955337690633,
+      "edge_density": 0.009080343364197531,
+      "sharpness": 212.71625,
+      "text_density": 2.218364197423883
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 89.35312628746033
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 89.95208144187927
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 50.20991563796997
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 94.52197551727295
+      }
+    ],
+    "created_at": "2026-03-08T08:02:00.193410",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  }
+]

@@ -1,0 +1,730 @@
+[
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 1,
+    "start_sec": 0.0,
+    "end_sec": 2.586,
+    "duration_sec": 2.586,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_001.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 3,
+      "largest_face_ratio": 0.01744499792444998,
+      "motion_score": 0.08649909222948438,
+      "edge_density": 0.0012667341220423411,
+      "sharpness": 4.7137783711021255,
+      "text_density": 29.609018264360067
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 55.48032852890066
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 79.2063283447223
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 71.24292254447937
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 98.24719429016113
+      }
+    ],
+    "created_at": "2026-03-07T23:19:21.133038",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 2,
+    "start_sec": 2.586,
+    "end_sec": 4.463,
+    "duration_sec": 1.877,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_002.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "happy",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "happy",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 4,
+      "largest_face_ratio": 0.007015359070153591,
+      "motion_score": 0.09151543209876543,
+      "edge_density": 0.0022926720112079703,
+      "sharpness": 4.317355813911947,
+      "text_density": 12.647882938773742
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.75
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 96.9461260405854
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 84.0749204158783
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 73.28592261243789
+      }
+    ],
+    "created_at": "2026-03-07T23:19:26.142873",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 3,
+    "start_sec": 4.463,
+    "end_sec": 8.675,
+    "duration_sec": 4.213,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_003.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 4,
+      "largest_face_ratio": 0.034013724574512245,
+      "motion_score": 0.11406924019607843,
+      "edge_density": 0.002509145392278954,
+      "sharpness": 49.28144113159307,
+      "text_density": 6.259080531239313
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.75
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 95.62453679745951
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 98.28812469769268
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 86.13929665918927
+      }
+    ],
+    "created_at": "2026-03-07T23:19:33.116587",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 4,
+    "start_sec": 8.675,
+    "end_sec": 12.846,
+    "duration_sec": 4.171,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_004.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 7,
+      "largest_face_ratio": 0.013825757575757576,
+      "motion_score": 0.07339465323166304,
+      "edge_density": 0.004713282222914072,
+      "sharpness": 6.419549498384874,
+      "text_density": 26.1876037770764
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.75
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 95.19605579329202
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 97.59563207626343
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 95.36519646644592
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      }
+    ],
+    "created_at": "2026-03-07T23:19:43.194782",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 5,
+    "start_sec": 12.846,
+    "end_sec": 19.603,
+    "duration_sec": 6.757,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_005.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 6,
+      "largest_face_ratio": 0.03925124533001245,
+      "motion_score": 0.10885164760348585,
+      "edge_density": 0.00166254799709423,
+      "sharpness": 5.186921922094704,
+      "text_density": 7.815743046780697
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 92.25730253799573
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 98.25442433357239
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 98.93776774406433
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 98.79012107849121
+      }
+    ],
+    "created_at": "2026-03-07T23:19:55.976753",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 6,
+    "start_sec": 19.603,
+    "end_sec": 22.731,
+    "duration_sec": 3.128,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_006.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 7,
+      "largest_face_ratio": 0.004361249481112495,
+      "motion_score": 0.04365125726216412,
+      "edge_density": 0.0008837302822748028,
+      "sharpness": 3.792768653614455,
+      "text_density": 27.257809256511102
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 99.81608986854553
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 80.43150189110648
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 96.80229425430298
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 95.49135619504973
+      }
+    ],
+    "created_at": "2026-03-07T23:20:11.273078",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 7,
+    "start_sec": 22.731,
+    "end_sec": 27.194,
+    "duration_sec": 4.463,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_007.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "other",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 2,
+      "largest_face_ratio": 0.002374072488584475,
+      "motion_score": 0.08171464233841685,
+      "edge_density": 0.0008153019925280199,
+      "sharpness": 3.6138041869583497,
+      "text_density": 4.15110004144369
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 97.89334535598755
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 86.1824631690979
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 98.19527268409729
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 94.16694010299088
+      }
+    ],
+    "created_at": "2026-03-07T23:20:28.845698",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 8,
+    "start_sec": 27.194,
+    "end_sec": 30.614,
+    "duration_sec": 3.42,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_008.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "other",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.08227752814088599,
+      "edge_density": 0.002115115193026152,
+      "sharpness": 5.567402159601983,
+      "text_density": 21.48518576137847
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 0.5
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": false,
+        "emotion": null,
+        "confidence": null
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 94.94381546974182
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 96.81999087333679
+      }
+    ],
+    "created_at": "2026-03-07T23:20:51.426540",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 9,
+    "start_sec": 30.614,
+    "end_sec": 36.328,
+    "duration_sec": 5.714,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_009.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-07T23:21:10.178798",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 10,
+    "start_sec": 36.328,
+    "end_sec": 42.834,
+    "duration_sec": 6.507,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_010.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-07T23:21:23.433127",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 11,
+    "start_sec": 42.834,
+    "end_sec": 46.546,
+    "duration_sec": 3.712,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_011.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-07T23:21:33.945702",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 12,
+    "start_sec": 46.546,
+    "end_sec": 49.549,
+    "duration_sec": 3.003,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_012.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-07T23:21:43.613876",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 13,
+    "start_sec": 49.549,
+    "end_sec": 52.886,
+    "duration_sec": 3.337,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_013.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-07T23:21:52.110293",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 14,
+    "start_sec": 52.886,
+    "end_sec": 56.974,
+    "duration_sec": 4.087,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_014.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-07T23:21:57.567708",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 15,
+    "start_sec": 56.974,
+    "end_sec": 59.268,
+    "duration_sec": 2.294,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_015.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-07T23:22:00.670367",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "erina og",
+    "video_path": "D:\\EDITEASE\\data\\erina og.mp4",
+    "scene_id": 16,
+    "start_sec": 59.268,
+    "end_sec": 60.519,
+    "duration_sec": 1.251,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\erina og\\erina og_scene_016.jpg",
+    "scene_label_auto": "establishing_shot",
+    "dominant_emotion_auto": null,
+    "scene_label": "establishing_shot",
+    "dominant_emotion_overall": null,
+    "scene_confidence": 0.6,
+    "scene_debug": {
+      "face_count": 0,
+      "largest_face_ratio": 0.0,
+      "motion_score": 0.0,
+      "edge_density": 0.0,
+      "sharpness": 0.0,
+      "text_density": 0.0
+    },
+    "faces": {
+      "face_present_any": false,
+      "face_present_ratio": 0.0
+    },
+    "emotion_timeline": [],
+    "created_at": "2026-03-07T23:22:02.985443",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  }
+]

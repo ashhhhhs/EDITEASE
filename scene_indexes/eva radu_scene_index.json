@@ -1,0 +1,408 @@
+[
+  {
+    "video": "eva radu",
+    "video_path": "D:\\EDITEASE\\data\\eva radu.mp4",
+    "scene_id": 1,
+    "start_sec": 0.0,
+    "end_sec": 10.6,
+    "duration_sec": 10.6,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\eva radu\\eva radu_scene_001.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 4,
+      "largest_face_ratio": 0.02419753086419753,
+      "motion_score": 0.33874305555555556,
+      "edge_density": 0.018264371141975308,
+      "sharpness": 190.86594241174404,
+      "text_density": 44.41550925711731
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 67.3380395577001
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 50.72666708985967
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 87.20294237136841
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 82.15488195419312
+      }
+    ],
+    "created_at": "2026-03-07T23:54:04.181370",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "eva radu",
+    "video_path": "D:\\EDITEASE\\data\\eva radu.mp4",
+    "scene_id": 2,
+    "start_sec": 10.6,
+    "end_sec": 13.52,
+    "duration_sec": 2.92,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\eva radu\\eva radu_scene_002.jpg",
+    "scene_label_auto": "audience_reaction",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "audience_reaction",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.7,
+    "scene_debug": {
+      "face_count": 4,
+      "largest_face_ratio": 0.04,
+      "motion_score": 0.1884178013798112,
+      "edge_density": 0.009114101080246913,
+      "sharpness": 170.72640912605831,
+      "text_density": 24.980709875338505
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 89.15813565254211
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 91.23920746083304
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 85.07802068257085
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 54.01487946510315
+      }
+    ],
+    "created_at": "2026-03-07T23:54:07.115017",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "eva radu",
+    "video_path": "D:\\EDITEASE\\data\\eva radu.mp4",
+    "scene_id": 3,
+    "start_sec": 13.52,
+    "end_sec": 19.8,
+    "duration_sec": 6.28,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\eva radu\\eva radu_scene_003.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "sad",
+    "scene_label": "other",
+    "dominant_emotion_overall": "sad",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 2,
+      "largest_face_ratio": 0.023553722993827162,
+      "motion_score": 0.23916895878721856,
+      "edge_density": 0.016564911265432098,
+      "sharpness": 143.61569578143875,
+      "text_density": 43.30632715840537
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 98.2442855834961
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 99.7925937052127
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 45.896359788937545
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 92.83015131950378
+      }
+    ],
+    "created_at": "2026-03-07T23:54:10.320044",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "eva radu",
+    "video_path": "D:\\EDITEASE\\data\\eva radu.mp4",
+    "scene_id": 4,
+    "start_sec": 19.8,
+    "end_sec": 21.64,
+    "duration_sec": 1.84,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\eva radu\\eva radu_scene_004.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "other",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 3,
+      "largest_face_ratio": 0.061807484567901236,
+      "motion_score": 0.1591971223674655,
+      "edge_density": 0.043712866512345676,
+      "sharpness": 180.52444821593056,
+      "text_density": 110.33950616751835
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 60.98753809928894
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 99.17352199554443
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 98.87398474657445
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 95.00822484395208
+      }
+    ],
+    "created_at": "2026-03-07T23:54:13.929248",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "eva radu",
+    "video_path": "D:\\EDITEASE\\data\\eva radu.mp4",
+    "scene_id": 5,
+    "start_sec": 21.64,
+    "end_sec": 23.56,
+    "duration_sec": 1.92,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\eva radu\\eva radu_scene_005.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "sad",
+    "scene_label": "other",
+    "dominant_emotion_overall": "sad",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 1,
+      "largest_face_ratio": 0.017593074845679013,
+      "motion_score": 0.16660446169208423,
+      "edge_density": 0.013941454475308642,
+      "sharpness": 80.49786733967767,
+      "text_density": 49.23804012108227
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "fear",
+        "confidence": 32.98270302907842
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 59.70374701641482
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 98.37726950645447
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 97.15238213539124
+      }
+    ],
+    "created_at": "2026-03-07T23:54:17.013365",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "eva radu",
+    "video_path": "D:\\EDITEASE\\data\\eva radu.mp4",
+    "scene_id": 6,
+    "start_sec": 23.56,
+    "end_sec": 27.08,
+    "duration_sec": 3.52,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\eva radu\\eva radu_scene_006.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "happy",
+    "scene_label": "other",
+    "dominant_emotion_overall": "happy",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 2,
+      "largest_face_ratio": 0.14854600694444445,
+      "motion_score": 0.19562994734931008,
+      "edge_density": 0.01874807098765432,
+      "sharpness": 153.6567987191679,
+      "text_density": 50.82947530619071
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 96.91381417677572
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 89.00737893493427
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 88.83812890507328
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "happy",
+        "confidence": 93.99930834770203
+      }
+    ],
+    "created_at": "2026-03-07T23:54:20.024467",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  },
+  {
+    "video": "eva radu",
+    "video_path": "D:\\EDITEASE\\data\\eva radu.mp4",
+    "scene_id": 7,
+    "start_sec": 27.08,
+    "end_sec": 48.92,
+    "duration_sec": 21.84,
+    "thumbnail": "D:\\EDITEASE\\thumbnails\\eva radu\\eva radu_scene_007.jpg",
+    "scene_label_auto": "other",
+    "dominant_emotion_auto": "neutral",
+    "scene_label": "other",
+    "dominant_emotion_overall": "neutral",
+    "scene_confidence": 0.5,
+    "scene_debug": {
+      "face_count": 2,
+      "largest_face_ratio": 0.022918595679012346,
+      "motion_score": 0.13253281590413943,
+      "edge_density": 0.01972511574074074,
+      "sharpness": 203.08353576632146,
+      "text_density": 41.28086419554008
+    },
+    "faces": {
+      "face_present_any": true,
+      "face_present_ratio": 1.0
+    },
+    "emotion_timeline": [
+      {
+        "time_ratio": 0.2,
+        "face_detected": true,
+        "emotion": "sad",
+        "confidence": 81.73031210899353
+      },
+      {
+        "time_ratio": 0.4,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 63.47437500953674
+      },
+      {
+        "time_ratio": 0.6,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 45.79058587551117
+      },
+      {
+        "time_ratio": 0.8,
+        "face_detected": true,
+        "emotion": "neutral",
+        "confidence": 53.70134755389065
+      }
+    ],
+    "created_at": "2026-03-07T23:54:23.140749",
+    "reviewed": false,
+    "uncertain": false,
+    "notes": "",
+    "manual_scene_label": null,
+    "manual_emotion": null
+  }
+]
