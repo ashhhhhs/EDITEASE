@@ -1,91 +1,238 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, UploadCloud, Grid, Wand2, Shield, LogOut, CheckSquare, Users, Activity } from 'lucide-react';
+import { LayoutDashboard, UploadCloud, Download, Wand2, Shield, LogOut, CheckSquare, Users, Activity, AlertTriangle, Settings } from 'lucide-react';
+import api from './lib/api';
+
+function VerificationBanner({ currentUser }) {
+  const [sending, setSending] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [message, setMessage] = useState('');
+
+  if (currentUser?.email_verified) return null;
+
+  const handleResend = async () => {
+    if (countdown > 0) return;
+    setSending(true);
+    try {
+      await api.post('/verify-email/resend');
+      setMessage('Verification email sent!');
+      setCountdown(60);
+      const timer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err) {
+      if (err.response?.status === 429) {
+          setMessage('Too many requests. Please wait a while.');
+      } else {
+          setMessage('Failed to resend. Try again later.');
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={{ background: 'var(--surface-elevated)', borderBottom: '1px solid var(--border-subtle)', padding: 'var(--space-12) var(--space-40)', display: 'flex', alignItems: 'center', gap: 'var(--space-16)', color: 'var(--warning)', fontSize: 'var(--font-small)' }}>
+      <AlertTriangle size={16} />
+      <span>Please verify your email address (<strong>{currentUser?.email}</strong>) to unlock all features.</span>
+      <button 
+        onClick={handleResend}
+        disabled={sending || countdown > 0}
+        className="btn"
+        style={{ padding: 'var(--space-4) var(--space-12)', fontSize: 'var(--font-meta)', borderColor: 'var(--warning)', color: 'var(--warning)', background: 'transparent' }}
+      >
+        {sending ? 'Sending...' : countdown > 0 ? `Resend in ${countdown}s` : 'Resend Email'}
+      </button>
+      {message && <span style={{color: 'var(--text-secondary)'}}>{message}</span>}
+    </div>
+  );
+}
+
+function GoogleLinkModal({ currentUser }) {
+  const [pendingLink, setPendingLink] = useState(null);
+  const [linking, setLinking] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  React.useEffect(() => {
+    try {
+      const stored = localStorage.getItem('pending_google_link');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.email === currentUser.email) {
+          setPendingLink(parsed);
+        } else {
+           localStorage.removeItem('pending_google_link');
+        }
+      }
+    } catch(e) {}
+  }, [currentUser]);
+
+  if (!pendingLink) return null;
+
+  const handleLink = async () => {
+    setLinking(true);
+    setError('');
+    try {
+      await api.post('/auth/google/link', { token: pendingLink.token });
+      setSuccess(true);
+      localStorage.removeItem('pending_google_link');
+      setTimeout(() => {
+         setPendingLink(null);
+      }, 2000);
+    } catch(err) {
+      setError(err.response?.data?.error || 'Failed to link account.');
+      setLinking(false);
+    }
+  };
+
+  const handleSkip = () => {
+    localStorage.removeItem('pending_google_link');
+    setPendingLink(null);
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+      <div className="panel" style={{ width: '400px', backgroundColor: 'var(--surface-panel)', padding: 'var(--space-24)', borderRadius: 'var(--radius-lg)', boxShadow: '0 24px 64px rgba(0,0,0,0.4)', border: '1px solid var(--border-default)' }}>
+        <h3 style={{ margin: '0 0 var(--space-8) 0', fontSize: '18px', fontWeight: 600 }}>Link Google Account?</h3>
+        {!success ? (
+          <>
+            <p style={{ margin: '0 0 var(--space-20) 0', color: 'var(--text-secondary)', fontSize: '14px', lineHeight: 1.5 }}>
+              You recently tried to sign in with Google. Would you like to link your Google account to your EditEase workspace for easier access next time?
+            </p>
+            {error && <div style={{ color: 'var(--danger)', marginBottom: 'var(--space-16)', fontSize: '14px', background: 'rgba(218,54,51,0.1)', padding: '8px 12px', borderRadius: '4px' }}>{error}</div>}
+            <div style={{ display: 'flex', gap: 'var(--space-12)', justifyContent: 'flex-end' }}>
+              <button onClick={handleSkip} className="btn" style={{ background: 'transparent', border: '1px solid var(--border-default)' }} disabled={linking}>Not Now</button>
+              <button onClick={handleLink} className="btn btn-primary" disabled={linking}>{linking ? 'Linking...' : 'Link Account'}</button>
+            </div>
+          </>
+        ) : (
+          <div style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px', padding: 'var(--space-12) 0', fontWeight: 500 }}>
+             <CheckSquare size={20} /> Successfully linked!
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function AppShell({ currentUser, onLogout }) {
   const location = useLocation();
   const role = currentUser?.role || 'editor';
+  const navDescriptions = {
+    Dashboard: 'System-wide visibility, recent activity, and the fastest route back into review.',
+    'Review Queue': 'A visual moderation surface for sorting scenes quickly and confidently.',
+    Uploads: 'Bring in new footage and hand it off to the processing pipeline.',
+    Exports: 'Prepare structured outputs and organized media for delivery.',
+    Users: 'Manage access, roles, and team operations from one place.',
+    'Job Monitor': 'Track background processing across the queue in real time.',
+  };
 
-  const navItems = [
-    { name: 'Dashboard', path: '/app/dashboard', icon: LayoutDashboard, roles: ['admin', 'reviewer', 'editor'] },
-    { name: 'Review Queue', path: '/app/review', icon: CheckSquare, roles: ['admin', 'reviewer'] },
-    { name: 'Users', path: '/app/admin/users', icon: Users, roles: ['admin'] },
-    { name: 'Job Monitor', path: '/app/admin/jobs', icon: Activity, roles: ['admin'] },
-    { name: 'Uploads', path: '/app/uploads', icon: UploadCloud, roles: ['admin', 'editor'] },
-    { name: 'Exports', path: '/app/exports', icon: Grid, roles: ['admin', 'editor'] },
+  // Workspace nav — shown to all roles (primary tasks)
+  const workspaceNav = [
+    { name: 'Dashboard',    path: '/app/dashboard', icon: LayoutDashboard, roles: ['admin', 'reviewer', 'editor'] },
+    { name: 'Review Queue', path: '/app/review',     icon: CheckSquare,     roles: ['admin', 'reviewer'] },
+    { name: 'Uploads',      path: '/app/uploads',    icon: UploadCloud,     roles: ['admin', 'editor'] },
+    { name: 'Exports',      path: '/app/exports',    icon: Download,        roles: ['admin', 'editor'] },
   ];
 
-  const visibleNav = navItems.filter(item => item.roles.includes(role));
-  const activeNav = visibleNav.find(n => location.pathname.startsWith(n.path));
+  // System nav — admin only (operational visibility)
+  const adminNav = [
+    { name: 'Users',       path: '/app/admin/users', icon: Users,    roles: ['admin'] },
+    { name: 'Job Monitor', path: '/app/admin/jobs',  icon: Activity, roles: ['admin'] },
+  ];
+
+  const visibleWorkspace = workspaceNav.filter(i => i.roles.includes(role));
+  const visibleAdmin     = adminNav.filter(i => i.roles.includes(role));
+  const visibleNav       = [...visibleWorkspace, ...visibleAdmin];
+  const activeNav        = visibleNav.find(n => location.pathname.startsWith(n.path));
+  const activeTitle = activeNav?.name || 'Dashboard';
+  const activeDescription = navDescriptions[activeTitle] || 'Move through review, uploads, and exports from one shared workspace.';
 
   return (
-    <div className="app-container">
-      <div className="sidebar">
+    <div className="app-container workspace-shell">
+      <div className="workspace-ambient workspace-ambient-a" />
+      <div className="workspace-ambient workspace-ambient-b" />
+      <div className="sidebar workspace-sidebar">
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)', marginBottom: 'var(--space-32)' }}>
-          <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: 'rgba(88,166,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(88,166,255,0.2)' }}>
+        <Link
+          to="/"
+          className="workspace-logo"
+        >
+          <div className="workspace-logo-mark">
             <Wand2 size={18} color="var(--accent)" />
           </div>
-          <span style={{ fontWeight: 700, fontSize: 'var(--font-title-card)', letterSpacing: '-0.01em' }}>EditEase</span>
-        </div>
+          <div className="workspace-logo-copy">
+            <span className="workspace-logo-text">EditEase</span>
+            <span className="workspace-logo-subtext">Review workspace</span>
+          </div>
+        </Link>
 
-        <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-meta)', textTransform: 'uppercase', letterSpacing: '0.07em', padding: '0 var(--space-16)', marginBottom: 'var(--space-8)' }}>
-          Navigation
-        </div>
 
-        <nav style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {visibleNav.map((item, idx) => {
+        <nav className="workspace-nav">
+          {/* Workspace items */}
+          <div className="workspace-nav-group">
+            <div className="workspace-section-label">Workspace</div>
+          {visibleWorkspace.map(item => {
             const isActive = location.pathname.startsWith(item.path);
             return (
-              <Link
-                to={item.path}
-                key={item.path}
-                className={`nav-item stagger-item link-draw ${isActive ? 'active' : ''}`}
-                style={{ position: 'relative', overflow: 'hidden', animationDelay: `${idx * 0.06}s` }}
+              <Link key={item.path} to={item.path}
+                className={`nav-item workspace-nav-item ${isActive ? 'active' : ''}`}
               >
-                {isActive && (
-                  <span style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: 3,
-                    background: 'var(--accent)',
-                    borderRadius: '0 2px 2px 0',
-                    animation: 'fadeIn 0.2s ease'
-                  }} />
-                )}
                 <item.icon size={18} />
                 {item.name}
               </Link>
             );
           })}
+          </div>
+
+          {/* Admin section — divider + items */}
+          {visibleAdmin.length > 0 && (
+            <div className="workspace-nav-group workspace-nav-group-admin">
+              <div className="workspace-section-label">System</div>
+              {visibleAdmin.map(item => {
+                const isActive = location.pathname.startsWith(item.path);
+                return (
+                  <Link key={item.path} to={item.path}
+                    className={`nav-item workspace-nav-item ${isActive ? 'active' : ''}`}
+                  >
+                    <item.icon size={18} />
+                    {item.name}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </nav>
 
         {/* Bottom account */}
-        <div style={{ marginTop: 'auto', paddingTop: 'var(--space-16)', borderTop: '1px solid var(--border-subtle)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-12)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)', color: 'var(--text-secondary)', fontSize: 'var(--font-small)', textTransform: 'capitalize' }}>
-              <Shield size={14} /> {role}
-            </div>
+        <div className="workspace-sidebar-footer">
+          <div className="workspace-footer-actions">
+            <Link to="/app/settings" className="btn workspace-ghost-btn">
+              <Settings size={14} /> Settings
+            </Link>
             <button
               onClick={onLogout}
-              style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', fontSize: 'var(--font-small)', padding: 'var(--space-4)', borderRadius: 'var(--radius-sm)', transition: 'opacity 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
-              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+              className="workspace-logout-btn"
             >
-              <LogOut size={14} /> Logout
+              <LogOut size={14} />
             </button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)', overflow: 'hidden', padding: 'var(--space-8)', background: 'var(--surface-base)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ minWidth: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent) 0%, #1f6feb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 'var(--font-body)', flexShrink: 0 }}>
-              {currentUser.username.charAt(0).toUpperCase()}
+          <div className="workspace-account-card">
+            <div className="workspace-account-avatar">
+              {(currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
             </div>
-            <div style={{ overflow: 'hidden' }}>
-              <div style={{ fontWeight: 500, fontSize: 'var(--font-small)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {currentUser.name || currentUser.username}
+            <div className="workspace-account-copy">
+              <div className="workspace-account-name">
+                {currentUser.name || currentUser.email}
               </div>
-              <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+              <div className="workspace-account-role">
                 {role}
               </div>
             </div>
@@ -94,18 +241,33 @@ export default function AppShell({ currentUser, onLogout }) {
       </div>
 
       {/* Top bar + content */}
-      <div className="main-wrapper">
-        <div style={{ height: 56, borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', padding: '0 var(--space-40)', justifyContent: 'space-between', backgroundColor: 'var(--surface-panel)', flexShrink: 0 }}>
-          <span style={{ fontWeight: 600, fontSize: 'var(--font-title-card)', letterSpacing: '-0.01em' }}>
-            {activeNav?.name || 'Dashboard'}
-          </span>
-          <span className="badge info" style={{ margin: 0 }}>
-            {role}
-          </span>
+      <div className="main-wrapper workspace-main">
+        <div className="workspace-topbar">
+          <div className="workspace-topbar-copy">
+            <span className="workspace-topbar-eyebrow">Workspace</span>
+            <span className="workspace-topbar-title">{activeTitle}</span>
+            <span className="workspace-topbar-subtitle">{activeDescription}</span>
+          </div>
+          <div className="workspace-topbar-actions">
+            <Link
+              to="/"
+              className="btn workspace-home-btn"
+            >
+              Homepage
+            </Link>
+            <span className="badge info workspace-role-badge">
+              {role}
+            </span>
+          </div>
         </div>
 
-        <div className="main-content">
-          <Outlet />
+        <VerificationBanner currentUser={currentUser} />
+        <GoogleLinkModal currentUser={currentUser} />
+
+        <div className="main-content workspace-content">
+          <div className="workspace-content-inner">
+            <Outlet />
+          </div>
         </div>
       </div>
     </div>

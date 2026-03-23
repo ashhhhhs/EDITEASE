@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
 import { UploadCloud, CheckCircle, FolderOpen, Loader, X, FileVideo } from 'lucide-react';
-import { API_BASE } from './config';
+import api from './lib/api';
 import { labelColors } from './constants';
 import PageHeader from './components/PageHeader';
 import ContentSection from './components/ContentSection';
 
-export default function EditorView() {
+export default function EditorView({ currentUser }) {
   const [files, setFiles] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -54,7 +53,7 @@ export default function EditorView() {
       const formData = new FormData();
       formData.append('file', newJobs[i].file);
       try {
-        const res = await axios.post(`${API_BASE}/auto_organize`, formData, {
+        const res = await api.post('/auto_organize', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
         newJobs[i].taskId = res.data.task_id;
@@ -83,7 +82,7 @@ export default function EditorView() {
       for (let job of newJobs) {
         if (!job.taskId || job.status === 'SUCCESS' || job.status === 'FAILURE') continue;
         try {
-          const res = await axios.get(`${API_BASE}/task_status/${job.taskId}`);
+          const res = await api.get(`/task_status/${job.taskId}`);
           if (res.data.status !== job.status) updated = true;
           job.status = res.data.status;
           if (res.data.status === 'PROGRESS' && res.data.result) {
@@ -116,7 +115,7 @@ export default function EditorView() {
 
   const openFolder = async (path) => {
     try {
-      await axios.post(`${API_BASE}/open_folder`, { path });
+      await api.post('/open_folder', { path });
     } catch (err) {
       alert('Could not open folder: ' + (err.response?.data?.error || err.message));
     }
@@ -225,9 +224,15 @@ export default function EditorView() {
               ))}
 
               <div style={{textAlign: 'center', marginTop: 'var(--space-24)'}}>
-                <button className="btn btn-primary" onClick={startOrganize} style={{padding: 'var(--space-12) var(--space-32)', fontSize: '1rem'}}>
-                  🚀 Auto-Organize {files.length} Video{files.length > 1 ? 's' : ''}
-                </button>
+                {currentUser?.email_verified ? (
+                    <button className="btn btn-primary" onClick={startOrganize} style={{padding: 'var(--space-12) var(--space-32)', fontSize: '1rem'}}>
+                    🚀 Auto-Organize {files.length} Video{files.length > 1 ? 's' : ''}
+                    </button>
+                ) : (
+                    <button className="btn" disabled style={{padding: 'var(--space-12) var(--space-32)', fontSize: '1rem', opacity: 0.6, cursor: 'not-allowed'}}>
+                        Verify your email to enable exports
+                    </button>
+                )}
               </div>
             </div>
           )}

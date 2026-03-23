@@ -9,9 +9,10 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 @role_required(['admin'])
 def admin_overview():
     from services.task_service import tasks_col
+    user_counts = auth_service.get_user_summary_counts()
     return jsonify({
-        'total_users': auth_service.users_col.count_documents({}),
-        'active_users': auth_service.users_col.count_documents({'is_active': True}),
+        'total_users': user_counts['total_users'],
+        'active_users': user_counts['active_users'],
         'total_videos': len(clip_service.col.distinct('video')),
         'total_clips': clip_service.col.count_documents({}),
         'pending_review': clip_service.col.count_documents({'reviewed': False}),

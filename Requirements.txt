@@ -6,3 +6,6 @@ requests
 numpy
 celery
 redis
+resend
+google-auth
+flask-cors

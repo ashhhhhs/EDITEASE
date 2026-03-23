@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
 import { UploadCloud, CheckCircle, FileVideo } from 'lucide-react';
-import { API_BASE } from './config';
+import api from './lib/api';
 import PageHeader from './components/PageHeader';
 import ContentSection from './components/ContentSection';
 
@@ -38,7 +37,7 @@ export default function Upload() {
     formData.append('file', file);
 
     try {
-      const res = await axios.post(`${API_BASE}/upload`, formData, {
+      const res = await api.post('/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       console.log('Upload response:', res.data);
@@ -59,7 +58,7 @@ export default function Upload() {
     if (taskId && taskStatus !== 'SUCCESS' && taskStatus !== 'FAILURE') {
       interval = setInterval(async () => {
         try {
-          const res = await axios.get(`${API_BASE}/task_status/${taskId}`);
+          const res = await api.get(`/task_status/${taskId}`);
           setTaskStatus(res.data.status);
           if (res.data.status === 'SUCCESS' || res.data.status === 'FAILURE') {
             clearInterval(interval);

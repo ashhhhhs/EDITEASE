@@ -32,3 +32,13 @@ def role_required(allowed_roles):
             return f(*args, **kwargs)
         return decorated
     return decorator
+
+def require_verified_email(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # Assumes login_required has already populated g.user
+        user = getattr(g, 'user', None)
+        if not user or not user.get('email_verified'):
+            return jsonify({'error': 'Email verification required', 'code': 'EMAIL_UNVERIFIED'}), 403
+        return f(*args, **kwargs)
+    return decorated

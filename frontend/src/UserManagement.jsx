@@ -8,6 +8,58 @@ import EmptyState from './components/EmptyState';
 import api from './lib/api';
 import { useToast } from './hooks/useToast.jsx';
 
+function InviteModal({ isOpen, onClose, onInvite }) {
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('editor');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      await api.post('/invite', { email, role });
+      onInvite();
+      setEmail('');
+      setRole('editor');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to send invite');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+      <div className="panel" style={{ width: '400px', backgroundColor: 'var(--surface-panel)', padding: 'var(--space-24)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-default)' }}>
+        <h3 style={{ margin: '0 0 var(--space-16) 0', fontSize: '18px', fontWeight: 600 }}>Invite Team Member</h3>
+        <form onSubmit={handleSubmit}>
+          {error && <div className="toast toast-error" style={{ marginBottom: 'var(--space-16)' }}>{error}</div>}
+          <div className="input-group" style={{ marginBottom: 'var(--space-16)' }}>
+            <label>Email Address</label>
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="colleague@example.com" />
+          </div>
+          <div className="input-group" style={{ marginBottom: 'var(--space-24)' }}>
+            <label>Role</label>
+            <select value={role} onChange={e => setRole(e.target.value)}>
+              <option value="editor">Editor (Upload & Export)</option>
+              <option value="reviewer">Reviewer (View & Approve)</option>
+              <option value="admin">Admin (Full Access)</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-12)', justifyContent: 'flex-end' }}>
+            <button type="button" onClick={onClose} className="btn" style={{ background: 'transparent' }} disabled={loading}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={loading || !email}>{loading ? 'Sending...' : 'Send Invite'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function UserManagement({ currentUser }) {
   const toast = useToast();
   const [users, setUsers] = useState([]);
@@ -15,6 +67,7 @@ export default function UserManagement({ currentUser }) {
   const [total, setTotal] = useState(0);
   const limit = 15;
   const [loading, setLoading] = useState(true);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -58,10 +111,25 @@ export default function UserManagement({ currentUser }) {
         title="User Management" 
         description="Control access and permissions for all users across the platform."
         actions={
-          <button className="btn" onClick={fetchUsers}>
-            <RefreshCw size={16} /> Refresh
-          </button>
+          <div style={{ display: 'flex', gap: 'var(--space-8)' }}>
+            <button className="btn" onClick={fetchUsers}>
+              <RefreshCw size={16} /> Refresh
+            </button>
+            <button className="btn btn-primary" onClick={() => setIsInviteModalOpen(true)}>
+              <Users size={16} /> Invite User
+            </button>
+          </div>
         }
+      />
+
+      <InviteModal 
+        isOpen={isInviteModalOpen} 
+        onClose={() => setIsInviteModalOpen(false)} 
+        onInvite={() => {
+          setIsInviteModalOpen(false);
+          toast.success("Invitation sent successfully");
+          // Optionally fetch invitations here if displaying them
+        }}
       />
 
       <ContentSection style={{ padding: 0, overflow: 'hidden' }}>

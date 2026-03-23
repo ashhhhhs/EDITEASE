@@ -4,6 +4,7 @@ import { SCENE_LABELS, EMOTIONS } from './constants';
 import PageHeader from './components/PageHeader';
 import LoadingState from './components/LoadingState';
 import EmptyState from './components/EmptyState';
+import { API_BASE } from './config';
 import api from './lib/api';
 import { useToast } from './hooks/useToast.jsx';
 
@@ -82,7 +83,7 @@ export default function Inspector() {
   };
 
   const totalPages = Math.ceil(total / limit) || 1;
-  const thumbUrl = (clip) => clip?._id ? `${import.meta.env.VITE_API_BASE || ''}/api/thumbnail/${clip._id}` : null;
+  const thumbUrl = (clip) => clip?._id ? `${API_BASE}/thumbnail/${clip._id}` : null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -195,7 +196,7 @@ export default function Inspector() {
                 {clips.map(clip => {
                   const key = `${clip.video}::${clip.scene_id}`;
                   const isSelected = selectedKeys.has(key);
-                  const thumb = clip?._id ? `/api/thumbnail/${clip._id}` : null; 
+                  const thumb = thumbUrl(clip);
                   return (
                     <div key={key} className={`clip-card stagger-item ${isSelected ? 'selected' : ''}`} onClick={() => toggleSelect(key)}>
                       <div style={{ position: 'absolute', top: 'var(--space-8)', left: 'var(--space-8)', zIndex: 10 }}>

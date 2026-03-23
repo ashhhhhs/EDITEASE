@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="7" time="5.877" timestamp="2026-03-21T22:49:07.535357" hostname="ASHHHHHH"><testcase classname="tests.test_phase5" name="test_google_auth_new_user" time="0.229" /><testcase classname="tests.test_phase5" name="test_google_auth_account_conflict" time="0.850" /><testcase classname="tests.test_phase5" name="test_google_auth_link_account" time="0.805" /><testcase classname="tests.test_phase5" name="test_update_password" time="0.902" /><testcase classname="tests.test_phase5" name="test_update_email" time="0.684"><failure message="AssertionError: assert 1 == 2&#10; +  where 1 = len(['IgCcdcToWBpOEZVqUUTOiRdIYpL2RHBQiSajZg7MXxg'])">client = &lt;FlaskClient &lt;Flask 'api.api_server'&gt;&gt;
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001F0571C2E00&gt;
+
+    def test_update_email(client, monkeypatch):
+        client.post('/register', json={
+            "email": "emailchange@example.com",
+            "password": "Password123!"
+        })
+        res_login = client.post('/login', json={"email": "emailchange@example.com", "password": "Password123!"})
+        token = res_login.get_json()["token"]
+    
+        from services import verification_service
+        sent_emails = []
+        monkeypatch.setattr(verification_service, "send_verification_email", lambda e, t: sent_emails.append(t))
+    
+        res = client.patch('/user/email', json={"email": "new.email@example.com"}, headers={"Authorization": f"Bearer {token}"})
+        assert res.status_code == 200
+    
+        res_me = client.get('/me', headers={"Authorization": f"Bearer {token}"})
+        assert res_me.get_json()["user"]["email"] == "new.email@example.com"
+        assert res_me.get_json()["user"]["email_verified"] is False
+&gt;       assert len(sent_emails) == 2 # 1 from register, 1 from update
+E       AssertionError: assert 1 == 2
+E        +  where 1 = len(['IgCcdcToWBpOEZVqUUTOiRdIYpL2RHBQiSajZg7MXxg'])
+
+tests\test_phase5.py:152: AssertionError</failure></testcase><testcase classname="tests.test_phase5" name="test_logout_all" time="0.686" /><testcase classname="tests.test_phase5" name="test_invitation_flow" time="0.883"><failure message="KeyError: 'token'">client = &lt;FlaskClient &lt;Flask 'api.api_server'&gt;&gt;
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001F0571C1570&gt;
+
+    def test_invitation_flow(client, monkeypatch):
+        # Setup admin
+        import services.auth_service
+        # Direct access to create an admin
+        client.post('/register', json={"email": "admin@example.com", "password": "Pass123!"})
+        admin_res = client.post('/login', json={"email": "admin@example.com", "password": "Pass123!"})
+        admin_token = admin_res.get_json()["token"]
+        admin_id = admin_res.get_json()["user"]["id"]
+        from pymongo import MongoClient
+        from bson import ObjectId
+        db = MongoClient(config.MONGO_URI)[config.DB_NAME]
+        db.users.update_one({"_id": ObjectId(admin_id)}, {"$set": {"role": "admin"}})
+    
+        # Admin creates invite
+        import services.invitation_service
+        sent_invites = []
+    
+        # We monkeypatch the actual Resend send function in invitation_service
+        import resend
+        class MockEmails:
+            @staticmethod
+            def send(kwargs):
+                sent_invites.append(kwargs)
+        monkeypatch.setattr(resend, "Emails", MockEmails)
+    
+        res = client.post('/invite', json={"email": "invited@example.com", "role": "reviewer"}, headers={"Authorization": f"Bearer {admin_token}"})
+        assert res.status_code == 200
+    
+        # Get token manually to test validate
+        invite_doc = db.invitations.find_one({"email": "invited@example.com"})
+        assert invite_doc is not None
+    
+        # User signs up but not accepts invite
+        new_res = client.post('/register', json={"email": "invited@example.com", "password": "Pass123!"})
+&gt;       new_token = new_res.get_json()["token"]
+E       KeyError: 'token'
+
+tests\test_phase5.py:202: KeyError</failure></testcase></testsuite></testsuites>

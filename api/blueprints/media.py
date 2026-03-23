@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify, send_file
 import config
 from utils.logger import setup_logger
 from services import clip_service, task_service, export_service
-from api.decorators import login_required, role_required
+from api.decorators import login_required, role_required, require_verified_email
 
 logger = setup_logger('media_bp')
 media_bp = Blueprint('media', __name__)
@@ -58,6 +58,7 @@ def auto_organize():
 
 @media_bp.post('/export')
 @role_required(['admin', 'editor'])
+@require_verified_email
 def export_scene():
     data = request.get_json(force=True) or {}
     res = export_service.export_single_clip(data.get('video'), data.get('scene_id'))
@@ -65,6 +66,7 @@ def export_scene():
 
 @media_bp.post('/export_batch')
 @role_required(['admin', 'editor'])
+@require_verified_email
 def export_batch():
     return jsonify(export_service.export_batch(request.get_json(force=True) or {}))
 

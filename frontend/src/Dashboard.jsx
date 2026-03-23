@@ -76,7 +76,7 @@ function AdminOverview() {
 
   return (
     <div>
-      <PageHeader title="System Dashboard" description="Real-time operational overview of the EditEase platform." />
+      <PageHeader title="Overview" description="System status and recent activity." />
 
       {/* ── Bento Grid ── */}
       <div style={{
@@ -180,7 +180,34 @@ function EditorDashboard() {
 
   return (
     <div>
-      <PageHeader title="Dataset Intelligence" description="Monitor ML readiness and class distributions across your clip library." />
+      <PageHeader title="Your Workspace" description="Clips awaiting review, recent uploads, and export-ready items." />
+
+      {/* ── Primary action banner — shown when unreviewed clips exist ── */}
+      {stats && stats.unreviewed > 0 && (
+        <div style={{
+          background: 'var(--surface-elevated)',
+          border: '1px solid var(--border-strong)',
+          borderLeft: '3px solid var(--accent)',
+          borderRadius: 'var(--radius-lg)',
+          padding: 'var(--space-20) var(--space-24)',
+          marginBottom: 'var(--space-24)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 'var(--space-16)',
+          flexWrap: 'wrap',
+        }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 'var(--font-title-card)', marginBottom: 4 }}>
+              {stats.unreviewed.toLocaleString()} clips awaiting review
+            </div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-small)' }}>
+              Review clips to build a clean, organized export.
+            </div>
+          </div>
+          <Link to="/app/review" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>Continue Review →</Link>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-20)', marginBottom: 'var(--space-24)' }}>
         <BentoCard accent="var(--accent)">
@@ -222,7 +249,16 @@ function EditorDashboard() {
               </div>
             );
           })
-        ) : <p style={{ color: 'var(--text-secondary)' }}>No data. Upload and process videos first.</p>}
+        ) : (
+          <div style={{ textAlign: 'center', padding: 'var(--space-64) var(--space-24)' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 'var(--space-16)' }}>📂</div>
+            <div style={{ fontWeight: 600, fontSize: 'var(--font-title-card)', marginBottom: 'var(--space-8)' }}>No footage yet</div>
+            <div style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-24)', maxWidth: 360, margin: '0 auto var(--space-24)' }}>
+              Upload your first video to start scene detection and review.
+            </div>
+            <Link to="/app/uploads" className="btn btn-primary">Upload Footage</Link>
+          </div>
+        )}
       </div>
     </div>
   );

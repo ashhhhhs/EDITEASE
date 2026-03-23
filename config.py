@@ -21,6 +21,12 @@ COLLECTION = os.getenv("COLLECTION", "scenes")
 API_HOST = os.getenv("API_HOST", "127.0.0.1")
 API_PORT = int(os.getenv("API_PORT", 5000))
 API_DEBUG = os.getenv("API_DEBUG", "True").lower() == "true"
+APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:5173")
+
+# Email Settings (Phase 2)
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+MAIL_FROM = os.environ.get('MAIL_FROM', '')
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 
 # Celery / Redis Settings
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")

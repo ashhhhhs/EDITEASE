@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="0" failures="7" skipped="0" tests="7" time="4.455" timestamp="2026-03-21T22:42:45.226151" hostname="ASHHHHHH"><testcase classname="tests.test_phase5" name="test_google_auth_new_user" time="0.132"><failure message="assert 500 == 200&#10; +  where 500 = &lt;WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]&gt;.status_code">client = &lt;FlaskClient &lt;Flask 'api.api_server'&gt;&gt;
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000020175265780&gt;
+
+    def test_google_auth_new_user(client, monkeypatch):
+        def mock_verify(*args, **kwargs):
+            return {
+                "email": "google.new@example.com",
+                "sub": "google_12345",
+                "name": "Google User"
+            }
+    
+        import google.oauth2.id_token
+        monkeypatch.setattr(google.oauth2.id_token, "verify_oauth2_token", mock_verify)
+    
+        res = client.post('/auth/google', json={"token": "mock_valid_token"})
+&gt;       assert res.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = &lt;WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]&gt;.status_code
+
+tests\test_phase5.py:46: AssertionError</failure></testcase><testcase classname="tests.test_phase5" name="test_google_auth_account_conflict" time="0.804"><failure message="assert 500 == 409&#10; +  where 500 = &lt;WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]&gt;.status_code">client = &lt;FlaskClient &lt;Flask 'api.api_server'&gt;&gt;
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x00000201755C03A0&gt;
+
+    def test_google_auth_account_conflict(client, monkeypatch):
+        client.post('/register', json={
+            "email": "conflict@example.com",
+            "password": "Password123!",
+            "name": "Conflict User"
+        })
+    
+        def mock_verify(*args, **kwargs):
+            return {
+                "email": "conflict@example.com",
+                "sub": "google_999",
+                "name": "Conflict User"
+            }
+    
+        import google.oauth2.id_token
+        monkeypatch.setattr(google.oauth2.id_token, "verify_oauth2_token", mock_verify)
+    
+        res = client.post('/auth/google', json={"token": "mock_token"})
+&gt;       assert res.status_code == 409
+E       assert 500 == 409
+E        +  where 500 = &lt;WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]&gt;.status_code
+
+tests\test_phase5.py:71: AssertionError</failure></testcase><testcase classname="tests.test_phase5" name="test_google_auth_link_account" time="0.575"><failure message="KeyError: 'token'">client = &lt;FlaskClient &lt;Flask 'api.api_server'&gt;&gt;
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000020176C93520&gt;
+
+    def test_google_auth_link_account(client, monkeypatch):
+        res1 = client.post('/register', json={
+            "email": "linkme@example.com",
+            "password": "Password123!"
+        })
+&gt;       client_token = res1.get_json()["token"]
+E       KeyError: 'token'
+
+tests\test_phase5.py:82: KeyError</failure></testcase><testcase classname="tests.test_phase5" name="test_update_password" time="0.568"><failure message="KeyError: 'token'">client = &lt;FlaskClient &lt;Flask 'api.api_server'&gt;&gt;
+
+    def test_update_password(client):
+        res1 = client.post('/register', json={
+            "email": "passchange@example.com",
+            "password": "OldPassword123!"
+        })
+&gt;       token = res1.get_json()["token"]
+E       KeyError: 'token'
+
+tests\test_phase5.py:112: KeyError</failure></testcase><testcase classname="tests.test_phase5" name="test_update_email" time="0.531"><failure message="KeyError: 'token'">client = &lt;FlaskClient &lt;Flask 'api.api_server'&gt;&gt;
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000020176C993C0&gt;
+
+    def test_update_email(client, monkeypatch):
+        res1 = client.post('/register', json={
+            "email": "emailchange@example.com",
+            "password": "Password123!"
+        })
+&gt;       token = res1.get_json()["token"]
+E       KeyError: 'token'
+
+tests\test_phase5.py:134: KeyError</failure></testcase><testcase classname="tests.test_phase5" name="test_logout_all" time="0.509"><failure message="KeyError: 'token'">client = &lt;FlaskClient &lt;Flask 'api.api_server'&gt;&gt;
+
+    def test_logout_all(client):
+        res1 = client.post('/register', json={
+            "email": "logoutall@example.com",
+            "password": "Password123!"
+        })
+&gt;       token = res1.get_json()["token"]
+E       KeyError: 'token'
+
+tests\test_phase5.py:153: KeyError</failure></testcase><testcase classname="tests.test_phase5" name="test_invitation_flow" time="0.565"><failure message="KeyError: 'token'">client = &lt;FlaskClient &lt;Flask 'api.api_server'&gt;&gt;
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000020176D744F0&gt;
+
+    def test_invitation_flow(client, monkeypatch):
+        # Setup admin
+        import services.auth_service
+        # Direct access to create an admin
+        admin_res = client.post('/register', json={"email": "admin@example.com", "password": "Pass123!"})
+&gt;       admin_token = admin_res.get_json()["token"]
+E       KeyError: 'token'
+
+tests\test_phase5.py:166: KeyError</failure></testcase></testsuite></testsuites>

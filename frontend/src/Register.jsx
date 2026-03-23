@@ -1,44 +1,98 @@
 import React, { useState } from 'react';
-import { Wand2, AlertTriangle, Loader2 } from 'lucide-react';
+import { Wand2, AlertTriangle, Loader2, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
+import zxcvbn from 'zxcvbn';
 import { API_BASE } from './config';
 
 export default function Register({ onLogin }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Password strength
+  const score = zxcvbn(password).score; // 0 to 4
+  const colors = ['var(--danger)', 'var(--danger)', 'var(--warning)', 'var(--success)', 'var(--success)'];
+  const labels = ['Weak', 'Fair', 'Good', 'Strong', 'Very Strong'];
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (password !== confirmPassword) {
-      setError("Passwords don't match");
+    if (!agreedToTerms) {
+      setError("Please agree to the Terms of Service.");
       return;
     }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    
     setError(null);
     setLoading(true);
     
     try {
-      const res = await axios.post(`${API_BASE}/register`, { username, password, name, email });
+      const res = await axios.post(`${API_BASE}/register`, { email, password, name });
       if (res.data.ok) {
-        const loginRes = await axios.post(`${API_BASE}/login`, { username, password });
+        // Auto sign-in after successful registration
+        const loginRes = await axios.post(`${API_BASE}/login`, { email, password });
         if (loginRes.data.token) {
           onLogin(loginRes.data.token, loginRes.data.user || loginRes.data);
         }
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Error connecting to server');
+      setError(err.response?.data?.error || 'Registration failed. The email might already be in use.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE}/auth/google`, {
+        token: credentialResponse.credential
+      });
+      if (res.data.token) {
+        onLogin(res.data.token, res.data.user || res.data);
+      } else {
+        setError(res.data.error || 'Google signup failed');
+      }
+    } catch (err) {
+      if (err.response?.data?.code === 'ACCOUNT_EXISTS_NEEDS_LINKING') {
+        setError(err.response.data.error);
+        localStorage.setItem('pending_google_link', JSON.stringify({
+           ...err.response.data.pending_link,
+           token: credentialResponse.credential
+        }));
+      } else {
+        setError(err.response?.data?.error || 'Error connecting to server');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setError("Google sign up was unsuccessful. Try again later.");
+  };
+
   return (
-    <div className="app-container" style={{ alignItems: 'center', justifyContent: 'center', overflowY: 'auto', padding: 'var(--space-40) 0', background: 'radial-gradient(circle at 50% 0%, var(--surface-panel) 0%, var(--surface-base) 100%)' }}>
+    <div className="app-container" style={{ position: 'relative', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', padding: 'var(--space-40) 0', background: 'radial-gradient(circle at 50% 0%, var(--surface-panel) 0%, var(--surface-base) 100%)' }}>
+      <Link
+        to="/"
+        style={{ position: 'absolute', top: 'var(--space-24)', left: 'var(--space-32)', display: 'flex', alignItems: 'center', gap: 'var(--space-8)', textDecoration: 'none', color: 'var(--text-primary)', fontWeight: 700, fontSize: 'var(--font-title-card)', letterSpacing: '-0.01em' }}
+      >
+        <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: 'rgba(88,166,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(88,166,255,0.2)' }}>
+          <Wand2 size={18} color="var(--accent)" />
+        </div>
+        <span>EditEase</span>
+      </Link>
       <div className="panel" style={{ width: '100%', maxWidth: '440px', boxShadow: '0 24px 64px rgba(0,0,0,0.4)', border: '1px solid var(--border-default)' }}>
         
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-16)', marginBottom: 'var(--space-32)' }}>
@@ -46,40 +100,95 @@ export default function Register({ onLogin }) {
             <Wand2 size={32} color="var(--accent)" />
           </div>
           <h2 style={{ margin: 0, fontSize: 'var(--font-title-section)', fontWeight: 600 }}>Create Account</h2>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 'var(--font-small)' }}>Sign up to join EditEase</p>
+          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '15px' }}>Sign up to join EditEase</p>
         </div>
         
         {error && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)', color: 'var(--danger)', padding: 'var(--space-12)', backgroundColor: 'rgba(218, 54, 51, 0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(218,54,51,0.2)', marginBottom: 'var(--space-24)', fontSize: 'var(--font-small)' }}>
-                <AlertTriangle size={16} /> <span>{error}</span>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-8)', color: 'var(--danger)', padding: 'var(--space-12)', backgroundColor: 'rgba(218, 54, 51, 0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(218,54,51,0.2)', marginBottom: 'var(--space-24)', fontSize: '14px', lineHeight: 1.4 }}>
+                <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: 2 }} /> 
+                <div style={{ flex: 1 }}>{error}</div>
             </div>
         )}
 
+        <div style={{ marginBottom: 'var(--space-24)', display: 'flex', justifyContent: 'center' }}>
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+            useOneTap={false}
+            theme="outline"
+            size="large"
+            text="continue_with"
+            width="320px"
+          />
+        </div>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)', marginBottom: 'var(--space-24)', color: 'var(--text-muted)' }}>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border-default)' }} />
+          <span style={{ fontSize: '12px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>or</span>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border-default)' }} />
+        </div>
+
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-16)' }}>
-          <div style={{ display: 'flex', gap: 'var(--space-16)' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: 'var(--space-8)', fontSize: 'var(--font-small)', fontWeight: 500, color: 'var(--text-primary)' }}>Full Name</label>
-                <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="Jane Doe" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: 'var(--space-8)', fontSize: 'var(--font-small)', fontWeight: 500, color: 'var(--text-primary)' }}>Username</label>
-                <input type="text" value={username} onChange={e => setUsername(e.target.value)} required placeholder="janedoe" />
-              </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: 'var(--space-8)', fontSize: 'var(--font-small)', fontWeight: 500, color: 'var(--text-primary)' }}>Full Name</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="Jane Doe" autoFocus />
           </div>
+          
           <div>
             <label style={{ display: 'block', marginBottom: 'var(--space-8)', fontSize: 'var(--font-small)', fontWeight: 500, color: 'var(--text-primary)' }}>Email</label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="jane@example.com" />
           </div>
+          
           <div>
             <label style={{ display: 'block', marginBottom: 'var(--space-8)', fontSize: 'var(--font-small)', fontWeight: 500, color: 'var(--text-primary)' }}>Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Create strong password" />
+            <div style={{ position: 'relative' }}>
+              <input 
+                type={showPassword ? "text" : "password"} 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                required 
+                placeholder="At least 8 characters"
+                style={{ paddingRight: '40px' }}
+              />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, display: 'flex' }}
+                tabIndex="-1"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            
+            {password.length > 0 && (
+              <div style={{ marginTop: 'var(--space-8)' }}>
+                <div style={{ display: 'flex', gap: '4px', height: '4px', borderRadius: '2px', overflow: 'hidden' }}>
+                  {[0, 1, 2, 3].map(i => (
+                    <div key={i} style={{ flex: 1, backgroundColor: i <= score && password.length > 0 ? colors[score] : 'var(--border-subtle)', transition: 'background-color 0.3s' }} />
+                  ))}
+                </div>
+                <div style={{ fontSize: '12px', marginTop: '4px', textAlign: 'right', color: colors[score], fontWeight: 500 }}>
+                  {labels[score]}
+                </div>
+              </div>
+            )}
           </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: 'var(--space-8)', fontSize: 'var(--font-small)', fontWeight: 500, color: 'var(--text-primary)' }}>Confirm Password</label>
-            <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required placeholder="Repeat password" />
+          
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-12)', marginTop: 'var(--space-4)' }}>
+            <input 
+              type="checkbox" 
+              id="terms" 
+              checked={agreedToTerms}
+              onChange={e => setAgreedToTerms(e.target.checked)}
+              style={{ marginTop: '2px', width: '16px', height: '16px', accentColor: 'var(--accent)', cursor: 'pointer' }}
+            />
+            <label htmlFor="terms" style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.4, cursor: 'pointer' }}>
+              I agree to the <a href="#" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Terms of Service</a> and <a href="#" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Privacy Policy</a>.
+            </label>
           </div>
-          <button type="submit" className="btn btn-primary" style={{ marginTop: 'var(--space-12)', width: '100%', padding: 'var(--space-12)', fontSize: '1rem' }} disabled={loading}>
-            {loading ? <><Loader2 size={18} className="spin" /> Creating Account...</> : 'Sign Up'}
+
+          <button type="submit" className="btn btn-primary" style={{ marginTop: 'var(--space-12)', width: '100%', padding: 'var(--space-12)', fontSize: '1rem' }} disabled={loading || !agreedToTerms || password.length < 8}>
+            {loading ? <><Loader2 size={18} className="spin" /> Creating Account...</> : 'Get Started'}
           </button>
         </form>
 
