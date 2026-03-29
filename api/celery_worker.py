@@ -90,32 +90,35 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str):
     from collections import Counter
     import shutil
     
-    labels = [scene.get("scene_label", "other") or "other" for scene in scenes]
+    confident_labels = [scene.get("scene_label", "other") for scene in scenes if scene.get("reviewed") is True]
+    if not confident_labels:
+        confident_labels = [scene.get("scene_label", "other") for scene in scenes]
+        
     dominant_label = "other"
-    if labels:
-        counts = Counter(labels)
+    if confident_labels:
+        counts = Counter(confident_labels)
         dominant_label = counts.most_common(1)[0][0]
         
-    exports_dir = Path(base_dir_str) / "exports"
-    out_dir = exports_dir / dominant_label
-    out_dir.mkdir(parents=True, exist_ok=True)
-    
-    original_ext = os.path.splitext(video_path_str)[1] or ".mp4"
-    out_name = f"{video_name}_full{original_ext}"
-    out_path = out_dir / out_name
-    
     try:
-        shutil.copy2(video_path_str, out_path)
-        logger.info(f"Auto-organize: Copied full video {video_name} to {out_path}")
+        from services import cloudinary_service
+        old_pub_id = f"editease/videos/{video_name}"
+        new_pub_id = f"editease/exports/{dominant_label}/{video_name}"
+        cloudinary_service.move_video(old_pub_id, new_pub_id)
     except Exception as e:
-        logger.error(f"Copy failed for {video_name}: {e}")
-        _update_task(self.request.id, status="FAILURE", error_message=str(e), progress_step="error")
-        return {"status": "error", "message": "Failed to copy video"}
-    
-    _update_task(self.request.id, status="SUCCESS", progress_step="done", output_path=str(out_path))
+        logger.error(f"Failed to move Cloudinary video for {video_name}: {e}")
+        
+    # Remove original video from local storage
+    try:
+        if os.path.exists(video_path_str):
+            os.remove(video_path_str)
+            logger.info("Removed original video from local storage: %s", video_path_str)
+    except Exception as e:
+        logger.warning("Failed to remove original video %s: %s", video_path_str, e)
+        
+    _update_task(self.request.id, status="SUCCESS", progress_step="done", output_path=new_pub_id)
     return {
         "status": "success",
         "video": video_name,
         "dominant_label": dominant_label,
-        "export_path": str(out_path)
+        "export_path": new_pub_id
     }

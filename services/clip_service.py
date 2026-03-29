@@ -197,13 +197,31 @@ def get_clip_by_id(clip_id):
         return None
 
 def resolve_thumbnail(clip_id):
+    """Return Cloudinary thumbnail URL if available, else local path."""
     doc = get_clip_by_id(clip_id)
-    if doc and doc.get("thumbnail") and os.path.exists(doc["thumbnail"]):
-        return doc["thumbnail"]
+    if not doc:
+        return None
+    # Prefer Cloudinary URL (cloud-hosted)
+    cloud_url = doc.get("thumbnail_url")
+    if cloud_url:
+        return cloud_url
+    # Fallback: legacy local path
+    local = doc.get("thumbnail")
+    if local and os.path.exists(local):
+        return local
     return None
 
 def resolve_video_path(clip_id):
+    """Return Cloudinary video URL if available, else local path."""
     doc = get_clip_by_id(clip_id)
-    if doc and doc.get("video_path") and os.path.exists(doc["video_path"]):
-        return doc["video_path"]
+    if not doc:
+        return None
+    # Prefer Cloudinary URL (cloud-hosted)
+    cloud_url = doc.get("cloudinary_url")
+    if cloud_url:
+        return cloud_url
+    # Fallback: legacy local path
+    local = doc.get("video_path")
+    if local and os.path.exists(local):
+        return local
     return None

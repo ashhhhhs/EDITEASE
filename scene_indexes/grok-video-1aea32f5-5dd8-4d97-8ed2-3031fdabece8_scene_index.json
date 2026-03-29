@@ -2,11 +2,13 @@
   {
     "video": "grok-video-1aea32f5-5dd8-4d97-8ed2-3031fdabece8",
     "video_path": "D:\\EDITEASE\\data\\grok-video-1aea32f5-5dd8-4d97-8ed2-3031fdabece8.mp4",
+    "cloudinary_url": "https://res.cloudinary.com/dsd2pcxsw/video/upload/v1774757636/editease/videos/grok-video-1aea32f5-5dd8-4d97-8ed2-3031fdabece8.mp4",
     "scene_id": 1,
     "start_sec": 0.0,
     "end_sec": 6.042,
     "duration_sec": 6.042,
     "thumbnail": "D:\\EDITEASE\\thumbnails\\grok-video-1aea32f5-5dd8-4d97-8ed2-3031fdabece8\\grok-video-1aea32f5-5dd8-4d97-8ed2-3031fdabece8_scene_001.jpg",
+    "thumbnail_url": "https://res.cloudinary.com/dsd2pcxsw/image/upload/v1774757121/editease/thumbnails/grok-video-1aea32f5-5dd8-4d97-8ed2-3031fdabece8_scene_001.jpg",
     "scene_label_auto": "b-roll",
     "dominant_emotion_auto": "sad",
     "scene_label": "b-roll",
@@ -18,7 +20,8 @@
       "motion_score": 0.15511996187363833,
       "edge_density": 0.0215625,
       "sharpness": 128.71897877145847,
-      "text_density": 63.21747448475626
+      "text_density": 63.21747448475626,
+      "agent_action": "auto_organized_agreed"
     },
     "faces": {
       "face_present_any": true,
@@ -50,8 +53,8 @@
         "confidence": 47.465187311172485
       }
     ],
-    "created_at": "2026-03-22T12:28:57.536057",
-    "reviewed": false,
+    "created_at": "2026-03-29T09:59:02.030019",
+    "reviewed": true,
     "uncertain": false,
     "notes": "",
     "manual_scene_label": null,

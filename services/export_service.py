@@ -33,22 +33,28 @@ def export_single_clip(video, scene_id):
     if not doc:
         return {"error": "scene not found"}
 
+    dominant_label = _get_dominant_scene_type(video)
+
+    # Prefer Cloudinary URL — no file copy needed
+    cloudinary_url = doc.get("cloudinary_url")
+    if cloudinary_url:
+        logger.info(f"Export via Cloudinary URL for {key}")
+        return {
+            "status": "exported_full_video",
+            "scene_label": dominant_label,
+            "cloudinary_url": cloudinary_url,
+        }
+
+    # Fallback: local file copy for legacy docs
     video_path = doc.get("video_path")
-    
     if not video_path or not os.path.exists(video_path):
         return {"error": "invalid video path metadata"}
 
-    dominant_label = _get_dominant_scene_type(video)
-    
     EXPORT_DIR = config.EXPORTS_DIR / dominant_label
     EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
-    original_ext = os.path.splitext(video_path)[1]
-    if not original_ext:
-        original_ext = ".mp4"
-    
-    out_name = f"{video}_full{original_ext}"
-    out_path = EXPORT_DIR / out_name
+    original_ext = os.path.splitext(video_path)[1] or ".mp4"
+    out_path = EXPORT_DIR / f"{video}_full{original_ext}"
 
     try:
         shutil.copy2(video_path, out_path)
@@ -86,23 +92,30 @@ def export_batch(filters):
     
     for doc in results:
         vid_name = doc.get("video")
-        video_path = doc.get("video_path")
-        
-        if not vid_name or not video_path or not os.path.exists(video_path):
+        if not vid_name or vid_name in processed_videos:
             continue
-            
-        if vid_name in processed_videos:
-            continue
-            
+
         dominant_label = _get_dominant_scene_type(vid_name)
-        
+
+        # Prefer Cloudinary URL — no file copy needed
+        cloudinary_url = doc.get("cloudinary_url")
+        if cloudinary_url:
+            exported.append(cloudinary_url)
+            logger.info(f"Exported full video {vid_name} via Cloudinary URL")
+            processed_videos.add(vid_name)
+            continue
+
+        # Fallback: local file copy for legacy docs
+        video_path = doc.get("video_path")
+        if not video_path or not os.path.exists(video_path):
+            continue
+
         EXPORT_DIR = config.EXPORTS_DIR / dominant_label
         EXPORT_DIR.mkdir(parents=True, exist_ok=True)
-        
+
         original_ext = os.path.splitext(video_path)[1] or ".mp4"
-        out_name = f"{vid_name}_full{original_ext}"
-        out_path = EXPORT_DIR / out_name
-        
+        out_path = EXPORT_DIR / f"{vid_name}_full{original_ext}"
+
         try:
             shutil.copy2(video_path, out_path)
             exported.append(str(out_path))

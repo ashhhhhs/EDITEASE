@@ -9,3 +9,8 @@ redis
 resend
 google-auth
 flask-cors
+cloudinary
+torch
+torchvision
+tqdm
+scikit-learn

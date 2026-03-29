@@ -1,8 +1,12 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Base directories
 BASE_DIR = Path(__file__).resolve().parent
+
+# Load environment variables from .env file
+load_dotenv(BASE_DIR / ".env")
 DATA_DIR = BASE_DIR / "data"
 EXPORTS_DIR = BASE_DIR / "exports"
 SCENE_INDEXES_DIR = BASE_DIR / "scene_indexes"
@@ -41,3 +45,8 @@ FFMPEG_PATH = os.getenv(
 # Pipeline settings
 SCENE_DETECT_THRESHOLD = float(os.getenv("SCENE_DETECT_THRESHOLD", "27.0"))
 CLASSIFIER_TYPE = os.getenv("CLASSIFIER_TYPE", "rule_based")
+
+# Cloudinary Settings
+CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "")
+CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "")

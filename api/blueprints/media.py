@@ -1,6 +1,6 @@
 """Media blueprint: /upload, /export, /thumbnail, /video_clip, /task_status, /auto_organize, /open_folder"""
 import os
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, redirect
 import config
 from utils.logger import setup_logger
 from services import clip_service, task_service, export_service
@@ -11,17 +11,23 @@ media_bp = Blueprint('media', __name__)
 
 @media_bp.get('/thumbnail/<clip_id>')
 def serve_thumbnail(clip_id):
-    path = clip_service.resolve_thumbnail(clip_id)
-    if not path:
+    url_or_path = clip_service.resolve_thumbnail(clip_id)
+    if not url_or_path:
         return jsonify({'error': 'file not found'}), 404
-    return send_file(path, mimetype='image/jpeg')
+    # Cloudinary URL → redirect; local path → send_file
+    if url_or_path.startswith('http'):
+        return redirect(url_or_path, code=302)
+    return send_file(url_or_path, mimetype='image/jpeg')
 
 @media_bp.get('/video_clip/<clip_id>')
 def serve_video_clip(clip_id):
-    path = clip_service.resolve_video_path(clip_id)
-    if not path:
+    url_or_path = clip_service.resolve_video_path(clip_id)
+    if not url_or_path:
         return jsonify({'error': 'file not found'}), 404
-    return send_file(path, mimetype='video/mp4')
+    # Cloudinary URL → redirect; local path → send_file
+    if url_or_path.startswith('http'):
+        return redirect(url_or_path, code=302)
+    return send_file(url_or_path, mimetype='video/mp4')
 
 @media_bp.get('/task_status/<task_id>')
 @login_required
@@ -38,7 +44,7 @@ def upload_video():
         return jsonify({'error': 'No selected file'}), 400
     file_path = config.DATA_DIR / file.filename
     file.save(str(file_path))
-    logger.info(f'Video uploaded to {file_path}')
+    logger.info(f'Video saved locally to {file_path}')
     task = task_service.dispatch_process(str(file_path))
     return jsonify({'status': 'uploaded', 'message': 'Processing started', 'video_path': str(file_path), 'task_id': task.id})
 
@@ -52,7 +58,7 @@ def auto_organize():
         return jsonify({'error': 'No selected file'}), 400
     file_path = config.DATA_DIR / file.filename
     file.save(str(file_path))
-    logger.info(f'Auto-organize upload: {file_path}')
+    logger.info(f'Auto-organize upload saved locally: {file_path}')
     task = task_service.dispatch_auto_organize(str(file_path))
     return jsonify({'status': 'uploaded', 'message': 'Auto-organize started', 'video_path': str(file_path), 'task_id': task.id})
 

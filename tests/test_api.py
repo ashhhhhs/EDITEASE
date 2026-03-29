@@ -3,6 +3,8 @@ import os
 import json
 
 from api.api_server import app
+from database import ingest_to_mongo
+from services import cloudinary_service
 
 @pytest.fixture
 def client():
@@ -60,3 +62,82 @@ def test_auto_organize_no_file(client):
     assert rv.status_code == 400
     data = json.loads(rv.data)
     assert 'error' in data
+
+
+def test_cloudinary_service_upload_mock(monkeypatch):
+    """Cloudinary upload helper should return the secure CDN URL from the SDK."""
+    monkeypatch.setattr(cloudinary_service, "is_configured", lambda: True)
+
+    calls = []
+
+    def fake_upload(local_path, **opts):
+        calls.append((local_path, opts))
+        return {"secure_url": "https://res.cloudinary.com/demo/video/upload/sample.mp4"}
+
+    monkeypatch.setattr(cloudinary_service.cloudinary.uploader, "upload", fake_upload)
+
+    result = cloudinary_service.upload_video(
+        "D:/EDITEASE/data/sample.mp4",
+        public_id="editease/videos/sample",
+    )
+
+    assert result == "https://res.cloudinary.com/demo/video/upload/sample.mp4"
+    assert calls == [(
+        "D:/EDITEASE/data/sample.mp4",
+        {"resource_type": "video", "public_id": "editease/videos/sample"},
+    )]
+
+
+def test_upsert_scene_docs_builds_keys_and_persists(monkeypatch):
+    """Scene ingestion should create Mongo-ready keys and preserve Cloudinary fields."""
+
+    class FakeCollection:
+        def __init__(self):
+            self.index_calls = []
+            self.update_calls = []
+
+        def create_index(self, spec, unique=False):
+            self.index_calls.append((spec, unique))
+
+        def update_one(self, query, update, upsert=False):
+            self.update_calls.append((query, update, upsert))
+
+    class FakeDatabase:
+        def __init__(self, collection):
+            self.collection = collection
+
+        def __getitem__(self, name):
+            return self.collection
+
+    class FakeClient:
+        def __init__(self, collection):
+            self.collection = collection
+
+        def __getitem__(self, name):
+            return FakeDatabase(self.collection)
+
+    fake_collection = FakeCollection()
+    monkeypatch.setattr(ingest_to_mongo, "MongoClient", lambda uri: FakeClient(fake_collection))
+
+    upserted = ingest_to_mongo.upsert_scene_docs([
+        {
+            "video": "demo",
+            "scene_id": 3,
+            "cloudinary_url": "https://res.cloudinary.com/demo/video/upload/demo.mp4",
+            "thumbnail_url": "https://res.cloudinary.com/demo/image/upload/demo.jpg",
+        }
+    ], source_name="demo_scene_index.json")
+
+    assert upserted == 1
+    assert fake_collection.index_calls
+    assert fake_collection.update_calls == [(
+        {"_key": "demo::3"},
+        {"$set": {
+            "video": "demo",
+            "scene_id": 3,
+            "cloudinary_url": "https://res.cloudinary.com/demo/video/upload/demo.mp4",
+            "thumbnail_url": "https://res.cloudinary.com/demo/image/upload/demo.jpg",
+            "_key": "demo::3",
+        }},
+        True,
+    )]
