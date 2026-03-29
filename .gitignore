@@ -37,6 +37,13 @@ downloads/
 exports/
 temp/
 tmp/
+data/
+thumbnails/
+scene_indexes/
+datasets/
+*.jpg
+*.jpeg
+*.png
 *.mp4
 *.mkv
 *.avi
