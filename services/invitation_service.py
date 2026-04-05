@@ -52,40 +52,18 @@ def create_and_send_invitation(email, role, invited_by_id):
     }
     
     invites_col.insert_one(invite_doc)
-    
-    # Send email
-    if config.RESEND_API_KEY:
-        import resend
-        resend.api_key = config.RESEND_API_KEY
-        
-        app_url = os.getenv("APP_BASE_URL", "http://localhost:5173")
-        invite_link = f"{app_url}/invite/{raw_token}"
-        
-        html_content = f"""
-        <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; color: #111;">
-            <h2>You've been invited to EditEase</h2>
-            <p>You have been invited to join the team as an {role}.</p>
-            <p>Click the button below to accept your invitation and set up your account:</p>
-            <div style="margin: 30px 0;">
-                <a href="{invite_link}" style="background-color: #0066ff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Accept Invitation</a>
-            </div>
-            <p style="color: #666; font-size: 13px;">This link expires in 7 days. If you're having trouble clicking the button, copy and paste this link into your browser:<br>{invite_link}</p>
-        </div>
-        """
-        
-        try:
-            resend.Emails.send({
-                "from": config.MAIL_FROM,
-                "to": email,
-                "subject": "You've been invited to EditEase",
-                "html": html_content
-            })
-            logger.info(f"Invitation email sent to {email}")
-        except Exception as e:
-            logger.error(f"Failed to send invitation email to {email}: {e}")
-            # we don't return error here so the invite still registers internally
-    
-    return {"ok": True, "token": raw_token} # API shouldn't return token unless testing
+
+    # Send email via shared email_service (Flask-Mail)
+    app_url = config.APP_BASE_URL
+    invite_link = f"{app_url}/invite/{raw_token}"
+    try:
+        from services.email_service import send_invitation_email
+        send_invitation_email(email, role, invite_link)
+    except Exception as e:
+        logger.error(f"Failed to send invitation email to {email}: {e}")
+        # we don't return error here so the invite still registers internally
+
+    return {"ok": True, "token": raw_token}  # API shouldn't return token unless testing
 
 
 def validate_invitation(raw_token):

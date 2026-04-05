@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, UploadCloud, Download, Wand2, Shield, LogOut, CheckSquare, Users, Activity, AlertTriangle, Settings } from 'lucide-react';
+import { LayoutDashboard, UploadCloud, Download, Library, Wand2, Shield, LogOut, CheckSquare, Users, Activity, AlertTriangle, Settings } from 'lucide-react';
 import api from './lib/api';
 
 function VerificationBanner({ currentUser }) {
@@ -126,10 +126,10 @@ export default function AppShell({ currentUser, onLogout }) {
   const location = useLocation();
   const role = currentUser?.role || 'editor';
   const navDescriptions = {
-    Dashboard: 'System-wide visibility, recent activity, and the fastest route back into review.',
-    'Review Queue': 'A visual moderation surface for sorting scenes quickly and confidently.',
-    Uploads: 'Bring in new footage and hand it off to the processing pipeline.',
-    Exports: 'Prepare structured outputs and organized media for delivery.',
+    Dashboard: 'Your creative hub. Track recent ingests and see what the system is organizing for you.',
+    'Review Queue': 'Quickly review and sort ambiguous clips so they land in the right folders.',
+    Uploads: 'Drop in your raw files. We\'ll split the scenes and sync them securely to the cloud.',
+    'Organized Videos': 'Browse your auto-organized clips, grouped by label, ready for batch download.',
     Users: 'Manage access, roles, and team operations from one place.',
     'Job Monitor': 'Track background processing across the queue in real time.',
   };
@@ -139,7 +139,7 @@ export default function AppShell({ currentUser, onLogout }) {
     { name: 'Dashboard',    path: '/app/dashboard', icon: LayoutDashboard, roles: ['admin', 'reviewer', 'editor'] },
     { name: 'Review Queue', path: '/app/review',     icon: CheckSquare,     roles: ['admin', 'reviewer'] },
     { name: 'Uploads',      path: '/app/uploads',    icon: UploadCloud,     roles: ['admin', 'editor'] },
-    { name: 'Exports',      path: '/app/exports',    icon: Download,        roles: ['admin', 'editor'] },
+    { name: 'Organized Videos', path: '/app/organized-videos', icon: Library, roles: ['admin', 'editor'] },
   ];
 
   // System nav — admin only (operational visibility)

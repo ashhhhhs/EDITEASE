@@ -1,4 +1,5 @@
-"""Media blueprint: /upload, /export, /thumbnail, /video_clip, /task_status, /auto_organize, /open_folder"""
+"""Media blueprint: /upload, /export, /thumbnail, /video_clip, /task_status,
+/auto_organize, /open_folder, /organized-videos, /organized-videos/download-batch"""
 import os
 from flask import Blueprint, request, jsonify, send_file, redirect
 import config
@@ -51,6 +52,7 @@ def upload_video():
 @media_bp.post('/auto_organize')
 @role_required(['admin', 'editor'])
 def auto_organize():
+    from flask import g
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
     file = request.files['file']
@@ -59,7 +61,8 @@ def auto_organize():
     file_path = config.DATA_DIR / file.filename
     file.save(str(file_path))
     logger.info(f'Auto-organize upload saved locally: {file_path}')
-    task = task_service.dispatch_auto_organize(str(file_path))
+    user_id = str(g.user['id']) if g.user else None
+    task = task_service.dispatch_auto_organize(str(file_path), user_id=user_id)
     return jsonify({'status': 'uploaded', 'message': 'Auto-organize started', 'video_path': str(file_path), 'task_id': task.id})
 
 @media_bp.post('/export')
@@ -86,3 +89,117 @@ def open_folder():
     if os.name == 'nt':
         os.startfile(path)
     return jsonify({'ok': True, 'opened': path})
+
+
+# ── Organized Videos ────────────────────────────────────────────────────────
+
+@media_bp.get('/organized-videos/stats')
+@role_required(['admin', 'editor'])
+def get_organized_video_stats():
+    """Return count of videos per dominant_label."""
+    from services.organized_video_service import get_label_counts
+    return jsonify(get_label_counts())
+
+@media_bp.get('/organized-videos')
+@role_required(['admin', 'editor'])
+def list_organized_videos():
+    """List organized videos with optional filters.
+    Query params: label, from_date, to_date, uploader, is_duplicate, search, page, limit
+    """
+    from services.organized_video_service import list_organized_videos as svc_list
+    is_dup = request.args.get('is_duplicate')
+    is_dup_bool = None
+    if is_dup is not None:
+        is_dup_bool = is_dup.lower() in ('1', 'true', 'yes')
+    result = svc_list(
+        label=request.args.get('label'),
+        from_date=request.args.get('from_date'),
+        to_date=request.args.get('to_date'),
+        uploader=request.args.get('uploader'),
+        is_duplicate=is_dup_bool,
+        search=request.args.get('search'),
+        page=request.args.get('page', 1, type=int),
+        limit=request.args.get('limit', 20, type=int),
+    )
+    return jsonify(result)
+
+
+@media_bp.get('/organized-videos/<video_id>')
+@role_required(['admin', 'editor'])
+def get_organized_video(video_id):
+    """Fetch a single organized video record by ID."""
+    from services.organized_video_service import get_organized_video as svc_get
+    doc = svc_get(video_id)
+    if not doc:
+        return jsonify({'error': 'Not found'}), 404
+    return jsonify(doc)
+
+
+@media_bp.post('/organized-videos/download')
+@role_required(['admin', 'editor'])
+@require_verified_email
+def download_organized_video():
+    """Redirect to the Cloudinary URL for a single organized video."""
+    from services.organized_video_service import get_organized_video as svc_get
+    data = request.get_json(force=True) or {}
+    video_id = data.get('id')
+    if not video_id:
+        return jsonify({'error': 'id is required'}), 400
+    doc = svc_get(video_id)
+    if not doc:
+        return jsonify({'error': 'Not found'}), 404
+    url = doc.get('cloudinary_url')
+    if not url:
+        return jsonify({'error': 'No Cloudinary URL available for this video'}), 404
+    return redirect(url, code=302)
+
+
+# ── Batch ZIP (background job) ───────────────────────────────────────────────
+
+@media_bp.post('/organized-videos/download-batch')
+@role_required(['admin', 'editor'])
+@require_verified_email
+def start_batch_download():
+    """Enqueue a background ZIP build for selected organized videos.
+    Body: { "ids": ["<id1>", "<id2>", ...] }  (max 10)
+    Returns: { "task_id": "..." }
+    """
+    from flask import g
+    from services.organized_video_service import validate_batch_request
+    from api.celery_worker import build_zip_task
+    data = request.get_json(force=True) or {}
+    ids = data.get('ids', [])
+    ok, err = validate_batch_request(ids)
+    if not ok:
+        return jsonify({'error': err}), 400
+    user_id = str(g.user['id']) if g.user else None
+    task = build_zip_task.delay(ids, user_id)
+    return jsonify({'task_id': task.id, 'status': 'queued'})
+
+
+@media_bp.get('/organized-videos/download-batch/<task_id>')
+@role_required(['admin', 'editor'])
+def poll_batch_download(task_id):
+    """Poll the status of a batch ZIP job.
+    Returns status; streams the ZIP file when status == SUCCESS.
+    """
+    import os
+    from services.task_service import tasks_col
+    from services.organized_video_service import get_zip_download_path
+    job = tasks_col.find_one({'task_id': task_id, 'type': 'build_zip'})
+    if not job:
+        return jsonify({'error': 'Task not found'}), 404
+    status = job.get('status')
+    if status == 'SUCCESS':
+        zip_path = get_zip_download_path(task_id)
+        if not zip_path or not os.path.exists(zip_path):
+            return jsonify({'error': 'ZIP file not found on server'}), 404
+        return send_file(
+            zip_path,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name='organized-videos.zip',
+        )
+    if status == 'FAILURE':
+        return jsonify({'status': 'FAILURE', 'error': job.get('error_message', 'Unknown error')}), 500
+    return jsonify({'status': status, 'progress_step': job.get('progress_step')})

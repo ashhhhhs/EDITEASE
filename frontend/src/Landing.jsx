@@ -23,8 +23,8 @@ const CAPABILITIES = [
     Icon: Grid3X3,
   },
   {
-    title: 'Structured exports',
-    desc: 'Generate JSON or CSV manifests that map clips to scenes and tags. Ingest directly into your NLE or training pipeline.',
+    title: 'Structured organization',
+    desc: 'Generate JSON or CSV manifests, or simply let the system automatically organize your assets into labeled folders, ready for batch download.',
     accent: 'var(--warning)',
     Icon: Download,
   },
@@ -40,7 +40,7 @@ const STEPS = [
   { num: '01', label: 'Upload', body: 'Drop any video format. No conversion needed.' },
   { num: '02', label: 'Analyze', body: 'Scene boundaries and tags detected automatically.' },
   { num: '03', label: 'Review', body: 'Visual clip grid. Approve, flag, or skip.' },
-  { num: '04', label: 'Export', body: 'Structured manifest ready for your NLE or dataset.' },
+  { num: '04', label: 'Download', body: 'Batch download organized videos or structured datasets.' },
 ];
 
 const heroFrameAssets = [
@@ -181,7 +181,7 @@ export default function Landing() {
               <Link to={isLoggedIn ? '/app/dashboard' : '/login'} className="btn-launch">
                 {isLoggedIn ? 'Open Workspace ->' : 'Get Started ->'}
               </Link>
-              <a href="#how-it-works" className="btn-ghost">See how it works -></a>
+              <a href="#how-it-works" className="btn-ghost">See how it works -</a>
             </div>
             <div className="hero-metrics fade-up">
               <div className="hero-metric-card">
@@ -313,7 +313,7 @@ export default function Landing() {
             <div className="preview-body">
               <div className="preview-sidebar">
                 <div className="preview-sidebar-logo" />
-                {['Dashboard', 'Review Queue', 'Uploads', 'Exports'].map((item, i) => (
+                {['Dashboard', 'Review Queue', 'Uploads', 'Organized Videos'].map((item, i) => (
                   <div key={item} className={`preview-nav-item ${i === 1 ? 'active' : ''}`}>{item}</div>
                 ))}
               </div>

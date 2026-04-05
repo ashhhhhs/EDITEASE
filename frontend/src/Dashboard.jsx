@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, CheckCircle, AlertCircle, Film, Users, Video, Scissors, CheckSquare, Activity, XOctagon, TrendingUp, Clock } from 'lucide-react';
+import { BarChart3, CheckCircle, AlertCircle, Film, Users, Video, Scissors, CheckSquare, Activity, XOctagon, TrendingUp, Clock, Library } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Link } from 'react-router-dom';
 import PageHeader from './components/PageHeader';
 import LoadingState from './components/LoadingState';
@@ -74,6 +75,24 @@ function AdminOverview() {
   const hasFailures = (stats?.tasks_failed || 0) > 0;
   const isRunning = (stats?.tasks_running || 0) > 0;
 
+  // Recharts data conversions
+  const COLORS = ['#58a6ff', '#3fb950', '#8957e5', '#d29922', '#f85149', '#cca700', '#2ea043', '#1f6feb'];
+
+  const labelData = stats?.organized_by_label 
+    ? Object.entries(stats.organized_by_label)
+        .sort((a,b) => b[1] - a[1])
+        .map(([name, value]) => ({ 
+          name: name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), 
+          value 
+        }))
+    : [];
+
+  const clipStatusData = stats ? [
+    { name: 'Reviewed & Sorted', value: Math.max(0, stats.total_clips - stats.pending_review - stats.uncertain_clips) },
+    { name: 'Pending Review', value: stats.pending_review },
+    { name: 'Uncertain Clips', value: stats.uncertain_clips },
+  ].filter(d => d.value > 0) : [];
+
   return (
     <div>
       <PageHeader title="Overview" description="System status and recent activity." />
@@ -128,10 +147,15 @@ function AdminOverview() {
           <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-secondary)' }}>{stats?.active_users} active</div>
         </BentoCard>
 
-        {/* Videos */}
-        <BentoCard>
-          <StatLabel><Video size={13} style={{verticalAlign:'middle',marginRight:4}} /> Videos</StatLabel>
-          <StatValue value={stats?.total_videos} />
+        {/* Organized Videos */}
+        <BentoCard accent="var(--success)">
+          <StatLabel><Library size={13} style={{verticalAlign:'middle',marginRight:4}} /> Organized Videos</StatLabel>
+          <StatValue value={stats?.total_organized_videos} color="var(--success)" />
+          {(stats?.duplicate_videos || 0) > 0 && (
+            <div style={{ fontSize: 'var(--font-meta)', color: 'var(--success)' }}>
+              + {stats.duplicate_videos} duplicates linked
+            </div>
+          )}
         </BentoCard>
 
         {/* Quick Actions — wide */}
@@ -144,6 +168,75 @@ function AdminOverview() {
           </div>
         </BentoCard>
       </div>
+
+      {/* ── Figurative Charts ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-20)' }}>
+        <BentoCard>
+          <h3 style={{ margin: '0 0 var(--space-8) 0', fontSize: 'var(--font-title-card)' }}>Review Pipeline Status</h3>
+          <p style={{ margin: '0 0 var(--space-16) 0', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)' }}>Distribution of raw clips by human review state.</p>
+          {clipStatusData.length > 0 ? (
+            <div style={{ width: '100%', height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={clipStatusData}
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={70}
+                    outerRadius={90}
+                    paddingAngle={5}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {clipStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.name.includes('Reviewed') ? 'var(--success)' : entry.name.includes('Pending') ? 'var(--warning)' : 'var(--danger)'} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'var(--surface-elevated)', border: '1px solid var(--border-strong)', borderRadius: 8 }}
+                    itemStyle={{ color: 'var(--text-primary)' }}
+                  />
+                  <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: 'var(--font-small)', color: 'var(--text-primary)' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-small)', padding: 'var(--space-48) 0', textAlign: 'center' }}>No clip data found.</div>
+          )}
+        </BentoCard>
+
+        <BentoCard>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-8)' }}>
+            <h3 style={{ margin: 0, fontSize: 'var(--font-title-card)' }}>Classification Breakdown</h3>
+            <Link to="/app/organized-videos" className="btn" style={{ fontSize: 'var(--font-meta)', padding: '4px 10px' }}>Browse</Link>
+          </div>
+          <p style={{ margin: '0 0 var(--space-16) 0', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)' }}>Total organized assets by AI detected category.</p>
+          {labelData.length > 0 ? (
+            <div style={{ width: '100%', height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsBarChart data={labelData} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-subtle)" />
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" width={110} axisLine={false} tickLine={false} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
+                  <Tooltip 
+                    cursor={{ fill: 'var(--surface-hover)' }}
+                    contentStyle={{ backgroundColor: 'var(--surface-elevated)', border: '1px solid var(--border-strong)', borderRadius: 8 }}
+                    itemStyle={{ color: 'var(--accent)' }}
+                  />
+                  <Bar dataKey="value" name="Count" radius={[0, 4, 4, 0]}>
+                    {labelData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </RechartsBarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-small)', padding: 'var(--space-48) 0', textAlign: 'center' }}>No organized footage.</div>
+          )}
+        </BentoCard>
+      </div>
+
     </div>
   );
 }
@@ -180,7 +273,7 @@ function EditorDashboard() {
 
   return (
     <div>
-      <PageHeader title="Your Workspace" description="Clips awaiting review, recent uploads, and export-ready items." />
+      <PageHeader title="Your Workspace" description="Clips awaiting review, recent uploads, and auto-organized assets." />
 
       {/* ── Primary action banner — shown when unreviewed clips exist ── */}
       {stats && stats.unreviewed > 0 && (
@@ -199,13 +292,13 @@ function EditorDashboard() {
         }}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 'var(--font-title-card)', marginBottom: 4 }}>
-              {stats.unreviewed.toLocaleString()} clips awaiting review
+              {stats.unreviewed.toLocaleString()} clips need a quick look
             </div>
             <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-small)' }}>
-              Review clips to build a clean, organized export.
+              Some of your footage was a bit tricky to categorize. An admin will double-check these to keep your folders clean.
             </div>
           </div>
-          <Link to="/app/review" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>Continue Review →</Link>
+          <Link to="/app/uploads" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>Continue Uploading →</Link>
         </div>
       )}
 
@@ -215,11 +308,11 @@ function EditorDashboard() {
           <StatValue value={stats?.total} />
         </BentoCard>
         <BentoCard accent="var(--success)">
-          <StatLabel><CheckCircle size={13} style={{verticalAlign:'middle',marginRight:4}} /> Reviewed</StatLabel>
+          <StatLabel><CheckCircle size={13} style={{verticalAlign:'middle',marginRight:4}} /> Organized</StatLabel>
           <StatValue value={stats?.reviewed} color="var(--success)" />
         </BentoCard>
         <BentoCard accent="var(--danger)">
-          <StatLabel><AlertCircle size={13} style={{verticalAlign:'middle',marginRight:4}} /> Unreviewed</StatLabel>
+          <StatLabel><AlertCircle size={13} style={{verticalAlign:'middle',marginRight:4}} /> Pending Sort</StatLabel>
           <StatValue value={stats?.unreviewed} color="var(--danger)" />
         </BentoCard>
       </div>
@@ -227,7 +320,7 @@ function EditorDashboard() {
       <div style={{ background: 'var(--surface-panel)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-24)', marginBottom: 'var(--space-24)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-20)' }}>
           <h2 style={{ margin: 0 }}>Class Distribution</h2>
-          {stats?.allClassesReady && <span className="badge success">🎉 ML Ready</span>}
+          {stats?.allClassesReady && <span className="badge success">🎉 Dataset Ready</span>}
         </div>
         {stats && Object.keys(stats.typeCounts).length > 0 ? (
           Object.entries(stats.typeCounts).sort((a, b) => b[1] - a[1]).map(([label, count]) => {
@@ -254,7 +347,7 @@ function EditorDashboard() {
             <div style={{ fontSize: '2.5rem', marginBottom: 'var(--space-16)' }}>📂</div>
             <div style={{ fontWeight: 600, fontSize: 'var(--font-title-card)', marginBottom: 'var(--space-8)' }}>No footage yet</div>
             <div style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-24)', maxWidth: 360, margin: '0 auto var(--space-24)' }}>
-              Upload your first video to start scene detection and review.
+              Upload your first batch of raw footage, and let the system organize your timeline.
             </div>
             <Link to="/app/uploads" className="btn btn-primary">Upload Footage</Link>
           </div>

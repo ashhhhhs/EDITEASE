@@ -27,9 +27,15 @@ API_PORT = int(os.getenv("API_PORT", 5000))
 API_DEBUG = os.getenv("API_DEBUG", "True").lower() == "true"
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:5173")
 
-# Email Settings (Phase 2)
-RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
-MAIL_FROM = os.environ.get('MAIL_FROM', '')
+# Email Settings — Gmail SMTP with App Password
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')   # kept for transition period
+MAIL_FROM = os.environ.get('MAIL_FROM', '')             # legacy alias
+MAIL_SERVER   = os.getenv('MAIL_SERVER',          'smtp.gmail.com')
+MAIL_PORT     = int(os.getenv('MAIL_PORT',        '587'))
+MAIL_USE_TLS  = os.getenv('MAIL_USE_TLS',  'True').lower() == 'true'
+MAIL_USERNAME = os.getenv('MAIL_USERNAME',        '')
+MAIL_PASSWORD = os.getenv('MAIL_PASSWORD',        '')   # 16-char Gmail App Password
+MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', '')
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 
 # Celery / Redis Settings

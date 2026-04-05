@@ -19,6 +19,18 @@ def create_app():
     CORS(app)
     Swagger(app)
 
+    # Flask-Mail configuration (Gmail SMTP with App Password)
+    app.config.update(
+        MAIL_SERVER=config.MAIL_SERVER,
+        MAIL_PORT=config.MAIL_PORT,
+        MAIL_USE_TLS=config.MAIL_USE_TLS,
+        MAIL_USERNAME=config.MAIL_USERNAME,
+        MAIL_PASSWORD=config.MAIL_PASSWORD,
+        MAIL_DEFAULT_SENDER=config.MAIL_DEFAULT_SENDER,
+    )
+    from services.email_service import mail
+    mail.init_app(app)
+
     # Register all domain blueprints
     app.register_blueprint(auth_bp)     # /register /login /logout /me
     app.register_blueprint(admin_bp)    # /admin/*

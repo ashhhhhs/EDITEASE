@@ -15,12 +15,13 @@ import VerifyEmail from './VerifyEmail';
 import Dashboard from './Dashboard';
 import Inspector from './Inspector';
 import Upload from './Upload';
-import EditorView from './EditorView';
+import OrganizedVideos from './OrganizedVideos';
 import UserManagement from './UserManagement';
 import JobMonitor from './JobMonitor';
 import Landing from './Landing';
 import Settings from './Settings';
 import Invite from './Invite';
+import { UploadProvider } from './UploadContext';
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
@@ -104,13 +105,13 @@ export default function App() {
           <Route path="/verify-email/:token" element={<VerifyEmail onVerificationSuccess={handleVerificationSuccess} />} />
           <Route path="/invite/:token" element={<Invite currentUser={currentUser} />} />
           
-          <Route path="/app" element={token && currentUser ? <AppShell currentUser={currentUser} onLogout={handleLogout} /> : <Navigate to="/login" replace />}>
+          <Route path="/app" element={token && currentUser ? <UploadProvider><AppShell currentUser={currentUser} onLogout={handleLogout} /></UploadProvider> : <Navigate to="/login" replace />}>
             <Route path="dashboard" element={<Dashboard currentUser={currentUser} />} />
             <Route path="review" element={<RoleGuard allowedRoles={['admin', 'reviewer']}><Inspector /></RoleGuard>} />
             <Route path="admin/users" element={<RoleGuard allowedRoles={['admin']}><UserManagement currentUser={currentUser} /></RoleGuard>} />
             <Route path="admin/jobs" element={<RoleGuard allowedRoles={['admin']}><JobMonitor /></RoleGuard>} />
             <Route path="uploads" element={<RoleGuard allowedRoles={['admin', 'editor']}><Upload /></RoleGuard>} />
-            <Route path="exports" element={<RoleGuard allowedRoles={['admin', 'editor']}><EditorView currentUser={currentUser} /></RoleGuard>} />
+            <Route path="organized-videos" element={<RoleGuard allowedRoles={['admin', 'editor']}><OrganizedVideos /></RoleGuard>} />
             <Route path="settings" element={<Settings currentUser={currentUser} />} />
             <Route path="*" element={<Navigate to="dashboard" replace />} />
           </Route>

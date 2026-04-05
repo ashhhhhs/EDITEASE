@@ -86,3 +86,40 @@ def move_video(old_public_id: str, new_public_id: str) -> str | None:
     except Exception as exc:
         logger.error("Cloudinary move failed: %s", exc)
         return None
+
+
+def upload_video_returning_id(local_path: str, public_id: str) -> tuple[str, str] | tuple[None, None]:
+    """Upload a video and return (secure_url, public_id). Used by hash-safe organize flow."""
+    if not is_configured():
+        logger.warning("Cloudinary credentials not configured; skipping upload.")
+        return None, None
+    try:
+        result = cloudinary.uploader.upload(
+            local_path,
+            resource_type="video",
+            public_id=public_id,
+        )
+        url = result.get("secure_url")
+        pid = result.get("public_id", public_id)
+        logger.info("Uploaded video to Cloudinary: %s -> %s", pid, url)
+        return url, pid
+    except Exception as exc:
+        logger.error("Cloudinary upload_video_returning_id failed: %s", exc)
+        return None, None
+
+
+def move_video_returning_id(old_public_id: str, new_public_id: str) -> tuple[str, str] | tuple[None, None]:
+    """Rename a Cloudinary video and return (secure_url, new_public_id). Used by hash-safe organize flow."""
+    if not is_configured():
+        logger.warning("Cloudinary credentials not configured; skipping move.")
+        return None, None
+    try:
+        res = cloudinary.uploader.rename(old_public_id, new_public_id, overwrite=True, resource_type="video")
+        url = res.get("secure_url")
+        pid = res.get("public_id", new_public_id)
+        logger.info("Moved Cloudinary video: %s -> %s", old_public_id, pid)
+        return url, pid
+    except Exception as exc:
+        logger.error("Cloudinary move_video_returning_id failed: %s", exc)
+        return None, None
+

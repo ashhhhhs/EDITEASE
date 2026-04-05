@@ -123,28 +123,41 @@ def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene
     return emotion_timeline, dominant_overall, face_present_any, face_present_ratio
 
 
-def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD):
+def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD, file_hash: str | None = None, progress_callback=None):
     video_name = os.path.splitext(os.path.basename(video_path))[0]
     logger.info(f"Processing video: {video_name}")
+    if progress_callback: progress_callback(f"Started analyzing {video_name}...")
 
     thumbs_dir = os.path.join(base_dir, "thumbnails", video_name)
     os.makedirs(thumbs_dir, exist_ok=True)
 
+    # Use hash-safe public ID when available (auto_organize flow) to prevent
+    # filename collisions at the first upload step — before any rename occurs.
+    if file_hash:
+        from database.organized_videos_schema import slugify
+        safe_name = slugify(video_name)
+        cloudinary_public_id = f"editease/videos/{file_hash}__{safe_name}"
+    else:
+        cloudinary_public_id = f"editease/videos/{video_name}"
+
     cloudinary_video_url = cloudinary_service.upload_video(
         video_path,
-        public_id=f"editease/videos/{video_name}",
+        public_id=cloudinary_public_id,
     )
     if cloudinary_video_url:
         logger.info("Video uploaded to Cloudinary: %s", cloudinary_video_url)
+        if progress_callback: progress_callback("Secure backup complete. Detecting cuts...")
     else:
         logger.warning(
             "Cloudinary video upload failed for %s, continuing with local path fallback",
             video_name,
         )
+        if progress_callback: progress_callback("Backup failed. Processing locally...")
 
     scenes = find_scenes(video_path, threshold=threshold)
     if not scenes:
         logger.warning("No scenes detected for %s, skipping", video_name)
+        if progress_callback: progress_callback("No distinct scenes found.")
         return
 
     merged = []
@@ -237,6 +250,11 @@ def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD)
             scene_label,
             dominant_overall,
         )
+        
+        if progress_callback:
+            emo_str = f"Emotion: {dominant_overall}." if dominant_overall else "No faces."
+            label_disp = scene_label.replace("_", " ").title()
+            progress_callback(f"Scene {idx}/{len(scenes)}: Classified as {label_disp}. {emo_str}")
 
     out_dir = os.path.join(base_dir, "scene_indexes")
     os.makedirs(out_dir, exist_ok=True)
@@ -249,6 +267,7 @@ def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD)
 
     upsert_count = upsert_scene_docs(merged, source_name=os.path.basename(out_path))
     logger.info("Upserted %s scenes into MongoDB for %s", upsert_count, video_name)
+    if progress_callback: progress_callback("Indexing timeline directly into database...")
 
 
 def run_batch():

@@ -9,7 +9,23 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 @role_required(['admin'])
 def admin_overview():
     from services.task_service import tasks_col
+    from database.organized_videos_schema import _get_col
+    from services.organized_video_service import get_label_counts
     user_counts = auth_service.get_user_summary_counts()
+    ov_col = _get_col()
+    total_organized = ov_col.count_documents({"status": "organized"})
+    total_duplicates = ov_col.count_documents({"status": "duplicate"})
+    label_counts = get_label_counts()
+    recent_cursor = ov_col.find({"status": "organized"}).sort("created_at", -1).limit(5)
+    recent_organized = []
+    for doc in recent_cursor:
+        recent_organized.append({
+            "id": str(doc["_id"]),
+            "display_name": doc.get("display_name"),
+            "dominant_label": doc.get("dominant_label"),
+            "created_at": doc.get("created_at"),
+            "uploaded_by": doc.get("uploaded_by"),
+        })
     return jsonify({
         'total_users': user_counts['total_users'],
         'active_users': user_counts['active_users'],
@@ -19,6 +35,10 @@ def admin_overview():
         'uncertain_clips': clip_service.col.count_documents({'uncertain': True}),
         'tasks_running': tasks_col.count_documents({'status': {'$in': ['PENDING', 'STARTED']}}),
         'tasks_failed': tasks_col.count_documents({'status': 'FAILURE'}),
+        'total_organized_videos': total_organized,
+        'duplicate_videos': total_duplicates,
+        'organized_by_label': label_counts,
+        'recent_organized_uploads': recent_organized,
     })
 
 @admin_bp.get('/users')

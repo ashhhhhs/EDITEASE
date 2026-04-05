@@ -7,15 +7,8 @@ from pymongo import MongoClient
 
 import config
 from utils.logger import setup_logger
-import resend
 
 logger = setup_logger("verification_service")
-
-RATE_LIMIT_PER_HOUR = 3
-
-# Resend config
-if config.RESEND_API_KEY:
-    resend.api_key = config.RESEND_API_KEY
 
 _client = None
 
@@ -28,44 +21,12 @@ def _get_db():
 def _hash_token(raw_token):
     return hashlib.sha256(raw_token.encode()).hexdigest()
 
+RATE_LIMIT_PER_HOUR = 3
+
 def send_verification_email(email, raw_token):
-    """Sends the verification email. Silently fails if no API key is set."""
-    if not config.RESEND_API_KEY:
-        logger.warning(f"No RESEND_API_KEY. Would have sent verification token {raw_token} to {email}")
-        return
-
-    # TODO: Once frontend router uses History API, this should be an absolute URL correctly resolving to frontend
-    # Assuming frontend runs on same domain or we have an APP_BASE_URL
-    app_url = config.APP_BASE_URL if hasattr(config, "APP_BASE_URL") else "http://localhost:5173"
-    verify_url = f"{app_url}/verify-email/{raw_token}"
-
-    html_content = f"""
-    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2>Verify your email address</h2>
-        <p>Thanks for joining EDITEASE! Please verify your email address to unlock all features.</p>
-        <div style="margin: 30px 0;">
-            <a href="{verify_url}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Verify Email Address &rarr;</a>
-        </div>
-        <p style="color: #666; font-size: 14px;">This link expires in 24 hours.</p>
-        <p style="color: #666; font-size: 14px;">If you didn't create an account, you can safely ignore this email.</p>
-        <p style="color: #666; font-size: 14px; margin-top: 30px;">&ndash; The EDITEASE Team</p>
-    </div>
-    """
-
-
-    try:
-        if config.RESEND_API_KEY.startswith("re_"):
-            # Only actually send if it looks like a real key to prevent crash on dummy key
-            # In testing, we might want to bypass
-            resend.Emails.send({
-                "from": config.MAIL_FROM,
-                "to": email,
-                "subject": "Verify your EDITEASE email",
-                "html": html_content
-            })
-            logger.info(f"Verification email sent to {email}")
-    except Exception as e:
-        logger.error(f"Failed to send verification email to {email}: {e}")
+    """Send verification email via the shared email_service."""
+    from services.email_service import send_verification_email as _send
+    _send(email, raw_token)
 
 def create_and_send_verification(user_id, email):
     """Generates a token, stores hash, and triggers email send."""

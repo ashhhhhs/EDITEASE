@@ -41,7 +41,7 @@ def dispatch_process(file_path, user_id=None):
 
 def dispatch_auto_organize(file_path, user_id=None):
     """Dispatch auto_organize task."""
-    task = auto_organize_task.delay(file_path, str(config.BASE_DIR))
+    task = auto_organize_task.delay(file_path, str(config.BASE_DIR), user_id)
     insert_task_record(task.id, "auto_organize", initiated_by=user_id, input_path=file_path)
     logger.info(f"Dispatched auto-organize task {task.id} for {file_path}")
     return task
@@ -49,10 +49,21 @@ def dispatch_auto_organize(file_path, user_id=None):
 def get_task_status(task_id):
     """Query celery worker for task status."""
     task_result = celery_app.AsyncResult(task_id)
+    
+    if task_result.ready():
+        result_data = task_result.result
+    else:
+        # info holds the meta dictionary during PROGRESS
+        result_data = task_result.info
+
+    # If info is just a string (sometimes Celery does this depending on backend), wrap it
+    if isinstance(result_data, str):
+        result_data = {"message": result_data}
+
     return {
         "task_id": task_id,
         "status": task_result.status,
-        "result": task_result.result if task_result.ready() else None
+        "result": result_data
     }
 
 def get_paginated_jobs(page=1, limit=20, status=None, task_type=None):

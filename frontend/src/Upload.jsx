@@ -1,12 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { UploadCloud, CheckCircle, FileVideo, AlertCircle, Loader } from 'lucide-react';
 import api from './lib/api';
 import PageHeader from './components/PageHeader';
 import ContentSection from './components/ContentSection';
+import { useUpload } from './UploadContext';
 
 export default function Upload() {
-  const [files, setFiles] = useState([]);
-  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
+  const { files, setFiles, isProcessingQueue, setIsProcessingQueue } = useUpload();
   const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
@@ -48,103 +48,11 @@ export default function Upload() {
     setIsProcessingQueue(true);
   };
 
-  // Upload queue runner
-  useEffect(() => {
-    if (!isProcessingQueue) return;
-
-    const activeIndex = files.findIndex(f => f.status === 'UPLOADING');
-    if (activeIndex !== -1) return; // Currently uploading one, wait for it
-
-    const nextIndex = files.findIndex(f => f.status === 'PENDING');
-    if (nextIndex === -1) {
-       setIsProcessingQueue(false); // Queue is empty/done uploading
-       return;
-    }
-
-    const uploadNext = async () => {
-       setFiles(prev => {
-           const newF = [...prev];
-           newF[nextIndex].status = 'UPLOADING';
-           return newF;
-       });
-
-       const formData = new FormData();
-       formData.append('file', files[nextIndex].fileObj);
-
-       try {
-           const res = await api.post('/auto_organize', formData, {
-               headers: { 'Content-Type': 'multipart/form-data' }
-           });
-           
-           if (res.data.task_id) {
-               setFiles(prev => {
-                   const newF = [...prev];
-                   newF[nextIndex].taskId = res.data.task_id;
-                   newF[nextIndex].status = 'PROCESSING';
-                   return newF;
-               });
-           } else {
-               setFiles(prev => {
-                   const newF = [...prev];
-                   newF[nextIndex].status = 'FAILURE';
-                   newF[nextIndex].error = 'No task ID returned';
-                   return newF;
-               });
-           }
-       } catch (err) {
-           setFiles(prev => {
-               const newF = [...prev];
-               newF[nextIndex].status = 'FAILURE';
-               newF[nextIndex].error = err.response?.data?.error || err.message;
-               return newF;
-           });
-       }
-    };
-
-    uploadNext();
-  }, [isProcessingQueue, files]);
-
-  // Polling for processing tasks
-  useEffect(() => {
-     let interval;
-     const processingFiles = files.filter(f => f.status === 'PROCESSING' && f.taskId);
-     
-     if (processingFiles.length > 0) {
-        interval = setInterval(async () => {
-           let changed = false;
-           const updatedFiles = await Promise.all(files.map(async f => {
-               if (f.status === 'PROCESSING' && f.taskId) {
-                   try {
-                       const res = await api.get(`/task_status/${f.taskId}`);
-                       if (res.data.status === 'SUCCESS' || res.data.status === 'FAILURE') {
-                           changed = true;
-                           return { 
-                               ...f, 
-                               status: res.data.status, 
-                               error: res.data.status === 'FAILURE' ? 'Processing failed' : null 
-                           };
-                       }
-                   } catch (err) {
-                       console.error('Failed to get status for task', f.taskId, err);
-                   }
-               }
-               return f;
-           }));
-           
-           if (changed) {
-               setFiles(updatedFiles);
-           }
-        }, 3000);
-     }
-     
-     return () => clearInterval(interval);
-  }, [files]);
-
   return (
     <div>
       <PageHeader 
-        title="Upload Videos" 
-        description="Videos will be automatically split, categorized, and organized into Cloudinary via our Agentic Workflow."
+        title="Ingest Footage" 
+        description="Drop your raw media here. We'll automatically break it down, sort the scenes, and sync everything directly to your cloud storage."
       />
 
       <ContentSection>
@@ -177,7 +85,7 @@ export default function Upload() {
                     <h3 style={{ margin: 0 }}>Upload Queue ({files.length})</h3>
                     {!isProcessingQueue && files.some(f => f.status === 'PENDING') && (
                         <button className="btn btn-primary" onClick={startUploadQueue}>
-                            Start Agentic Processing
+                            Start Processing
                         </button>
                     )}
                 </div>
@@ -203,7 +111,16 @@ export default function Upload() {
                                     <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', color: 'var(--accent)' }}>Uploading...</span>
                                 )}
                                 {file.status === 'PROCESSING' && (
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', color: '#d97706' }}>Agent Processing...</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', color: '#d97706' }}>
+                                            Analyzing & Sorting...
+                                        </span>
+                                        {file.progressMessage && (
+                                            <span style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)', fontStyle: 'italic', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {file.progressMessage}
+                                            </span>
+                                        )}
+                                    </div>
                                 )}
                                 {file.status === 'SUCCESS' && (
                                     <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', color: 'var(--success)' }}><CheckCircle size={16} /> Organized</span>
