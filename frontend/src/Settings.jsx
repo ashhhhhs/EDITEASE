@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { Mail, Lock, LogOut, Trash2, Smartphone, ShieldAlert } from 'lucide-react';
 import api from './lib/api';
+import PageHeader from './components/PageHeader';
 
 export default function Settings({ currentUser }) {
   const [activeTab, setActiveTab] = useState('profile');
 
   return (
     <div style={{ padding: 'var(--space-24) var(--space-40)', maxWidth: 800 }}>
-      {/* Header */}
-      <div style={{ marginBottom: 'var(--space-32)' }}>
-        <h1 style={{ margin: '0 0 var(--space-8) 0', fontSize: '24px', fontWeight: 600 }}>Account Settings</h1>
-        <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Manage your profile, security preferences, and connected accounts.</p>
-      </div>
+      <PageHeader 
+        title="Account Settings" 
+        description="Manage your profile, security preferences, and connected accounts." 
+      />
 
       <div style={{ display: 'flex', gap: 'var(--space-32)' }}>
         {/* Sidebar Tabs */}

@@ -136,7 +136,7 @@ def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD,
     if file_hash:
         from database.organized_videos_schema import slugify
         safe_name = slugify(video_name)
-        cloudinary_public_id = f"editease/videos/{file_hash}__{safe_name}"
+        cloudinary_public_id = f"editease/videos/{file_hash}/{safe_name}"
     else:
         cloudinary_public_id = f"editease/videos/{video_name}"
 

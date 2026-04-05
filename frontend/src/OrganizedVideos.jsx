@@ -4,11 +4,14 @@ import {
   CheckCircle, Archive, X, ChevronLeft, PlayCircle
 } from 'lucide-react';
 import api from './lib/api';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
 import { useToast } from './hooks/useToast.jsx';
 import PageHeader from './components/PageHeader';
 import LoadingState from './components/LoadingState';
 
-const POLL_INTERVAL_MS = 2500;
 const BATCH_MAX = 10;
 
 const LABEL_MAP = {
@@ -57,6 +60,7 @@ function FolderCard({ label, count, onClick }) {
   const display = getDisplayLabel(label);
   return (
     <div
+      className="folder-card gs-reveal"
       onClick={() => onClick(label)}
       style={{
         background: 'var(--surface-panel)', border: '1px solid var(--border-subtle)',
@@ -108,6 +112,7 @@ function VideoCard({ doc, selected, onSelect, onPreview, onDownload }) {
 
   return (
     <div
+      className="video-card gs-reveal"
       style={{
         background: 'var(--surface-panel)',
         border: `1px solid ${selected ? 'var(--accent)' : 'var(--border-subtle)'}`,
@@ -254,10 +259,6 @@ export default function OrganizedVideos() {
   const [search, setSearch]         = useState('');
   const [filterDup, setFilterDup]   = useState('');   // '' | 'true' | 'false'
 
-  // Batch download
-  const [batchTask, setBatchTask]   = useState(null);  // { id, status, step }
-  const [batchPolling, setBatchPolling] = useState(false);
-
   const limit = 24;
 
   const fetchStats = useCallback(async () => {
@@ -290,6 +291,34 @@ export default function OrganizedVideos() {
     }
   }, [search, filterDup, currentFolder, toast]);
 
+  // GSAP Batch entrance effect
+  const mainRef = React.useRef(null);
+
+  React.useLayoutEffect(() => {
+    if (loading || statsLoading) return;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    let t = setTimeout(() => {
+      const ctx = gsap.context(() => {
+        ScrollTrigger.batch('.gs-reveal', {
+          onEnter: elements => {
+            gsap.fromTo(elements,
+              { opacity: 0, y: 30 },
+              { opacity: 1, y: 0, stagger: 0.05, duration: 0.5, ease: 'power2.out', overwrite: true }
+            );
+          },
+          once: true
+        });
+        ScrollTrigger.refresh();
+      }, mainRef);
+
+      return () => ctx.revert();
+    }, 50); // slight delay to allow React to paint DOM elements
+
+    return () => clearTimeout(t);
+  }, [loading, statsLoading, videos, folderStats]);
+
   // Load stats or videos depending on folder state
   useEffect(() => { 
     if (currentFolder === null) {
@@ -314,65 +343,46 @@ export default function OrganizedVideos() {
   const clearAll  = () => setSelected(new Set());
 
   const handleSingleDownload = async (doc) => {
-    if (!doc.cloudinary_url) { toast.error('No download URL available'); return; }
     try {
-      await api.post('/organized-videos/download', { id: doc.id });
-    } catch { }
-    window.open(doc.cloudinary_url, '_blank', 'noopener');
+      const res = await api.post('/organized-videos/download', { id: doc.id });
+      if (res.data.url) {
+        // Trigger direct download via attachment URL
+        window.location.href = res.data.url;
+        toast.success(`Starting download: ${doc.display_name}`);
+      }
+    } catch (err) {
+      toast.error(err.friendlyMessage || 'Download failed');
+    }
   };
 
   const handleBatchDownload = async () => {
     const ids = Array.from(selected);
-    if (ids.length === 0) { toast.error('Select at least one video'); return; }
+    if (ids.size === 0) { toast.error('Select at least one video'); return; }
     if (ids.length > BATCH_MAX) { toast.error(`Batch limit is ${BATCH_MAX} files`); return; }
+    
+    setLoading(true); // Reusing general loading state for the instant pulse
     try {
       const res = await api.post('/organized-videos/download-batch', { ids });
-      setBatchTask({ id: res.data.task_id, status: 'PENDING', step: 'queued' });
-      setBatchPolling(true);
-      toast.info(`Building ZIP for ${ids.length} file${ids.length > 1 ? 's' : ''}…`);
+      if (res.data.url) {
+        // Trigger instant download
+        window.location.href = res.data.url;
+        toast.success(res.data.message || 'Generating ZIP…');
+        clearAll();
+      }
     } catch (err) {
-      toast.error(err.friendlyMessage || 'Failed to start batch download');
+      toast.error(err.friendlyMessage || 'Failed to generate batch download');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Poll batch ZIP task
-  useEffect(() => {
-    if (!batchPolling || !batchTask?.id) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await api.get(`/organized-videos/download-batch/${batchTask.id}`);
-        const { status, progress_step } = res.data;
-        setBatchTask(t => ({ ...t, status, step: progress_step }));
-        if (status === 'SUCCESS') {
-          clearInterval(interval);
-          setBatchPolling(false);
-          const a = document.createElement('a');
-          a.href = `${api.defaults.baseURL}/organized-videos/download-batch/${batchTask.id}`;
-          a.setAttribute('download', 'organized-videos.zip');
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          toast.success('ZIP ready — downloading');
-          setBatchTask(null);
-        } else if (status === 'FAILURE') {
-          clearInterval(interval);
-          setBatchPolling(false);
-          toast.error(res.data.error || 'Batch ZIP failed');
-          setBatchTask(null);
-        }
-      } catch {
-        clearInterval(interval);
-        setBatchPolling(false);
-      }
-    }, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [batchPolling, batchTask?.id, toast]);
+  // Batch polling removed - now instant via Cloudinary
 
   const totalPages = Math.ceil(total / limit);
   const selCount   = selected.size;
 
   return (
-    <div>
+    <div ref={mainRef}>
       <PageHeader
         title="Organized Videos"
         description="Videos classified and organized intelligently. Select a category below to browse files."
@@ -462,12 +472,9 @@ export default function OrganizedVideos() {
                 className="btn btn-primary"
                 style={{ fontSize: 'var(--font-meta)', padding: '4px 14px', marginLeft: 'auto' }}
                 onClick={handleBatchDownload}
-                disabled={batchPolling || selCount > BATCH_MAX}
+                disabled={loading || selCount > BATCH_MAX}
               >
-                {batchPolling
-                  ? <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> {batchTask?.step || 'Building…'}</>
-                  : <><Archive size={12} /> Download ZIP ({selCount})</>
-                }
+                <Archive size={12} /> Download ZIP ({selCount})
               </button>
             </>
           )}

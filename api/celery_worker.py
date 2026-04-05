@@ -179,8 +179,8 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
 
     # ── Step 6: Move video to organized folder ────────────────────────────────
     from services import cloudinary_service
-    old_pub_id = f"editease/videos/{file_hash}__{safe_name}"
-    new_pub_id = f"editease/organized-videos/{dominant_label}/{file_hash}__{safe_name}"
+    old_pub_id = f"editease/videos/{file_hash}/{safe_name}"
+    new_pub_id = f"editease/organized-videos/{dominant_label}/{file_hash}/{safe_name}"
     cloudinary_url, actual_pub_id = cloudinary_service.move_video_returning_id(old_pub_id, new_pub_id)
 
     if not cloudinary_url:
@@ -220,67 +220,4 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
     }
 
 
-@celery_app.task(bind=True, name="build_zip_task")
-def build_zip_task(self, video_ids: list, user_id: str | None = None):
-    """
-    Build a ZIP archive of selected organized videos for batch download.
-    Hard limit: max 10 files (enforced at API level before dispatch).
-    Files streamed from Cloudinary to disk temp files, not into memory.
-    """
-    import tempfile
-    import zipfile
-    import requests as http_requests
-    from bson import ObjectId
-    from database.organized_videos_schema import _get_col
 
-    logger.info(f"build_zip_task started for {len(video_ids)} videos")
-    tasks_col.update_one({"task_id": self.request.id}, {"$set": {"type": "build_zip", "status": "STARTED", "progress_step": "building"}})
-
-    col = _get_col()
-    docs = list(col.find({"_id": {"$in": [ObjectId(i) for i in video_ids if ObjectId.is_valid(i)]}}))
-
-    if not docs:
-        tasks_col.update_one({"task_id": self.request.id}, {"$set": {"status": "FAILURE", "error_message": "No valid records found", "progress_step": "error"}})
-        return {"status": "error", "message": "No valid records found"}
-
-    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".zip", prefix="editease_batch_")
-    os.close(tmp_fd)
-
-    try:
-        with zipfile.ZipFile(tmp_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for idx, doc in enumerate(docs, start=1):
-                label = doc.get("dominant_label", "other")
-                download_name = doc.get("download_name") or f"{doc.get('safe_name', 'video')}.mp4"
-                arcname = f"organized-videos/{label}/{download_name}"
-                url = doc.get("cloudinary_url", "")
-                self.update_state(state="PROGRESS", meta={"step": "downloading", "current": idx, "total": len(docs)})
-                tasks_col.update_one({"task_id": self.request.id}, {"$set": {"progress_step": f"downloading {idx}/{len(docs)}"}})
-                if not url:
-                    logger.warning("No URL for doc %s, skipping", str(doc["_id"]))
-                    continue
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as vid_tmp:
-                    vid_tmp_path = vid_tmp.name
-                try:
-                    resp = http_requests.get(url, stream=True, timeout=120)
-                    resp.raise_for_status()
-                    with open(vid_tmp_path, "wb") as fout:
-                        for chunk in resp.iter_content(chunk_size=262144):
-                            fout.write(chunk)
-                    zf.write(vid_tmp_path, arcname=arcname)
-                finally:
-                    try:
-                        os.remove(vid_tmp_path)
-                    except Exception:
-                        pass
-    except Exception as exc:
-        logger.error("build_zip_task failed: %s", exc, exc_info=True)
-        try:
-            os.remove(tmp_path)
-        except Exception:
-            pass
-        tasks_col.update_one({"task_id": self.request.id}, {"$set": {"status": "FAILURE", "error_message": str(exc), "progress_step": "error"}})
-        raise exc
-
-    tasks_col.update_one({"task_id": self.request.id}, {"$set": {"status": "SUCCESS", "progress_step": "done", "output_path": tmp_path}})
-    logger.info("build_zip_task complete: %s", tmp_path)
-    return {"status": "success", "zip_path": tmp_path, "file_count": len(docs)}

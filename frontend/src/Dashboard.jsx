@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
 import { BarChart3, CheckCircle, AlertCircle, Film, Users, Video, Scissors, CheckSquare, Activity, XOctagon, TrendingUp, Clock, Library } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Link } from 'react-router-dom';
@@ -29,7 +30,7 @@ function AnimatedNumber({ target }) {
 /* ── Bento card with optional accent bar ── */
 function BentoCard({ children, span = 1, accent, style = {} }) {
   return (
-    <div style={{
+    <div className="bento-card" style={{
       background: 'var(--surface-panel)',
       border: '1px solid var(--border-subtle)',
       borderRadius: 'var(--radius-lg)',
@@ -63,6 +64,24 @@ function AdminOverview() {
   const toast = useToast();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const containerRef = useRef(null);
+
+  useLayoutEffect(() => {
+    if (loading || !containerRef.current) return;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    const ctx = gsap.context(() => {
+      gsap.from('.bento-card', {
+        y: 24,
+        opacity: 0,
+        duration: 0.6,
+        stagger: 0.05,
+        ease: 'power2.out',
+      });
+    }, containerRef);
+    return () => ctx.revert();
+  }, [loading]);
 
   useEffect(() => {
     api.get('/admin/overview')
@@ -94,7 +113,7 @@ function AdminOverview() {
   ].filter(d => d.value > 0) : [];
 
   return (
-    <div>
+    <div ref={containerRef}>
       <PageHeader title="Overview" description="System status and recent activity." />
 
       {/* ── Bento Grid ── */}
@@ -246,6 +265,24 @@ function EditorDashboard() {
   const toast = useToast();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const containerRef = useRef(null);
+
+  useLayoutEffect(() => {
+    if (loading || !containerRef.current) return;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    const ctx = gsap.context(() => {
+      gsap.from('.bento-card, .editor-banner, .class-dist-row', {
+        y: 20,
+        opacity: 0,
+        duration: 0.5,
+        stagger: 0.04,
+        ease: 'power2.out',
+      });
+    }, containerRef);
+    return () => ctx.revert();
+  }, [loading]);
 
   useEffect(() => {
     api.get('/search?limit=10000')
@@ -272,12 +309,12 @@ function EditorDashboard() {
   if (loading) return <LoadingState message="Loading dataset statistics..." />;
 
   return (
-    <div>
+    <div ref={containerRef}>
       <PageHeader title="Your Workspace" description="Clips awaiting review, recent uploads, and auto-organized assets." />
 
       {/* ── Primary action banner — shown when unreviewed clips exist ── */}
       {stats && stats.unreviewed > 0 && (
-        <div style={{
+        <div className="editor-banner" style={{
           background: 'var(--surface-elevated)',
           border: '1px solid var(--border-strong)',
           borderLeft: '3px solid var(--accent)',
@@ -327,7 +364,7 @@ function EditorDashboard() {
             const reviewed = stats.reviewedTypeCounts[label] || 0;
             const isReady = reviewed >= MIN_PER_CLASS;
             return (
-              <div key={label} style={{ marginBottom: 'var(--space-20)' }}>
+              <div key={label} className="class-dist-row" style={{ marginBottom: 'var(--space-20)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-8)', fontSize: 'var(--font-small)' }}>
                   <span style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
                     {label} {isReady && <CheckCircle size={13} color="var(--success)" />}

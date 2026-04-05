@@ -2,6 +2,7 @@
 /auto_organize, /open_folder, /organized-videos, /organized-videos/download-batch"""
 import os
 from flask import Blueprint, request, jsonify, send_file, redirect
+import cloudinary.utils
 import config
 from utils.logger import setup_logger
 from services import clip_service, task_service, export_service
@@ -139,7 +140,7 @@ def get_organized_video(video_id):
 @role_required(['admin', 'editor'])
 @require_verified_email
 def download_organized_video():
-    """Redirect to the Cloudinary URL for a single organized video."""
+    """Generate a signed Cloudinary URL with the attachment flag for direct download."""
     from services.organized_video_service import get_organized_video as svc_get
     data = request.get_json(force=True) or {}
     video_id = data.get('id')
@@ -148,10 +149,20 @@ def download_organized_video():
     doc = svc_get(video_id)
     if not doc:
         return jsonify({'error': 'Not found'}), 404
-    url = doc.get('cloudinary_url')
-    if not url:
-        return jsonify({'error': 'No Cloudinary URL available for this video'}), 404
-    return redirect(url, code=302)
+        
+    pid = doc.get('cloudinary_public_id')
+    if not pid:
+        return jsonify({'error': 'No cloud asset available'}), 404
+        
+    # Generate URL with fl_attachment to force browser "Save As"
+    download_url = cloudinary.utils.cloudinary_url(
+        pid,
+        resource_type="video",
+        flags="attachment",
+        attachment=doc.get('download_name', 'video.mp4')
+    )[0]
+    
+    return jsonify({'url': download_url})
 
 
 # ── Batch ZIP (background job) ───────────────────────────────────────────────
@@ -160,46 +171,34 @@ def download_organized_video():
 @role_required(['admin', 'editor'])
 @require_verified_email
 def start_batch_download():
-    """Enqueue a background ZIP build for selected organized videos.
-    Body: { "ids": ["<id1>", "<id2>", ...] }  (max 10)
-    Returns: { "task_id": "..." }
-    """
+    """Generate an instant, signed Cloudinary ZIP URL for selected videos."""
     from flask import g
-    from services.organized_video_service import validate_batch_request
-    from api.celery_worker import build_zip_task
+    from bson import ObjectId
+    from services.organized_video_service import _get_col, validate_batch_request
     data = request.get_json(force=True) or {}
     ids = data.get('ids', [])
     ok, err = validate_batch_request(ids)
     if not ok:
         return jsonify({'error': err}), 400
-    user_id = str(g.user['id']) if g.user else None
-    task = build_zip_task.delay(ids, user_id)
-    return jsonify({'task_id': task.id, 'status': 'queued'})
-
-
-@media_bp.get('/organized-videos/download-batch/<task_id>')
-@role_required(['admin', 'editor'])
-def poll_batch_download(task_id):
-    """Poll the status of a batch ZIP job.
-    Returns status; streams the ZIP file when status == SUCCESS.
-    """
-    import os
-    from services.task_service import tasks_col
-    from services.organized_video_service import get_zip_download_path
-    job = tasks_col.find_one({'task_id': task_id, 'type': 'build_zip'})
-    if not job:
-        return jsonify({'error': 'Task not found'}), 404
-    status = job.get('status')
-    if status == 'SUCCESS':
-        zip_path = get_zip_download_path(task_id)
-        if not zip_path or not os.path.exists(zip_path):
-            return jsonify({'error': 'ZIP file not found on server'}), 404
-        return send_file(
-            zip_path,
-            mimetype='application/zip',
-            as_attachment=True,
-            download_name='organized-videos.zip',
-        )
-    if status == 'FAILURE':
-        return jsonify({'status': 'FAILURE', 'error': job.get('error_message', 'Unknown error')}), 500
-    return jsonify({'status': status, 'progress_step': job.get('progress_step')})
+    
+    col = _get_col()
+    docs = list(col.find({"_id": {"$in": [ObjectId(i) for i in ids if ObjectId.is_valid(i)]}}))
+    if not docs:
+        return jsonify({'error': 'No valid videos found'}), 404
+        
+    public_ids = [doc.get('cloudinary_public_id') for doc in docs if doc.get('cloudinary_public_id')]
+    if not public_ids:
+        return jsonify({'error': 'No cloud assets found for these videos'}), 404
+        
+    # Generate the signed Cloudinary ZIP URL (expires in 1 hour)
+    zip_url = cloudinary.utils.download_zip_url(
+        public_ids=public_ids,
+        resource_type="video",
+        flatten_folders=True,
+    )
+    
+    return jsonify({
+        'status': 'SUCCESS', 
+        'url': zip_url,
+        'message': f'Instant ZIP created for {len(public_ids)} files'
+    })
