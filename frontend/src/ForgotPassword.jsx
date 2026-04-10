@@ -3,6 +3,7 @@ import { ShieldAlert, Loader2, ArrowLeft, MailCheck } from 'lucide-react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { API_BASE } from './config';
+import AuthShell from './components/AuthShell';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -45,17 +46,8 @@ export default function ForgotPassword() {
 
   if (submitted) {
     return (
-      <div className="app-container" style={{ alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at 50% 0%, var(--surface-panel) 0%, var(--surface-base) 100%)' }}>
-        <div className="panel" style={{ width: '100%', maxWidth: '400px', boxShadow: '0 24px 64px rgba(0,0,0,0.4)', border: '1px solid var(--border-default)', textAlign: 'center' }}>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-16)', marginBottom: 'var(--space-24)' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'rgba(56, 139, 253, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(56, 139, 253, 0.2)' }}>
-              <MailCheck size={32} color="#58a6ff" />
-            </div>
-            <h2 style={{ margin: 0, fontSize: 'var(--font-title-section)', fontWeight: 600 }}>Check your inbox</h2>
-          </div>
-          
-          <p style={{ color: 'var(--text-secondary)', fontSize: '15px', lineHeight: 1.6, marginBottom: 'var(--space-24)' }}>
+      <AuthShell title="Check your inbox" icon={MailCheck}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '15px', lineHeight: 1.6, marginBottom: 'var(--space-24)', textAlign: 'center' }}>
             If an account exists for <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{email}</strong>, you will receive a password reset link shortly.
             Links expire in 15 minutes.
           </p>
@@ -65,7 +57,7 @@ export default function ForgotPassword() {
               Back to sign in
             </Link>
             
-            <p style={{ margin: 0, fontSize: 'var(--font-small)', color: 'var(--text-muted)' }}>
+            <p style={{ margin: 0, fontSize: 'var(--font-small)', color: 'var(--text-muted)', textAlign: 'center' }}>
               Didn't receive it?{' '}
               {resendCooldown > 0 ? (
                 <span>Resend available in {resendCooldown}s</span>
@@ -76,26 +68,16 @@ export default function ForgotPassword() {
               )}
             </p>
           </div>
-        </div>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="app-container" style={{ alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at 50% 0%, var(--surface-panel) 0%, var(--surface-base) 100%)' }}>
-      <div className="panel" style={{ width: '100%', maxWidth: '400px', boxShadow: '0 24px 64px rgba(0,0,0,0.4)', border: '1px solid var(--border-default)' }}>
-        
-        <Link to="/login" style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-4)', color: 'var(--text-muted)', textDecoration: 'none', fontSize: 'var(--font-small)', marginBottom: 'var(--space-24)', transition: 'color 0.2s' }} onMouseEnter={e => e.currentTarget.style.color='var(--text-primary)'} onMouseLeave={e => e.currentTarget.style.color='var(--text-muted)'}>
-          <ArrowLeft size={16} /> Back
-        </Link>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-12)', marginBottom: 'var(--space-32)' }}>
-          <h2 style={{ margin: 0, fontSize: 'var(--font-title-section)', fontWeight: 600 }}>Forgot your password?</h2>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '15px', lineHeight: 1.5 }}>
-            Enter your email and we'll send you a reset link.
-          </p>
-        </div>
-        
+    <AuthShell
+      title="Forgot your password?"
+      subtitle="Enter your email and we'll send you a reset link."
+      icon={ShieldAlert}
+    >
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-20)' }}>
           <div>
             <label style={{ display: 'block', marginBottom: 'var(--space-8)', fontSize: 'var(--font-small)', fontWeight: 500, color: 'var(--text-primary)' }}>Email</label>
@@ -113,7 +95,12 @@ export default function ForgotPassword() {
             {loading ? <><Loader2 size={18} className="spin" /> Sending...</> : 'Send Reset Link'}
           </button>
         </form>
-      </div>
-    </div>
+
+        <div style={{ textAlign: 'center', marginTop: 'var(--space-32)' }}>
+          <Link to="/login" style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-4)', color: 'var(--text-muted)', textDecoration: 'none', fontSize: 'var(--font-small)', transition: 'color 0.2s' }} onMouseEnter={e => e.currentTarget.style.color='var(--text-primary)'} onMouseLeave={e => e.currentTarget.style.color='var(--text-muted)'}>
+            <ArrowLeft size={16} /> Back to Sign In
+          </Link>
+        </div>
+    </AuthShell>
   );
 }

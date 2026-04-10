@@ -4,8 +4,9 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { API_BASE } from './config';
+import AuthShell from './components/AuthShell';
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, currentUser, onLogout }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -61,34 +62,34 @@ export default function Login({ onLogin }) {
     setError("Google sign in was unsuccessful. Try again later.");
   };
 
-  return (
-    <div className="app-container" style={{ position: 'relative', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at 50% 0%, var(--surface-panel) 0%, var(--surface-base) 100%)' }}>
-      <Link
-        to="/"
-        style={{ position: 'absolute', top: 'var(--space-24)', left: 'var(--space-32)', display: 'flex', alignItems: 'center', gap: 'var(--space-8)', textDecoration: 'none', color: 'var(--text-primary)', fontWeight: 700, fontSize: 'var(--font-title-card)', letterSpacing: '-0.01em' }}
+  if (currentUser && !currentUser.email_verified) {
+    return (
+      <AuthShell 
+        title="Verify Your Email" 
+        subtitle="You need to verify your email address to access your workspace."
       >
-        <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: 'rgba(88,166,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(88,166,255,0.2)' }}>
-          <Wand2 size={18} color="var(--accent)" />
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-24)', color: 'var(--text-secondary)' }}>
+          We've sent a verification link to <strong>{currentUser.email}</strong>.
+          Please check your inbox and click the link to activate your account.
         </div>
-        <span>EditEase</span>
-      </Link>
-      <div className="panel" style={{ width: '100%', maxWidth: '400px', boxShadow: '0 24px 64px rgba(0,0,0,0.4)', border: '1px solid var(--border-default)' }}>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-16)', marginBottom: 'var(--space-32)' }}>
-          <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'rgba(88, 166, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(88, 166, 255, 0.2)' }}>
-            <Wand2 size={32} color="var(--accent)" />
-          </div>
-          <h2 style={{ margin: 0, fontSize: 'var(--font-title-section)', fontWeight: 600 }}>Welcome to EditEase</h2>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '15px' }}>Sign in to continue to your workspace</p>
-        </div>
-        
-        {error && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)', color: 'var(--danger)', padding: 'var(--space-12)', backgroundColor: 'rgba(218, 54, 51, 0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(218,54,51,0.2)', marginBottom: 'var(--space-24)', fontSize: '14px' }}>
-                <AlertTriangle size={18} style={{ flexShrink: 0 }} /> <span>{error}</span>
-            </div>
-        )}
+        <button 
+          onClick={onLogout} 
+          className="btn" 
+          style={{ width: '100%', justifyContent: 'center' }}
+        >
+          Sign Out
+        </button>
+      </AuthShell>
+    );
+  }
 
-        <div style={{ marginBottom: 'var(--space-24)', display: 'flex', justifyContent: 'center' }}>
+  return (
+    <AuthShell 
+      title="Welcome to EditEase" 
+      subtitle="Sign in to continue to your workspace" 
+      error={error}
+    >
+      <div style={{ marginBottom: 'var(--space-24)', display: 'flex', justifyContent: 'center' }}>
           <GoogleLogin
             onSuccess={handleGoogleSuccess}
             onError={handleGoogleError}
@@ -155,7 +156,6 @@ export default function Login({ onLogin }) {
           Don't have an account?{' '}
           <Link to="/register" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>Create account</Link>
         </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

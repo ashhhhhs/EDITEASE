@@ -4,6 +4,7 @@ import { Eye, EyeOff, Loader2, AlertTriangle, KeyRound, CheckCircle2 } from 'luc
 import axios from 'axios';
 import zxcvbn from 'zxcvbn';
 import { API_BASE } from './config';
+import AuthShell from './components/AuthShell';
 
 export default function ResetPassword() {
   const { token } = useParams();
@@ -48,57 +49,37 @@ export default function ResetPassword() {
 
   if (success) {
     return (
-      <div className="app-container" style={{ alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at 50% 0%, var(--surface-panel) 0%, var(--surface-base) 100%)' }}>
-        <div className="panel" style={{ width: '100%', maxWidth: '400px', boxShadow: '0 24px 64px rgba(0,0,0,0.4)', border: '1px solid var(--border-default)', textAlign: 'center' }}>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-16)', marginBottom: 'var(--space-24)' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'rgba(46, 160, 67, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(46, 160, 67, 0.2)' }}>
-              <CheckCircle2 size={32} color="var(--success)" />
-            </div>
-            <h2 style={{ margin: 0, fontSize: 'var(--font-title-section)', fontWeight: 600 }}>Password updated</h2>
-          </div>
-          
-          <p style={{ color: 'var(--text-secondary)', fontSize: '15px', lineHeight: 1.6, marginBottom: 'var(--space-32)' }}>
+      <AuthShell title="Password updated" icon={CheckCircle2}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '15px', lineHeight: 1.6, marginBottom: 'var(--space-32)', textAlign: 'center' }}>
             Your password has been changed successfully. You can now sign in with your new password.
           </p>
 
           <Link to="/login" className="btn btn-primary" style={{ width: '100%', padding: 'var(--space-12)', fontSize: '1rem', justifyContent: 'center' }}>
             Go to Sign In →
           </Link>
-        </div>
-      </div>
+      </AuthShell>
     );
   }
 
-  return (
-    <div className="app-container" style={{ alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at 50% 0%, var(--surface-panel) 0%, var(--surface-base) 100%)' }}>
-      <div className="panel" style={{ width: '100%', maxWidth: '400px', boxShadow: '0 24px 64px rgba(0,0,0,0.4)', border: '1px solid var(--border-default)' }}>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-12)', marginBottom: 'var(--space-24)' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(88, 166, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(88, 166, 255, 0.2)', marginBottom: 'var(--space-8)' }}>
-            <KeyRound size={24} color="var(--accent)" />
-          </div>
-          <h2 style={{ margin: 0, fontSize: 'var(--font-title-section)', fontWeight: 600 }}>Set a new password</h2>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '15px', lineHeight: 1.5 }}>
-            Pick something strong that you don't use elsewhere.
-          </p>
-        </div>
-        
-        {error && (
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-8)', color: 'var(--danger)', padding: 'var(--space-12)', backgroundColor: 'rgba(218, 54, 51, 0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(218,54,51,0.2)', marginBottom: 'var(--space-24)', fontSize: '14px', lineHeight: 1.4 }}>
-                <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 2 }} /> 
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 2 }}>Reset failed</div>
-                  {error}
-                  {error.includes("expired") && (
-                    <Link to="/forgot-password" style={{ display: 'block', marginTop: 'var(--space-8)', color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>
-                      Request a new link →
-                    </Link>
-                  )}
-                </div>
-            </div>
-        )}
+  const errorNode = error ? (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ fontWeight: 600, marginBottom: 2 }}>Reset failed</div>
+      <div>{error}</div>
+      {error.includes("expired") && (
+        <Link to="/forgot-password" style={{ display: 'block', marginTop: 'var(--space-8)', color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>
+          Request a new link →
+        </Link>
+      )}
+    </div>
+  ) : undefined;
 
+  return (
+    <AuthShell
+      title="Set a new password"
+      subtitle="Pick something strong that you don't use elsewhere."
+      icon={KeyRound}
+      error={errorNode}
+    >
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-20)' }}>
           <div>
             <label style={{ display: 'block', marginBottom: 'var(--space-8)', fontSize: 'var(--font-small)', fontWeight: 500, color: 'var(--text-primary)' }}>New Password</label>
@@ -151,7 +132,6 @@ export default function ResetPassword() {
             {loading ? <><Loader2 size={18} className="spin" /> Updating...</> : 'Update Password'}
           </button>
         </form>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

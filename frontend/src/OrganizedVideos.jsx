@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   Folder, Download, RefreshCw, Search,
-  CheckCircle, Archive, X, ChevronLeft, PlayCircle
+  CheckCircle, Archive, X, ChevronLeft, PlayCircle,
+  FileText, Clock, Hash, Brain, Eye, Zap,
+  Activity, AlertTriangle, ChevronDown, ChevronUp
 } from 'lucide-react';
 import api from './lib/api';
 import gsap from 'gsap';
@@ -31,6 +33,35 @@ const getDisplayLabel = (key) => {
   return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + 's';
 };
 
+/* ── Inline style helpers ── */
+const metaRowStyle = {
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+  fontSize: 'var(--font-meta)', padding: '3px 0',
+};
+const metaKeyStyle = { color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 };
+const metaValStyle = { color: 'var(--text-secondary)', fontWeight: 500, fontFamily: 'var(--font-mono)', fontSize: '0.7rem' };
+
+/* ── Status color mapping ── */
+const STATUS_COLORS = {
+  SUCCESS: { bg: 'rgba(35,134,54,0.12)', color: 'var(--success)', border: 'rgba(35,134,54,0.3)' },
+  FAILURE: { bg: 'rgba(218,54,51,0.12)', color: 'var(--danger)', border: 'rgba(218,54,51,0.3)' },
+  STARTED: { bg: 'rgba(88,166,255,0.12)', color: 'var(--accent)', border: 'rgba(88,166,255,0.3)' },
+  PENDING: { bg: 'rgba(210,153,34,0.12)', color: 'var(--warning)', border: 'rgba(210,153,34,0.3)' },
+  NO_RECORD: { bg: 'rgba(110,118,129,0.12)', color: 'var(--text-muted)', border: 'rgba(110,118,129,0.3)' },
+  NO_TASK: { bg: 'rgba(110,118,129,0.12)', color: 'var(--text-muted)', border: 'rgba(110,118,129,0.3)' },
+};
+
+function StatusBadge({ status }) {
+  const s = STATUS_COLORS[status] || STATUS_COLORS.NO_RECORD;
+  return (
+    <span style={{
+      background: s.bg, color: s.color, border: `1px solid ${s.border}`,
+      fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em',
+      padding: '2px 8px', borderRadius: 20, textTransform: 'uppercase',
+    }}>{status?.replace(/_/g, ' ') || 'Unknown'}</span>
+  );
+}
+
 /* ── Label badge ── */
 function LabelBadge({ label }) {
   const display = getDisplayLabel(label);
@@ -52,6 +83,65 @@ function DupBadge() {
       fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em',
       padding: '2px 7px', borderRadius: 20, border: '1px solid rgba(218,54,51,0.3)',
     }}>DUPLICATE</span>
+  );
+}
+
+/* ── Metadata strip for video cards ── */
+function MetadataStrip({ ai }) {
+  if (!ai || Object.keys(ai).length === 0) return null;
+  
+  const confidence = ai.average_confidence != null ? Math.round(ai.average_confidence * 100) : null;
+  const emotionConfidence = ai.dominant_emotion_confidence != null ? Math.round(ai.dominant_emotion_confidence) : null;
+  const scenes = ai.total_scenes_detected;
+  const emotion = ai.dominant_emotion;
+  const hasFaces = ai.has_faces;
+
+  return (
+    <div style={{
+      background: 'rgba(88,166,255,0.04)',
+      border: '1px solid rgba(88,166,255,0.08)',
+      borderRadius: 'var(--radius-md)',
+      padding: '8px 10px',
+      display: 'flex', flexDirection: 'column', gap: 2,
+      marginTop: 2,
+    }}>
+      <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <Brain size={9} /> AI Metadata
+      </div>
+      {confidence != null && (
+        <div style={metaRowStyle}>
+          <span style={metaKeyStyle}><Zap size={10} /> Confidence</span>
+          <span style={{
+            ...metaValStyle,
+            color: confidence >= 80 ? 'var(--success)' : confidence >= 50 ? 'var(--warning)' : 'var(--danger)',
+          }}>{confidence}%</span>
+        </div>
+      )}
+      {scenes != null && (
+        <div style={metaRowStyle}>
+          <span style={metaKeyStyle}><Activity size={10} /> Scenes</span>
+          <span style={metaValStyle}>{scenes} cuts</span>
+        </div>
+      )}
+      {emotion && emotion !== 'none' && (
+        <div style={metaRowStyle}>
+          <span style={metaKeyStyle}><Eye size={10} /> Emotion</span>
+          <span style={{ ...metaValStyle, textTransform: 'capitalize' }}>{emotion}</span>
+        </div>
+      )}
+      {emotionConfidence != null && (
+        <div style={metaRowStyle}>
+          <span style={metaKeyStyle}><Zap size={10} /> Emotion Conf.</span>
+          <span style={metaValStyle}>{emotionConfidence}%</span>
+        </div>
+      )}
+      {hasFaces != null && (
+        <div style={metaRowStyle}>
+          <span style={metaKeyStyle}><Eye size={10} /> Faces</span>
+          <span style={metaValStyle}>{hasFaces ? 'Detected' : 'None'}</span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -99,7 +189,7 @@ function FolderCard({ label, count, onClick }) {
 }
 
 /* ── Video card ── */
-function VideoCard({ doc, selected, onSelect, onPreview, onDownload }) {
+function VideoCard({ doc, selected, onSelect, onPreview, onDownload, showMeta }) {
   const [isHovering, setIsHovering] = useState(false);
   const date = doc.created_at
     ? new Date(doc.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -222,6 +312,16 @@ function VideoCard({ doc, selected, onSelect, onPreview, onDownload }) {
         {doc.original_filename}
       </div>
 
+      {/* Inline metadata */}
+      {showMeta && <MetadataStrip ai={doc.ai_metadata} />}
+
+      {/* File hash snippet */}
+      {showMeta && doc.file_hash && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+          <Hash size={9} /> {doc.file_hash.substring(0, 12)}…
+        </div>
+      )}
+
       {/* Footer row */}
       <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, paddingTop: 8 }}>
         <span style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>{date}</span>
@@ -233,6 +333,276 @@ function VideoCard({ doc, selected, onSelect, onPreview, onDownload }) {
         >
           <Download size={13} />
         </button>
+      </div>
+    </div>
+  );
+}
+
+
+/* ── Processing Logs Panel ── */
+function LogsPanel({ currentFolder, search }) {
+  const toast = useToast();
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [expandedId, setExpandedId] = useState(null);
+  const limit = 20;
+
+  const fetchLogs = useCallback(async (p = 1) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ page: p, limit });
+      if (currentFolder) params.set('label', currentFolder);
+      if (search) params.set('search', search);
+      const res = await api.get(`/organized-videos/logs?${params}`);
+      setLogs(res.data.logs || []);
+      setTotal(res.data.total || 0);
+      setPage(p);
+    } catch (err) {
+      toast.error('Failed to load processing logs');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentFolder, search, toast]);
+
+  useEffect(() => { fetchLogs(1); }, [fetchLogs]);
+
+  const totalPages = Math.ceil(total / limit);
+
+  const formatDuration = (secs) => {
+    if (secs == null) return '—';
+    if (secs < 60) return `${secs}s`;
+    return `${Math.floor(secs / 60)}m ${Math.round(secs % 60)}s`;
+  };
+
+  const formatDate = (iso) => {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    } catch { return iso; }
+  };
+
+  if (loading) return <LoadingState message="Loading logs…" />;
+
+  if (logs.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: 'var(--space-40) var(--space-24)', color: 'var(--text-muted)' }}>
+        <FileText size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
+        <div style={{ fontWeight: 500 }}>No processing logs found</div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Logs table */}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--font-small)' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+              {['Video', 'Label', 'Status', 'Task', 'Duration', 'Progress', 'Processed At', ''].map(h => (
+                <th key={h} style={{
+                  padding: '10px 12px', textAlign: 'left', fontWeight: 600,
+                  color: 'var(--text-muted)', fontSize: 'var(--font-meta)',
+                  textTransform: 'uppercase', letterSpacing: '0.06em',
+                  whiteSpace: 'nowrap', background: 'rgba(255,255,255,0.02)',
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {logs.map(log => (
+              <React.Fragment key={log.id}>
+                <tr
+                  style={{
+                    borderBottom: '1px solid var(--border-subtle)',
+                    cursor: 'pointer',
+                    transition: 'background 0.15s',
+                  }}
+                  onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-surface)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <td style={{ padding: '10px 12px', maxWidth: 200 }}>
+                    <div style={{ fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {log.video_name}
+                    </div>
+                    <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                      <Hash size={8} style={{ display: 'inline', verticalAlign: 'middle' }} /> {log.file_hash}
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <LabelBadge label={log.dominant_label} />
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{
+                      fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+                      background: log.status === 'duplicate' ? 'rgba(218,54,51,0.12)' : 'rgba(35,134,54,0.12)',
+                      color: log.status === 'duplicate' ? 'var(--danger)' : 'var(--success)',
+                      border: `1px solid ${log.status === 'duplicate' ? 'rgba(218,54,51,0.3)' : 'rgba(35,134,54,0.3)'}`,
+                      textTransform: 'uppercase',
+                    }}>{log.status}</span>
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <StatusBadge status={log.task_status} />
+                  </td>
+                  <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: 'var(--font-meta)', whiteSpace: 'nowrap' }}>
+                    <Clock size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                    {formatDuration(log.processing_seconds)}
+                  </td>
+                  <td style={{ padding: '10px 12px', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)' }}>
+                    {log.task_progress || '—'}
+                  </td>
+                  <td style={{ padding: '10px 12px', fontSize: 'var(--font-meta)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    {formatDate(log.created_at)}
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>
+                    {expandedId === log.id ? <ChevronUp size={14} color="var(--text-muted)" /> : <ChevronDown size={14} color="var(--text-muted)" />}
+                  </td>
+                </tr>
+
+                {/* Expanded detail row */}
+                {expandedId === log.id && (
+                  <tr>
+                    <td colSpan={8} style={{ padding: 0 }}>
+                      <div style={{
+                        background: 'rgba(88,166,255,0.03)',
+                        borderBottom: '2px solid rgba(88,166,255,0.12)',
+                        padding: '16px 24px',
+                        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16,
+                        animation: 'fadeIn 0.2s ease',
+                      }}>
+                        {/* AI Metadata panel */}
+                        <div>
+                          <div style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Brain size={10} /> AI Metadata
+                          </div>
+                          {log.ai_metadata && Object.keys(log.ai_metadata).length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {log.ai_metadata.average_confidence != null && (
+                                <div style={metaRowStyle}>
+                                  <span style={metaKeyStyle}>Confidence</span>
+                                  <span style={metaValStyle}>{Math.round(log.ai_metadata.average_confidence * 100)}%</span>
+                                </div>
+                              )}
+                              {log.ai_metadata.total_scenes_detected != null && (
+                                <div style={metaRowStyle}>
+                                  <span style={metaKeyStyle}>Scenes</span>
+                                  <span style={metaValStyle}>{log.ai_metadata.total_scenes_detected} cuts</span>
+                                </div>
+                              )}
+                              {log.ai_metadata.dominant_emotion && (
+                                <div style={metaRowStyle}>
+                                  <span style={metaKeyStyle}>Emotion</span>
+                                  <span style={{ ...metaValStyle, textTransform: 'capitalize' }}>{log.ai_metadata.dominant_emotion}</span>
+                                </div>
+                              )}
+                              {log.ai_metadata.dominant_emotion_confidence != null && (
+                                <div style={metaRowStyle}>
+                                  <span style={metaKeyStyle}>Emotion Conf.</span>
+                                  <span style={metaValStyle}>{Math.round(log.ai_metadata.dominant_emotion_confidence)}%</span>
+                                </div>
+                              )}
+                              {log.ai_metadata.has_faces != null && (
+                                <div style={metaRowStyle}>
+                                  <span style={metaKeyStyle}>Faces</span>
+                                  <span style={metaValStyle}>{log.ai_metadata.has_faces ? 'Detected' : 'None'}</span>
+                                </div>
+                              )}
+                              {log.ai_metadata.action_taken && (
+                                <div style={metaRowStyle}>
+                                  <span style={metaKeyStyle}>Action</span>
+                                  <span style={{ ...metaValStyle, color: 'var(--success)' }}>{String(log.ai_metadata.action_taken).replace(/_/g, ' ')}</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>No AI metadata</div>
+                          )}
+                        </div>
+
+                        {/* Label Distribution */}
+                        {log.ai_metadata?.label_distribution && Object.keys(log.ai_metadata.label_distribution).length > 0 && (
+                          <div>
+                            <div style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <Activity size={10} /> Category Distribution
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              {Object.entries(log.ai_metadata.label_distribution)
+                                .sort((a, b) => b[1] - a[1])
+                                .map(([key, val]) => (
+                                  <div key={key} style={metaRowStyle}>
+                                    <span style={{ ...metaKeyStyle, textTransform: 'capitalize' }}>{getDisplayLabel(key)}</span>
+                                    <span style={metaValStyle}>{val} scene{val !== 1 ? 's' : ''}</span>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Task details */}
+                        <div>
+                          <div style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Clock size={10} /> Task Details
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <div style={metaRowStyle}>
+                              <span style={metaKeyStyle}>Task ID</span>
+                              <span style={{ ...metaValStyle, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{log.batch_id || '—'}</span>
+                            </div>
+                            <div style={metaRowStyle}>
+                              <span style={metaKeyStyle}>Started</span>
+                              <span style={metaValStyle}>{formatDate(log.task_created_at)}</span>
+                            </div>
+                            <div style={metaRowStyle}>
+                              <span style={metaKeyStyle}>Finished</span>
+                              <span style={metaValStyle}>{formatDate(log.task_updated_at)}</span>
+                            </div>
+                            <div style={metaRowStyle}>
+                              <span style={metaKeyStyle}>Duration</span>
+                              <span style={metaValStyle}>{formatDuration(log.processing_seconds)}</span>
+                            </div>
+                            {log.task_error && (
+                              <div style={{ marginTop: 6, padding: '8px 10px', background: 'rgba(218,54,51,0.08)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(218,54,51,0.2)' }}>
+                                <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                                  <AlertTriangle size={10} /> Error
+                                </div>
+                                <div style={{ fontSize: 'var(--font-meta)', color: 'var(--danger)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>
+                                  {log.task_error}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', gap: 'var(--space-8)', justifyContent: 'center', marginTop: 'var(--space-20)', flexWrap: 'wrap' }}>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+            <button
+              key={p}
+              className={`btn${p === page ? ' btn-primary' : ''}`}
+              style={{ minWidth: 36, padding: '4px 10px' }}
+              onClick={() => fetchLogs(p)}
+            >{p}</button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ textAlign: 'center', marginTop: 'var(--space-12)', fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>
+        {total} log entr{total !== 1 ? 'ies' : 'y'}
       </div>
     </div>
   );
@@ -255,9 +625,11 @@ export default function OrganizedVideos() {
   const [selected, setSelected]   = useState(new Set());
   const [previewDoc, setPreviewDoc] = useState(null); // Preview modal state
 
-  // Filters
+  // Filters & toggles
   const [search, setSearch]         = useState('');
   const [filterDup, setFilterDup]   = useState('');   // '' | 'true' | 'false'
+  const [showMeta, setShowMeta]     = useState(true);
+  const [showLogs, setShowLogs]     = useState(false);
 
   const limit = 24;
 
@@ -326,6 +698,7 @@ export default function OrganizedVideos() {
       setVideos([]);  // Clear videos when going back to folders
       setSelected(new Set()); // clear selection
       setSearch(''); // clear search
+      setShowLogs(false); // close logs when going back
     } else {
       fetchVideos(1); 
     }
@@ -440,6 +813,26 @@ export default function OrganizedVideos() {
             <option value="true">Duplicates only</option>
           </select>
 
+          {/* Metadata toggle */}
+          <button
+            className={`btn${showMeta ? ' btn-primary' : ''}`}
+            style={{ height: 36, padding: '0 12px', fontSize: 'var(--font-meta)', gap: 4 }}
+            onClick={() => setShowMeta(!showMeta)}
+            title={showMeta ? 'Hide metadata' : 'Show metadata'}
+          >
+            <Brain size={13} /> Meta
+          </button>
+
+          {/* Logs toggle */}
+          <button
+            className={`btn${showLogs ? ' btn-primary' : ''}`}
+            style={{ height: 36, padding: '0 12px', fontSize: 'var(--font-meta)', gap: 4 }}
+            onClick={() => setShowLogs(!showLogs)}
+            title={showLogs ? 'Hide logs' : 'Show processing logs'}
+          >
+            <FileText size={13} /> Logs
+          </button>
+
           {/* Refresh */}
           <button
             className="btn" style={{ height: 36, padding: '0 10px' }}
@@ -450,8 +843,46 @@ export default function OrganizedVideos() {
         </div>
       )}
 
+      {/* ── Processing Logs Panel ── */}
+      {currentFolder && showLogs && (
+        <div style={{
+          background: 'var(--surface-panel)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--radius-lg)',
+          marginBottom: 'var(--space-24)',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            padding: '14px 20px',
+            borderBottom: '1px solid var(--border-subtle)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: 'rgba(88,166,255,0.04)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <FileText size={16} color="var(--accent)" />
+              <span style={{ fontWeight: 600, fontSize: 'var(--font-body)', color: 'var(--text-primary)' }}>
+                Processing Logs
+              </span>
+              <span style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>
+                — {getDisplayLabel(currentFolder)}
+              </span>
+            </div>
+            <button
+              className="btn"
+              style={{ padding: '4px 8px' }}
+              onClick={() => setShowLogs(false)}
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div style={{ padding: '12px 0' }}>
+            <LogsPanel currentFolder={currentFolder} search={search} />
+          </div>
+        </div>
+      )}
+
       {/* ── Selection bar ── */}
-      {currentFolder && videos.length > 0 && (
+      {currentFolder && videos.length > 0 && !showLogs && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 'var(--space-12)',
           marginBottom: 'var(--space-20)', flexWrap: 'wrap',
@@ -482,7 +913,8 @@ export default function OrganizedVideos() {
       )}
 
       {/* ── Content Area ── */}
-      {currentFolder === null ? (
+      {!showLogs && (
+        currentFolder === null ? (
         /* Folders Grid */
         statsLoading ? (
           <LoadingState message="Loading folders…" />
@@ -525,15 +957,16 @@ export default function OrganizedVideos() {
                 selected={selected.has(doc.id)} 
                 onSelect={toggleSelect} 
                 onPreview={setPreviewDoc} 
-                onDownload={handleSingleDownload} 
+                onDownload={handleSingleDownload}
+                showMeta={showMeta}
               />
             ))}
           </div>
         )
-      )}
+      ))}
 
       {/* ── Pagination (Only in folder view) ── */}
-      {currentFolder && totalPages > 1 && (
+      {currentFolder && !showLogs && totalPages > 1 && (
         <div style={{ display: 'flex', gap: 'var(--space-8)', justifyContent: 'center', marginTop: 'var(--space-32)', flexWrap: 'wrap' }}>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
             <button
@@ -547,7 +980,7 @@ export default function OrganizedVideos() {
       )}
 
       {/* ── Count footer ── */}
-      {currentFolder && total > 0 && (
+      {currentFolder && !showLogs && total > 0 && (
         <div style={{ textAlign: 'center', marginTop: 'var(--space-20)', fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>
           {total.toLocaleString()} video{total !== 1 ? 's' : ''} in {getDisplayLabel(currentFolder)}
         </div>
@@ -608,6 +1041,15 @@ export default function OrganizedVideos() {
                     <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-small)' }}>Dominant Emotion</span>
                     <span style={{ fontWeight: 500, fontSize: 'var(--font-small)', textTransform: 'capitalize', color: 'var(--text-primary)' }}>{previewDoc.ai_metadata.dominant_emotion || 'None'}</span>
                   </div>
+
+                  {previewDoc.ai_metadata.dominant_emotion_confidence != null && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-small)' }}>Emotion Confidence</span>
+                      <span style={{ fontWeight: 500, fontSize: 'var(--font-small)' }}>
+                        {Math.round(previewDoc.ai_metadata.dominant_emotion_confidence)}%
+                      </span>
+                    </div>
+                  )}
                   
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-small)' }}>AI Matching Confidence</span>
@@ -637,6 +1079,18 @@ export default function OrganizedVideos() {
                       ))}
                     </div>
                   </div>
+
+                  {/* File hash in preview */}
+                  {previewDoc.file_hash && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-8)' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-small)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Hash size={12} /> File Hash
+                      </span>
+                      <span style={{ fontWeight: 500, fontSize: 'var(--font-meta)', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+                        {previewDoc.file_hash.substring(0, 16)}…
+                      </span>
+                    </div>
+                  )}
 
                   <div style={{ marginTop: 'auto', paddingTop: 'var(--space-16)', borderTop: '1px solid var(--border-subtle)', fontSize: 'var(--font-meta)', color: 'var(--success)' }}>
                     ✓ Agent Action: {String(previewDoc.ai_metadata.action_taken || 'auto_organized').replace(/_/g, ' ')}

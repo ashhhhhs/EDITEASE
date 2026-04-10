@@ -5,11 +5,13 @@ import { Link } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import zxcvbn from 'zxcvbn';
 import { API_BASE } from './config';
+import AuthShell from './components/AuthShell';
 
 export default function Register({ onLogin }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   
@@ -20,11 +22,17 @@ export default function Register({ onLogin }) {
   const score = zxcvbn(password).score; // 0 to 4
   const colors = ['var(--danger)', 'var(--danger)', 'var(--warning)', 'var(--success)', 'var(--success)'];
   const labels = ['Weak', 'Fair', 'Good', 'Strong', 'Very Strong'];
+  const passwordsMatch = password === confirmPassword;
+  const showPasswordMismatch = confirmPassword.length > 0 && !passwordsMatch;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!agreedToTerms) {
       setError("Please agree to the Terms of Service.");
+      return;
+    }
+    if (!passwordsMatch) {
+      setError("Passwords don't match.");
       return;
     }
     if (password.length < 8) {
@@ -36,7 +44,12 @@ export default function Register({ onLogin }) {
     setLoading(true);
     
     try {
-      const res = await axios.post(`${API_BASE}/register`, { email, password, name });
+      const res = await axios.post(`${API_BASE}/register`, {
+        email,
+        password,
+        confirm_password: confirmPassword,
+        name,
+      });
       if (res.data.ok) {
         // Auto sign-in after successful registration
         const loginRes = await axios.post(`${API_BASE}/login`, { email, password });
@@ -83,33 +96,12 @@ export default function Register({ onLogin }) {
   };
 
   return (
-    <div className="app-container" style={{ position: 'relative', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', padding: 'var(--space-40) 0', background: 'radial-gradient(circle at 50% 0%, var(--surface-panel) 0%, var(--surface-base) 100%)' }}>
-      <Link
-        to="/"
-        style={{ position: 'absolute', top: 'var(--space-24)', left: 'var(--space-32)', display: 'flex', alignItems: 'center', gap: 'var(--space-8)', textDecoration: 'none', color: 'var(--text-primary)', fontWeight: 700, fontSize: 'var(--font-title-card)', letterSpacing: '-0.01em' }}
-      >
-        <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: 'rgba(88,166,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(88,166,255,0.2)' }}>
-          <Wand2 size={18} color="var(--accent)" />
-        </div>
-        <span>EditEase</span>
-      </Link>
-      <div className="panel" style={{ width: '100%', maxWidth: '440px', boxShadow: '0 24px 64px rgba(0,0,0,0.4)', border: '1px solid var(--border-default)' }}>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-16)', marginBottom: 'var(--space-32)' }}>
-          <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'rgba(88, 166, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(88, 166, 255, 0.2)' }}>
-            <Wand2 size={32} color="var(--accent)" />
-          </div>
-          <h2 style={{ margin: 0, fontSize: 'var(--font-title-section)', fontWeight: 600 }}>Create Account</h2>
-          <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '15px' }}>Sign up to join EditEase</p>
-        </div>
-        
-        {error && (
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-8)', color: 'var(--danger)', padding: 'var(--space-12)', backgroundColor: 'rgba(218, 54, 51, 0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(218,54,51,0.2)', marginBottom: 'var(--space-24)', fontSize: '14px', lineHeight: 1.4 }}>
-                <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: 2 }} /> 
-                <div style={{ flex: 1 }}>{error}</div>
-            </div>
-        )}
-
+    <AuthShell
+      title="Create Account"
+      subtitle="Sign up to join EditEase"
+      error={error}
+      maxWidth={440}
+    >
         <div style={{ marginBottom: 'var(--space-24)', display: 'flex', justifyContent: 'center' }}>
           <GoogleLogin
             onSuccess={handleGoogleSuccess}
@@ -173,6 +165,22 @@ export default function Register({ onLogin }) {
               </div>
             )}
           </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: 'var(--space-8)', fontSize: 'var(--font-small)', fontWeight: 500, color: 'var(--text-primary)' }}>Confirm Password</label>
+            <input
+              type={showPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              required
+              placeholder="Repeat password"
+            />
+            {showPasswordMismatch && (
+              <div style={{ marginTop: 'var(--space-8)', fontSize: '12px', color: 'var(--danger)', fontWeight: 500 }}>
+                Passwords don't match yet.
+              </div>
+            )}
+          </div>
           
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-12)', marginTop: 'var(--space-4)' }}>
             <input 
@@ -187,7 +195,7 @@ export default function Register({ onLogin }) {
             </label>
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ marginTop: 'var(--space-12)', width: '100%', padding: 'var(--space-12)', fontSize: '1rem' }} disabled={loading || !agreedToTerms || password.length < 8}>
+          <button type="submit" className="btn btn-primary" style={{ marginTop: 'var(--space-12)', width: '100%', padding: 'var(--space-12)', fontSize: '1rem' }} disabled={loading || !agreedToTerms || password.length < 8 || !passwordsMatch}>
             {loading ? <><Loader2 size={18} className="spin" /> Creating Account...</> : 'Get Started'}
           </button>
         </form>
@@ -196,7 +204,6 @@ export default function Register({ onLogin }) {
           Already have an account?{' '}
           <Link to="/login" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>Sign in here</Link>
         </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

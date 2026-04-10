@@ -565,7 +565,7 @@ export default function Landing() {
               <div className="preview-dot" style={{ background: '#ff5f57' }} />
               <div className="preview-dot" style={{ background: '#febc2e' }} />
               <div className="preview-dot" style={{ background: '#28c840' }} />
-              <div className="mono-caps" style={{ marginLeft: 'auto', fontSize: '0.6rem' }}>editease / review queue</div>
+              <div className="mono-caps" style={{ marginLeft: 'auto', fontSize: '0.82rem' }}>editease / review queue</div>
             </div>
             <div className="preview-body">
               <div className="preview-sidebar">
@@ -656,7 +656,7 @@ export default function Landing() {
           </div>
           <div className="footer-meta">
             <div className="mono-caps" style={{ marginBottom: 8 }}>System Status</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--success)', fontWeight: 600, fontSize: '0.875rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--success)', fontWeight: 600, fontSize: '0.96rem' }}>
               <span className="pulse-dot" style={{ background: 'var(--success)' }} />
               Online
             </div>

@@ -89,7 +89,8 @@ export const UploadProvider = ({ children }) => {
                            return { 
                                id: f.taskId, // Use taskId to correlate
                                status: res.data.status, 
-                               error: res.data.status === 'FAILURE' ? 'Processing failed' : null 
+                               error: res.data.status === 'FAILURE' ? 'Processing failed' : null,
+                               exportPath: res.data.status === 'SUCCESS' && res.data.result?.export_path ? res.data.result.export_path : null
                            };
                        } else {
                            // Still processing (STARTED, PROGRESS, etc.)
@@ -117,7 +118,8 @@ export const UploadProvider = ({ children }) => {
                                ...f, 
                                status: update.status, 
                                error: update.error !== undefined ? update.error : f.error,
-                               progressMessage: update.progressMessage !== undefined ? update.progressMessage : f.progressMessage
+                               progressMessage: update.progressMessage !== undefined ? update.progressMessage : f.progressMessage,
+                               exportPath: update.exportPath !== undefined ? update.exportPath : f.exportPath
                            };
                        }
                        return f;
