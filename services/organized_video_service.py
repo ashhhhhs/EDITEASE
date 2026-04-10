@@ -116,6 +116,82 @@ def get_zip_download_path(task_id: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Processing logs (join organized_videos → tasks via batch_id)
+# ---------------------------------------------------------------------------
+
+def get_processing_logs(
+    *,
+    label: str | None = None,
+    search: str | None = None,
+    page: int = 1,
+    limit: int = 30,
+) -> dict:
+    """Return processing logs for organized videos.
+    Each entry merges organized_video record with its task record.
+    """
+    from pymongo import MongoClient
+    import config
+
+    col = _get_col()
+    client = MongoClient(config.MONGO_URI)
+    tasks_col = client[config.DB_NAME]["tasks"]
+
+    page = max(1, page)
+    limit = max(1, min(limit, 100))
+    skip = (page - 1) * limit
+
+    query: dict = {}
+    if label:
+        query["dominant_label"] = label
+    if search:
+        query["original_filename"] = {"$regex": search, "$options": "i"}
+
+    cursor = col.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    total = col.count_documents(query)
+
+    logs = []
+    for doc in cursor:
+        entry = {
+            "id": str(doc["_id"]),
+            "video_name": doc.get("display_name", doc.get("original_filename", "")),
+            "original_filename": doc.get("original_filename", ""),
+            "dominant_label": doc.get("dominant_label", "other"),
+            "status": doc.get("status", ""),
+            "file_hash": doc.get("file_hash", "")[:12] + "…" if doc.get("file_hash") else "",
+            "created_at": doc.get("created_at", ""),
+            "uploaded_by": doc.get("uploaded_by"),
+            "batch_id": doc.get("batch_id"),
+            "ai_metadata": doc.get("ai_metadata", {}),
+        }
+        # Enrich with task record if available
+        if doc.get("batch_id"):
+            task = tasks_col.find_one({"task_id": doc["batch_id"]})
+            if task:
+                entry["task_status"] = task.get("status", "UNKNOWN")
+                entry["task_progress"] = task.get("progress_step", "")
+                entry["task_created_at"] = task.get("created_at", "")
+                entry["task_updated_at"] = task.get("updated_at", "")
+                entry["task_error"] = task.get("error_message")
+                # Compute processing duration
+                if task.get("created_at") and task.get("updated_at"):
+                    try:
+                        from datetime import datetime
+                        start = datetime.fromisoformat(task["created_at"])
+                        end = datetime.fromisoformat(task["updated_at"])
+                        entry["processing_seconds"] = round((end - start).total_seconds(), 1)
+                    except Exception:
+                        entry["processing_seconds"] = None
+            else:
+                entry["task_status"] = "NO_RECORD"
+        else:
+            entry["task_status"] = "NO_TASK"
+
+        logs.append(entry)
+
+    return {"logs": logs, "total": total, "page": page, "limit": limit}
+
+
+# ---------------------------------------------------------------------------
 # Per-label counts (for admin overview)
 # ---------------------------------------------------------------------------
 
@@ -126,3 +202,4 @@ def get_label_counts() -> dict:
         {"$group": {"_id": "$dominant_label", "count": {"$sum": 1}}},
     ]
     return {r["_id"]: r["count"] for r in col.aggregate(pipeline)}
+

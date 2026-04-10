@@ -38,7 +38,7 @@ def find_scenes(video_path, threshold=config.SCENE_DETECT_THRESHOLD):
     #fallback to full video if no scenes found
     if len(scene_list) == 0:
         logger.warning("⚠️ No cuts found. Using full video as a single scene.")
-        duration_seconds = video_manager.get_duration()[0].get_seconds()
+        duration_seconds = video_manager.get_duration()[0].get_seconds()  # type: ignore
         fps = video_manager.get_framerate()
 
         scene_list = [

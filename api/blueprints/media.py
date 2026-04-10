@@ -38,6 +38,7 @@ def get_task_status(task_id):
 
 @media_bp.post('/upload')
 @role_required(['admin', 'editor'])
+@require_verified_email
 def upload_video():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
@@ -52,6 +53,7 @@ def upload_video():
 
 @media_bp.post('/auto_organize')
 @role_required(['admin', 'editor'])
+@require_verified_email
 def auto_organize():
     from flask import g
     if 'file' not in request.files:
@@ -134,6 +136,23 @@ def get_organized_video(video_id):
     if not doc:
         return jsonify({'error': 'Not found'}), 404
     return jsonify(doc)
+
+
+@media_bp.get('/organized-videos/logs')
+@role_required(['admin', 'editor'])
+def get_organized_video_logs():
+    """Return processing logs for organized videos.
+    Links organized_videos → tasks via batch_id.
+    Query params: label, page, limit, search
+    """
+    from services.organized_video_service import get_processing_logs
+    result = get_processing_logs(
+        label=request.args.get('label'),
+        search=request.args.get('search'),
+        page=request.args.get('page', 1, type=int),
+        limit=request.args.get('limit', 30, type=int),
+    )
+    return jsonify(result)
 
 
 @media_bp.post('/organized-videos/download')

@@ -37,8 +37,14 @@ def _upload(local_path: str, resource_type: str, public_id: str | None = None) -
         opts = {"resource_type": resource_type}
         if public_id:
             opts["public_id"] = public_id
-        result = cloudinary.uploader.upload(local_path, **opts)
-        url = result.get("secure_url")
+            
+        if resource_type == "video":
+            # upload_large chunks the file, preventing SSLEOFError hangs on large files
+            result = cloudinary.uploader.upload_large(local_path, **opts)
+        else:
+            result = cloudinary.uploader.upload(local_path, **opts)
+            
+        url = result.get("secure_url") # type: ignore
         logger.info("Uploaded %s to Cloudinary: %s", resource_type, url)
         return url
     except Exception as exc:
@@ -94,13 +100,14 @@ def upload_video_returning_id(local_path: str, public_id: str) -> tuple[str, str
         logger.warning("Cloudinary credentials not configured; skipping upload.")
         return None, None
     try:
-        result = cloudinary.uploader.upload(
+        # upload_large chunks the file, preventing network hangs on large files
+        result = cloudinary.uploader.upload_large(
             local_path,
             resource_type="video",
             public_id=public_id,
         )
-        url = result.get("secure_url")
-        pid = result.get("public_id", public_id)
+        url = result.get("secure_url") # type: ignore
+        pid = result.get("public_id", public_id) # type: ignore
         logger.info("Uploaded video to Cloudinary: %s -> %s", pid, url)
         return url, pid
     except Exception as exc:

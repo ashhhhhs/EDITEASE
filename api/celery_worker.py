@@ -126,11 +126,25 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
 
     dominant_emotion_votes = Counter([s.get("dominant_emotion_overall") for s in scenes if s.get("dominant_emotion_overall")])
     dominant_emotion = dominant_emotion_votes.most_common(1)[0][0] if dominant_emotion_votes else "none"
+    dominant_emotion_conf_samples = []
+    if dominant_emotion != "none":
+        for scene in scenes:
+            for sample in scene.get("emotion_timeline", []):
+                if sample.get("emotion") == dominant_emotion and sample.get("confidence") is not None:
+                    try:
+                        dominant_emotion_conf_samples.append(float(sample["confidence"]))
+                    except (TypeError, ValueError):
+                        continue
+    dominant_emotion_confidence = (
+        round(sum(dominant_emotion_conf_samples) / len(dominant_emotion_conf_samples), 2)
+        if dominant_emotion_conf_samples else None
+    )
     avg_conf = sum(s.get("scene_confidence", 0) for s in scenes) / max(len(scenes), 1)
     
     ai_metadata = {
         "dominant_label": dominant_label,
         "dominant_emotion": dominant_emotion,
+        "dominant_emotion_confidence": dominant_emotion_confidence,
         "average_confidence": round(avg_conf, 2),
         "total_scenes_detected": len(scenes),
         "label_distribution": dict(Counter([s.get("scene_label", "other") for s in scenes])),

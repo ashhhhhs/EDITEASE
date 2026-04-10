@@ -34,7 +34,7 @@ def _get_users_col():
 # Registration
 # ---------------------------------------------------------------------------
 
-def register_user(email, password, name=None):
+def register_user(email, password, name=None, confirm_password=None):
     """Create a new user account. Email is the primary identity key.
 
     Returns a dict with 'ok' on success or 'error' on failure.
@@ -42,6 +42,9 @@ def register_user(email, password, name=None):
     email = _normalize_email(email)
     if not email or not password:
         return {"error": "Email and password are required.", "status": 400}
+
+    if confirm_password is not None and password != confirm_password:
+        return {"error": "Passwords do not match.", "status": 400}
 
     users_col = _get_users_col()
     if users_col.find_one({"email": email}):

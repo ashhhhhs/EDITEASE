@@ -21,6 +21,7 @@ def register():
     res = auth_service.register_user(
         email=data.get('email'),
         password=data.get('password'),
+        confirm_password=data.get('confirm_password'),
         name=data.get('name'),
     )
     if 'error' in res:

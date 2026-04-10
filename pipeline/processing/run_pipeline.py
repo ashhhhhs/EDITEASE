@@ -30,7 +30,7 @@ def has_face(img_path):
         return False
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     cascade = cv2.CascadeClassifier(
-        os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")
+        os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml") # type: ignore
     )
     faces = cascade.detectMultiScale(gray, 1.1, 5, minSize=(40, 40))
     return len(faces) > 0
@@ -65,6 +65,14 @@ def extract_frame(video_path, timestamp, out_path):
     cap.release()
 
     if ret and frame is not None:
+        # Resize to max-width 1280 to prevent AI models and OpenCV from hanging on 4K/8K footage
+        height, width = frame.shape[:2]
+        if width > 1280:
+            scale = 1280 / width
+            new_width = 1280
+            new_height = int(height * scale)
+            frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_AREA)
+            
         cv2.imwrite(out_path, frame)
         return True
     return False
@@ -116,7 +124,7 @@ def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene
         if dominant:
             emotion_votes[dominant] = emotion_votes.get(dominant, 0) + 1
 
-    dominant_overall = max(emotion_votes, key=emotion_votes.get) if emotion_votes else None
+    dominant_overall = max(emotion_votes, key=emotion_votes.get) if emotion_votes else None # type: ignore
     face_present_any = face_hits > 0
     face_present_ratio = (face_hits / total_samples) if total_samples > 0 else 0.0
 
@@ -140,6 +148,7 @@ def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD,
     else:
         cloudinary_public_id = f"editease/videos/{video_name}"
 
+    logger.info("DEBUG: [STEP 1] Starting robust Cloudinary upload_large for %s", video_name)
     cloudinary_video_url = cloudinary_service.upload_video(
         video_path,
         public_id=cloudinary_public_id,
@@ -154,6 +163,7 @@ def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD,
         )
         if progress_callback: progress_callback("Backup failed. Processing locally...")
 
+    logger.info("DEBUG: [STEP 2] Starting scene detection (Heavy CPU task) for %s", video_name)
     scenes = find_scenes(video_path, threshold=threshold)
     if not scenes:
         logger.warning("No scenes detected for %s, skipping", video_name)
@@ -162,20 +172,26 @@ def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD,
 
     merged = []
 
+    logger.info("DEBUG: [STEP 3] Entering scene processing loop. Found %s scenes.", len(scenes))
     for idx, scene in enumerate(scenes, start=1):
+        logger.info("DEBUG: ---> Processing Scene %s of %s", idx, len(scenes))
         start = scene[0].get_seconds()
         end = scene[1].get_seconds()
         mid = (start + end) / 2
 
         thumb_name = f"{video_name}_scene_{idx:03d}.jpg"
         thumb_path = os.path.join(thumbs_dir, thumb_name)
+        
+        logger.info("DEBUG:      Extracting and resizing thumbnail frame for scene %s", idx)
         extract_frame(video_path, mid, thumb_path)
 
+        logger.info("DEBUG:      Uploading scene %s thumbnail to Cloudinary...", idx)
         thumbnail_url = cloudinary_service.upload_image(
             thumb_path,
             public_id=f"editease/thumbnails/{video_name}_scene_{idx:03d}",
         )
 
+        logger.info("DEBUG:      Starting Emotion & Face sampling for scene %s...", idx)
         emotion_timeline, dominant_overall, face_any, face_ratio = sample_emotions_over_scene(
             video_path=video_path,
             start_sec=start,
@@ -184,6 +200,7 @@ def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD,
             scene_id=idx,
         )
 
+        logger.info("DEBUG:      Running AI Video Classification (ML/Rule-based) for scene %s...", idx)
         scene_label, scene_conf, scene_debug = scene_classifier.classify(
             video_path=video_path,
             start_sec=start,
@@ -244,6 +261,7 @@ def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD,
             "manual_emotion": None,
         }))
 
+        logger.info("DEBUG:      Scene %s processing complete.", idx)
         logger.info(
             "Scene %s: type=%s | dominant_emotion=%s",
             idx,

@@ -73,6 +73,16 @@ def test_register_and_login(client):
     me_data = rv.get_json()
     assert me_data["user"]["email"] == "test@example.com"
 
+def test_register_rejects_mismatched_confirm_password(client):
+    rv = client.post('/register', json={
+        "email": "mismatch@example.com",
+        "password": "StrongPassword123!",
+        "confirm_password": "WrongPassword123!",
+        "name": "Mismatch User"
+    })
+    assert rv.status_code == 400
+    assert rv.get_json()["error"] == "Passwords do not match."
+
 def test_login_failures(client):
     # Register first
     client.post('/register', json={

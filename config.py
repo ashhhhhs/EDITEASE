@@ -50,7 +50,7 @@ FFMPEG_PATH = os.getenv(
 
 # Pipeline settings
 SCENE_DETECT_THRESHOLD = float(os.getenv("SCENE_DETECT_THRESHOLD", "27.0"))
-CLASSIFIER_TYPE = os.getenv("CLASSIFIER_TYPE", "rule_based")
+CLASSIFIER_TYPE = os.getenv("CLASSIFIER_TYPE", "ml")
 
 # Cloudinary Settings
 CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "")

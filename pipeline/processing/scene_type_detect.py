@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 
-CASCADE_PATH = os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")
+CASCADE_PATH = os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml") # type: ignore
 
 
 def detect_faces_info(image_bgr):
@@ -99,7 +99,7 @@ def compute_text_component_density(image_bgr):
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
 
     # Improve contrast for slides/UIs
-    gray = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
+    gray = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX) # type: ignore
 
     # Adaptive threshold tends to catch text on varying backgrounds
     bw = cv2.adaptiveThreshold(

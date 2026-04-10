@@ -117,7 +117,7 @@ def accept_invitation(raw_token, user_id, user_email):
     )
     
     # Update user
-    db = _client[config.DB_NAME]
+    db = _client[config.DB_NAME] # type: ignore
     db.users.update_one(
         {"_id": ObjectId(user_id)},
         {"$set": {
