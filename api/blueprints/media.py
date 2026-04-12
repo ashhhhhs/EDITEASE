@@ -99,26 +99,34 @@ def open_folder():
 @media_bp.get('/organized-videos/stats')
 @role_required(['admin', 'editor'])
 def get_organized_video_stats():
-    """Return count of videos per dominant_label."""
+    """Return count of videos per dominant_label.
+    Admins see all users. Editors only see their own.
+    """
+    from flask import g
     from services.organized_video_service import get_label_counts
-    return jsonify(get_label_counts())
+    user_id = None if g.user.get('role') == 'admin' else g.user.get('id')
+    return jsonify(get_label_counts(uploader=user_id))
 
 @media_bp.get('/organized-videos')
 @role_required(['admin', 'editor'])
 def list_organized_videos():
     """List organized videos with optional filters.
-    Query params: label, from_date, to_date, uploader, is_duplicate, search, page, limit
+    Admins see all. Editors are scoped to their own uploads.
+    Query params: label, from_date, to_date, is_duplicate, search, page, limit
     """
+    from flask import g
     from services.organized_video_service import list_organized_videos as svc_list
     is_dup = request.args.get('is_duplicate')
     is_dup_bool = None
     if is_dup is not None:
         is_dup_bool = is_dup.lower() in ('1', 'true', 'yes')
+    # Scope to the current user unless they are an admin
+    uploader = None if g.user.get('role') == 'admin' else g.user.get('id')
     result = svc_list(
         label=request.args.get('label'),
         from_date=request.args.get('from_date'),
         to_date=request.args.get('to_date'),
-        uploader=request.args.get('uploader'),
+        uploader=uploader,
         is_duplicate=is_dup_bool,
         search=request.args.get('search'),
         page=request.args.get('page', 1, type=int),
@@ -201,9 +209,13 @@ def start_batch_download():
         return jsonify({'error': err}), 400
     
     col = _get_col()
-    docs = list(col.find({"_id": {"$in": [ObjectId(i) for i in ids if ObjectId.is_valid(i)]}}))
+    # Build ownership filter — admins can download any video
+    ownership_filter = {"_id": {"$in": [ObjectId(i) for i in ids if ObjectId.is_valid(i)]}}
+    if g.user.get('role') != 'admin':
+        ownership_filter["uploaded_by"] = g.user.get('id')
+    docs = list(col.find(ownership_filter))
     if not docs:
-        return jsonify({'error': 'No valid videos found'}), 404
+        return jsonify({'error': 'No valid videos found (or access denied)'}), 404
         
     public_ids = [doc.get('cloudinary_public_id') for doc in docs if doc.get('cloudinary_public_id')]
     if not public_ids:
@@ -220,4 +232,47 @@ def start_batch_download():
         'status': 'SUCCESS', 
         'url': zip_url,
         'message': f'Instant ZIP created for {len(public_ids)} files'
+    })
+
+
+@media_bp.post('/organized-videos/download-category')
+@role_required(['admin', 'editor'])
+@require_verified_email
+def download_category():
+    """Generate a signed Cloudinary ZIP URL for ALL videos in a category.
+    Non-admins are scoped to their own uploads. Capped at 50 files.
+    """
+    from flask import g
+    from services.organized_video_service import _get_col
+    data = request.get_json(force=True) or {}
+    label = data.get('label', '').strip()
+    if not label:
+        return jsonify({'error': 'label is required'}), 400
+
+    col = _get_col()
+    query = {"dominant_label": label, "status": "organized"}
+    if g.user.get('role') != 'admin':
+        query["uploaded_by"] = g.user.get('id')
+
+    CAP = 50
+    docs = list(col.find(query, {"cloudinary_public_id": 1}).limit(CAP))
+    if not docs:
+        return jsonify({'error': 'No videos found in this category'}), 404
+
+    public_ids = [d['cloudinary_public_id'] for d in docs if d.get('cloudinary_public_id')]
+    if not public_ids:
+        return jsonify({'error': 'No cloud assets found for this category'}), 404
+
+    zip_url = cloudinary.utils.download_zip_url(
+        public_ids=public_ids,
+        resource_type="video",
+        flatten_folders=True,
+    )
+    capped = len(docs) == CAP
+    return jsonify({
+        'status': 'SUCCESS',
+        'url': zip_url,
+        'count': len(public_ids),
+        'capped': capped,
+        'message': f'ZIP ready for {len(public_ids)} files{" (first 50 only)" if capped else ""}'
     })

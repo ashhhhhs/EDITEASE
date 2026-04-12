@@ -3,7 +3,7 @@ import {
   Folder, Download, RefreshCw, Search,
   CheckCircle, Archive, X, ChevronLeft, PlayCircle,
   FileText, Clock, Hash, Brain, Eye, Zap,
-  Activity, AlertTriangle, ChevronDown, ChevronUp
+  Activity, AlertTriangle, ChevronDown, ChevronUp, FolderDown
 } from 'lucide-react';
 import api from './lib/api';
 import gsap from 'gsap';
@@ -146,7 +146,7 @@ function MetadataStrip({ ai }) {
 }
 
 /* ── Folder card ── */
-function FolderCard({ label, count, onClick }) {
+function FolderCard({ label, count, onClick, onDownloadAll, isDownloading }) {
   const display = getDisplayLabel(label);
   return (
     <div
@@ -175,7 +175,7 @@ function FolderCard({ label, count, onClick }) {
         }}>
           <Folder size={20} fill="currentColor" fillOpacity={0.2} />
         </div>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: 'var(--font-body)', color: 'var(--text-primary)' }}>
             {display}
           </div>
@@ -183,6 +183,26 @@ function FolderCard({ label, count, onClick }) {
             {count} video{count !== 1 ? 's' : ''}
           </div>
         </div>
+      </div>
+
+      {/* Download-all button row */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          className="btn"
+          style={{
+            fontSize: 'var(--font-meta)', padding: '4px 10px',
+            opacity: isDownloading ? 0.6 : 1,
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}
+          disabled={isDownloading}
+          title={`Download all ${display} videos as ZIP`}
+          onClick={e => { e.stopPropagation(); onDownloadAll(label); }}
+        >
+          {isDownloading
+            ? <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} />
+            : <FolderDown size={12} />}
+          {isDownloading ? 'Preparing…' : 'Download All'}
+        </button>
       </div>
     </div>
   );
@@ -633,6 +653,9 @@ export default function OrganizedVideos() {
 
   const limit = 24;
 
+  // Track which category folder is currently generating a ZIP
+  const [downloadingCategory, setDownloadingCategory] = useState(null);
+
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
     try {
@@ -652,6 +675,7 @@ export default function OrganizedVideos() {
       const params = new URLSearchParams({ page: p, limit, label: currentFolder });
       if (search)      params.set('search', search);
       if (filterDup)   params.set('is_duplicate', filterDup);
+      // NOTE: no uploader param – server scopes results to logged-in user automatically
       const res = await api.get(`/organized-videos?${params}`);
       setVideos(res.data.videos || []);
       setTotal(res.data.total || 0);
@@ -730,14 +754,13 @@ export default function OrganizedVideos() {
 
   const handleBatchDownload = async () => {
     const ids = Array.from(selected);
-    if (ids.size === 0) { toast.error('Select at least one video'); return; }
+    if (ids.length === 0) { toast.error('Select at least one video'); return; }
     if (ids.length > BATCH_MAX) { toast.error(`Batch limit is ${BATCH_MAX} files`); return; }
     
-    setLoading(true); // Reusing general loading state for the instant pulse
+    setLoading(true);
     try {
       const res = await api.post('/organized-videos/download-batch', { ids });
       if (res.data.url) {
-        // Trigger instant download
         window.location.href = res.data.url;
         toast.success(res.data.message || 'Generating ZIP…');
         clearAll();
@@ -746,6 +769,24 @@ export default function OrganizedVideos() {
       toast.error(err.friendlyMessage || 'Failed to generate batch download');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCategoryDownload = async (label) => {
+    setDownloadingCategory(label);
+    try {
+      const res = await api.post('/organized-videos/download-category', { label });
+      if (res.data.url) {
+        window.location.href = res.data.url;
+        const msg = res.data.capped
+          ? `ZIP ready (first 50 of ${folderStats[label]} videos)`
+          : res.data.message || `ZIP ready for ${res.data.count} videos`;
+        toast.success(msg);
+      }
+    } catch (err) {
+      toast.error(err.friendlyMessage || `Failed to download ${getDisplayLabel(label)} category`);
+    } finally {
+      setDownloadingCategory(null);
     }
   };
 
@@ -933,7 +974,14 @@ export default function OrganizedVideos() {
             {Object.entries(folderStats)
               .sort(([a], [b]) => getDisplayLabel(a).localeCompare(getDisplayLabel(b)))
               .map(([label, count]) => (
-                <FolderCard key={label} label={label} count={count} onClick={setCurrentFolder} />
+                <FolderCard
+                  key={label}
+                  label={label}
+                  count={count}
+                  onClick={setCurrentFolder}
+                  onDownloadAll={handleCategoryDownload}
+                  isDownloading={downloadingCategory === label}
+                />
               ))}
           </div>
         )

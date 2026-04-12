@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
-import { BarChart3, CheckCircle, AlertCircle, Film, Users, Video, Scissors, CheckSquare, Activity, XOctagon, TrendingUp, Clock, Library } from 'lucide-react';
+import { BarChart3, CheckCircle, AlertCircle, Film, Users, Video, Scissors, CheckSquare, Activity, XOctagon, TrendingUp, Clock, Library, Copy, Upload } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Link } from 'react-router-dom';
 import PageHeader from './components/PageHeader';
@@ -8,7 +8,6 @@ import LoadingState from './components/LoadingState';
 import api from './lib/api';
 import { useToast } from './hooks/useToast.jsx';
 
-const MIN_PER_CLASS = 50;
 
 /* ── Animated counter ── */
 function AnimatedNumber({ target }) {
@@ -261,7 +260,7 @@ function AdminOverview() {
 }
 
 /* ─────────── EDITOR VIEW ─────────── */
-function EditorDashboard() {
+function EditorDashboard({ currentUser }) {
   const toast = useToast();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -271,110 +270,112 @@ function EditorDashboard() {
     if (loading || !containerRef.current) return;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) return;
-
     const ctx = gsap.context(() => {
       gsap.from('.bento-card, .editor-banner, .class-dist-row', {
-        y: 20,
-        opacity: 0,
-        duration: 0.5,
-        stagger: 0.04,
-        ease: 'power2.out',
+        y: 20, opacity: 0, duration: 0.5, stagger: 0.04, ease: 'power2.out',
       });
     }, containerRef);
     return () => ctx.revert();
   }, [loading]);
 
   useEffect(() => {
-    api.get('/search?limit=10000')
-      .then(res => {
-        const results = res.data.results || [];
-        const total = results.length;
-        const reviewed = results.filter(r => r.reviewed).length;
-        const typeCounts = {};
-        const reviewedTypeCounts = {};
-        results.forEach(r => {
-          const t = r.scene_label || 'other';
-          typeCounts[t] = (typeCounts[t] || 0) + 1;
-          if (r.reviewed) reviewedTypeCounts[t] = (reviewedTypeCounts[t] || 0) + 1;
-        });
-        const maxCount = Math.max(...Object.values(typeCounts), 1);
-        const allClassesReady = Object.values(reviewedTypeCounts).length > 0 &&
-          Object.values(reviewedTypeCounts).every(v => v >= MIN_PER_CLASS);
-        setStats({ total, reviewed, unreviewed: total - reviewed, typeCounts, reviewedTypeCounts, maxCount, allClassesReady });
+    // Fetch only THIS user's data — both endpoints are server-scoped to the logged-in user
+    Promise.all([
+      api.get('/organized-videos/stats'),                      // {label: count}  — organized only
+      api.get('/organized-videos?limit=1'),                    // total of all statuses
+      api.get('/organized-videos?is_duplicate=true&limit=1'),  // duplicate count
+    ])
+      .then(([statsRes, totalRes, dupRes]) => {
+        const labelCounts = statsRes.data || {};
+        const organizedCount = Object.values(labelCounts).reduce((a, b) => a + b, 0);
+        const duplicateCount = dupRes.data.total || 0;
+        const total = totalRes.data.total || 0;
+        const maxCount = Math.max(...Object.values(labelCounts), 1);
+        setStats({ total, organized: organizedCount, duplicates: duplicateCount, labelCounts, maxCount });
         setLoading(false);
       })
-      .catch(err => { toast.error(err.friendlyMessage || 'Failed to load stats'); setLoading(false); });
+      .catch(err => { toast.error(err.friendlyMessage || 'Failed to load your stats'); setLoading(false); });
   }, []);
 
-  if (loading) return <LoadingState message="Loading dataset statistics..." />;
+  if (loading) return <LoadingState message="Loading your workspace..." />;
+
+  const hasVideos = stats && stats.total > 0;
+  const firstName = currentUser?.name?.split(' ')[0] || 'there';
 
   return (
     <div ref={containerRef}>
-      <PageHeader title="Your Workspace" description="Clips awaiting review, recent uploads, and auto-organized assets." />
+      <PageHeader
+        title={`Welcome back, ${firstName}`}
+        description="Your personal video library — organised, categorised, and ready to explore."
+      />
 
-      {/* ── Primary action banner — shown when unreviewed clips exist ── */}
-      {stats && stats.unreviewed > 0 && (
+      {/* ── Duplicate notice banner ── */}
+      {stats && stats.duplicates > 0 && (
         <div className="editor-banner" style={{
           background: 'var(--surface-elevated)',
           border: '1px solid var(--border-strong)',
-          borderLeft: '3px solid var(--accent)',
+          borderLeft: '3px solid var(--warning)',
           borderRadius: 'var(--radius-lg)',
           padding: 'var(--space-20) var(--space-24)',
           marginBottom: 'var(--space-24)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 'var(--space-16)',
-          flexWrap: 'wrap',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          gap: 'var(--space-16)', flexWrap: 'wrap',
         }}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 'var(--font-title-card)', marginBottom: 4 }}>
-              {stats.unreviewed.toLocaleString()} clips need a quick look
+              {stats.duplicates} duplicate{stats.duplicates !== 1 ? 's' : ''} detected
             </div>
             <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-small)' }}>
-              Some of your footage was a bit tricky to categorize. An admin will double-check these to keep your folders clean.
+              These files were already uploaded. They're linked to the originals so you won't lose anything.
             </div>
           </div>
-          <Link to="/app/uploads" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>Continue Uploading →</Link>
+          <Link to="/app/organized-videos" className="btn" style={{ whiteSpace: 'nowrap' }}>View Library →</Link>
         </div>
       )}
 
+      {/* ── Stat cards ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-20)', marginBottom: 'var(--space-24)' }}>
         <BentoCard accent="var(--accent)">
-          <StatLabel><Film size={13} style={{verticalAlign:'middle',marginRight:4}} /> Total Clips</StatLabel>
+          <StatLabel><Upload size={13} style={{verticalAlign:'middle',marginRight:4}} /> Total Uploaded</StatLabel>
           <StatValue value={stats?.total} />
+          <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>videos in your library</div>
         </BentoCard>
         <BentoCard accent="var(--success)">
-          <StatLabel><CheckCircle size={13} style={{verticalAlign:'middle',marginRight:4}} /> Organized</StatLabel>
-          <StatValue value={stats?.reviewed} color="var(--success)" />
+          <StatLabel><CheckCircle size={13} style={{verticalAlign:'middle',marginRight:4}} /> Organised</StatLabel>
+          <StatValue value={stats?.organized} color="var(--success)" />
+          <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>successfully classified</div>
         </BentoCard>
-        <BentoCard accent="var(--danger)">
-          <StatLabel><AlertCircle size={13} style={{verticalAlign:'middle',marginRight:4}} /> Pending Sort</StatLabel>
-          <StatValue value={stats?.unreviewed} color="var(--danger)" />
+        <BentoCard accent="var(--warning)">
+          <StatLabel><Copy size={13} style={{verticalAlign:'middle',marginRight:4}} /> Duplicates</StatLabel>
+          <StatValue value={stats?.duplicates} color="var(--warning)" />
+          <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>linked to originals</div>
         </BentoCard>
       </div>
 
+      {/* ── Your category breakdown ── */}
       <div style={{ background: 'var(--surface-panel)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-24)', marginBottom: 'var(--space-24)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-20)' }}>
-          <h2 style={{ margin: 0 }}>Class Distribution</h2>
-          {stats?.allClassesReady && <span className="badge success">🎉 Dataset Ready</span>}
+          <h2 style={{ margin: 0 }}>Your Categories</h2>
+          <Link to="/app/organized-videos" className="btn" style={{ fontSize: 'var(--font-meta)', padding: '4px 10px' }}>Browse →</Link>
         </div>
-        {stats && Object.keys(stats.typeCounts).length > 0 ? (
-          Object.entries(stats.typeCounts).sort((a, b) => b[1] - a[1]).map(([label, count]) => {
-            const reviewed = stats.reviewedTypeCounts[label] || 0;
-            const isReady = reviewed >= MIN_PER_CLASS;
+
+        {hasVideos && stats && Object.keys(stats.labelCounts).length > 0 ? (
+          Object.entries(stats.labelCounts).sort((a, b) => b[1] - a[1]).map(([label, count]) => {
+            const displayLabel = label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             return (
               <div key={label} className="class-dist-row" style={{ marginBottom: 'var(--space-20)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-8)', fontSize: 'var(--font-small)' }}>
-                  <span style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
-                    {label} {isReady && <CheckCircle size={13} color="var(--success)" />}
-                  </span>
-                  <span style={{ color: 'var(--text-secondary)' }}>{reviewed}/{count}</span>
+                  <span style={{ fontWeight: 500 }}>{displayLabel}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{count} video{count !== 1 ? 's' : ''}</span>
                 </div>
-                <div style={{ width: '100%', height: 10, background: 'var(--surface-base)', borderRadius: 5, overflow: 'hidden', position: 'relative', border: '1px solid var(--border-subtle)' }}>
-                  <div style={{ width: `${(count / stats.maxCount) * 100}%`, height: '100%', background: 'rgba(88,166,255,0.25)', position: 'absolute' }} />
-                  <div style={{ width: `${(reviewed / stats.maxCount) * 100}%`, height: '100%', background: 'var(--success)', position: 'absolute', transition: 'width 0.5s ease' }} />
-                  <div style={{ left: `${Math.min(100, (MIN_PER_CLASS / stats.maxCount) * 100)}%`, position: 'absolute', top: 0, bottom: 0, width: 2, background: 'rgba(218,54,51,0.6)' }} />
+                <div style={{ width: '100%', height: 8, background: 'var(--surface-base)', borderRadius: 4, overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{
+                    width: `${(count / stats.maxCount) * 100}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, var(--accent), rgba(88,166,255,0.6))',
+                    borderRadius: 4,
+                    transition: 'width 0.6s ease',
+                  }} />
                 </div>
               </div>
             );
@@ -383,8 +384,8 @@ function EditorDashboard() {
           <div style={{ textAlign: 'center', padding: 'var(--space-64) var(--space-24)' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: 'var(--space-16)' }}>📂</div>
             <div style={{ fontWeight: 600, fontSize: 'var(--font-title-card)', marginBottom: 'var(--space-8)' }}>No footage yet</div>
-            <div style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-24)', maxWidth: 360, margin: '0 auto var(--space-24)' }}>
-              Upload your first batch of raw footage, and let the system organize your timeline.
+            <div style={{ color: 'var(--text-secondary)', maxWidth: 360, margin: '0 auto var(--space-24)' }}>
+              Upload your first video and let the AI organise it into categories automatically.
             </div>
             <Link to="/app/uploads" className="btn btn-primary">Upload Footage</Link>
           </div>
@@ -396,5 +397,5 @@ function EditorDashboard() {
 
 export default function Dashboard({ currentUser }) {
   if (currentUser?.role === 'admin') return <AdminOverview />;
-  return <EditorDashboard />;
+  return <EditorDashboard currentUser={currentUser} />;
 }

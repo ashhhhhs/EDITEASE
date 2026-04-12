@@ -195,10 +195,13 @@ def get_processing_logs(
 # Per-label counts (for admin overview)
 # ---------------------------------------------------------------------------
 
-def get_label_counts() -> dict:
+def get_label_counts(uploader: str | None = None) -> dict:
     col = _get_col()
+    match: dict = {"status": "organized"}
+    if uploader:
+        match["uploaded_by"] = uploader
     pipeline = [
-        {"$match": {"status": "organized"}},
+        {"$match": match},
         {"$group": {"_id": "$dominant_label", "count": {"$sum": 1}}},
     ]
     return {r["_id"]: r["count"] for r in col.aggregate(pipeline)}
