@@ -24,6 +24,7 @@ const LABEL_MAP = {
   screen_recording: 'Screen Recordings',
   'b-roll': 'B-Rolls',
   establishing_shot: 'Establishing Shots',
+  edited: 'Edited Videos',
   other: 'Other'
 };
 
@@ -65,13 +66,15 @@ function StatusBadge({ status }) {
 /* ── Label badge ── */
 function LabelBadge({ label }) {
   const display = getDisplayLabel(label);
+  const isEdited = label === 'edited';
   return (
     <span style={{
-      background: 'rgba(88,166,255,0.15)', color: '#58a6ff',
+      background: isEdited ? 'rgba(191,144,255,0.15)' : 'rgba(88,166,255,0.15)', 
+      color: isEdited ? '#d2a8ff' : '#58a6ff',
       fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em',
       padding: '2px 8px', borderRadius: 20,
-      border: `1px solid rgba(88,166,255,0.33)`,
-    }}>{display}</span>
+      border: `1px solid ${isEdited ? 'rgba(191,144,255,0.33)' : 'rgba(88,166,255,0.33)'}`,
+    }}>{isEdited ? '✨ ' : ''}{display}</span>
   );
 }
 
@@ -222,7 +225,7 @@ function VideoCard({ doc, selected, onSelect, onPreview, onDownload, showMeta })
 
   return (
     <div
-      className="video-card gs-reveal"
+      className="video-card gs-reveal tour-video-card"
       style={{
         background: 'var(--surface-panel)',
         border: `1px solid ${selected ? 'var(--accent)' : 'var(--border-subtle)'}`,
@@ -656,6 +659,8 @@ export default function OrganizedVideos() {
   // Track which category folder is currently generating a ZIP
   const [downloadingCategory, setDownloadingCategory] = useState(null);
 
+
+
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
     try {
@@ -797,6 +802,7 @@ export default function OrganizedVideos() {
 
   return (
     <div ref={mainRef}>
+
       <PageHeader
         title="Organized Videos"
         description="Videos classified and organized intelligently. Select a category below to browse files."
@@ -816,7 +822,7 @@ export default function OrganizedVideos() {
 
       {/* ── Toolbar (Only visible inside a folder) ── */}
       {currentFolder && (
-        <div style={{
+        <div className="tour-toolbar" style={{
           display: 'flex', flexWrap: 'wrap', gap: 'var(--space-12)',
           marginBottom: 'var(--space-24)', alignItems: 'center',
         }}>
@@ -856,7 +862,7 @@ export default function OrganizedVideos() {
 
           {/* Metadata toggle */}
           <button
-            className={`btn${showMeta ? ' btn-primary' : ''}`}
+            className={`btn${showMeta ? ' btn-primary' : ''} tour-meta-toggle`}
             style={{ height: 36, padding: '0 12px', fontSize: 'var(--font-meta)', gap: 4 }}
             onClick={() => setShowMeta(!showMeta)}
             title={showMeta ? 'Hide metadata' : 'Show metadata'}
@@ -866,7 +872,7 @@ export default function OrganizedVideos() {
 
           {/* Logs toggle */}
           <button
-            className={`btn${showLogs ? ' btn-primary' : ''}`}
+            className={`btn${showLogs ? ' btn-primary' : ''} tour-logs-toggle`}
             style={{ height: 36, padding: '0 12px', fontSize: 'var(--font-meta)', gap: 4 }}
             onClick={() => setShowLogs(!showLogs)}
             title={showLogs ? 'Hide logs' : 'Show processing logs'}
@@ -881,6 +887,8 @@ export default function OrganizedVideos() {
           >
             <RefreshCw size={14} />
           </button>
+
+
         </div>
       )}
 

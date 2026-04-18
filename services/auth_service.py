@@ -207,14 +207,29 @@ def reset_password(user_id, new_password):
 # User Management (admin)
 # ---------------------------------------------------------------------------
 
-def get_paginated_users(page=1, limit=20):
+def get_paginated_users(page=1, limit=20, search='', role='', status=''):
     page = max(1, int(page))
     limit = max(1, min(int(limit), 200))
     skip = (page - 1) * limit
     users_col = _get_users_col()
+
+    query = {}
+    if search:
+        query['$or'] = [
+            {'username': {'$regex': search, '$options': 'i'}},
+            {'email': {'$regex': search, '$options': 'i'}},
+            {'name': {'$regex': search, '$options': 'i'}},
+        ]
+    if role and role != 'all':
+        query['role'] = role
+    if status == 'active':
+        query['is_active'] = True
+    elif status == 'inactive':
+        query['is_active'] = False
+
     cursor = (
         users_col
-        .find({}, {"password_hash": 0, "token": 0})
+        .find(query, {"password_hash": 0, "token": 0})
         .sort("created_at", -1)
         .skip(skip)
         .limit(limit)
@@ -223,7 +238,7 @@ def get_paginated_users(page=1, limit=20):
     for u in cursor:
         u["_id"] = str(u["_id"])
         users.append(u)
-    total = users_col.count_documents({})
+    total = users_col.count_documents(query)
     return {"users": users, "total": total, "page": page, "limit": limit}
 
 

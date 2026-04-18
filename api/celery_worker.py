@@ -56,6 +56,35 @@ def process_video_task(self, video_path_str: str, base_dir_str: str):
         raise e
 
 
+def check_if_edited_by_metadata(video_path: str) -> bool:
+    """Check video metadata for editing software signatures via ffprobe."""
+    import subprocess
+    import json
+    try:
+        cmd = [
+            'ffprobe', '-v', 'quiet', '-print_format', 'json', 
+            '-show_format', video_path
+        ]
+        res = subprocess.check_output(cmd).decode('utf-8')
+        data = json.loads(res)
+        fmt_tags = data.get('format', {}).get('tags', {})
+        # Check encoder/software tags
+        encoder = str(fmt_tags.get('encoder', '')).lower()
+        software = str(fmt_tags.get('software', '')).lower()
+        markers = ['adobe', 'premiere', 'resolve', 'davinci', 'final cut', 'fcp', 'handbrake', 'lavf', 'capcut', 'imovie']
+        if any(sw in encoder for sw in markers) or any(sw in software for sw in markers):
+            return True
+        return False
+    except Exception:
+        return False
+
+def check_if_edited_by_filename(filename: str) -> bool:
+    """Check filename for versioning or export keywords."""
+    import re
+    pattern = r'(_final|_v\d+|_edit|_export|_master|_render|final|edit|export|version)'
+    return bool(re.search(pattern, filename.lower()))
+
+
 @celery_app.task(bind=True, name="auto_organize_task")
 def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: str | None = None):
     """
@@ -86,71 +115,105 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
             file_hash = hashlib.sha256(fh.read()).hexdigest()
         safe_name = slugify(video_name)
         logger.info(f"File hash for {video_name}: {file_hash[:12]}...")
+        
+        # ── Smart Edited Detection (Pre-analysis) ──────────────────────────
+        heuristic_edited = check_if_edited_by_filename(original_filename) or check_if_edited_by_metadata(video_path_str)
+        if heuristic_edited:
+            logger.info(f"Heuristics suggest {video_name} is an edited video. Skipping analysis.")
+            is_edited_auto = True
+        else:
+            is_edited_auto = False
+            
     except Exception as e:
         logger.error(f"Failed to hash video {video_path_str}: {e}")
         _update_task(self.request.id, status="FAILURE", error_message=str(e), progress_step="error")
         raise e
 
     # ── Step 2: Process video (pipeline uses the hash-safe public ID) ─────────
-    self.update_state(state="PROGRESS", meta={"step": "processing", "message": "Analyzing video..."})
-    _update_task(self.request.id, status="STARTED", progress_step="processing")
-    from pipeline.processing.run_pipeline import process_video
-    try:
-        def on_progress(msg):
-            self.update_state(state="PROGRESS", meta={"step": "processing", "message": msg})
-            _update_task(self.request.id, progress_step=msg)
+    if not is_edited_auto:
+        self.update_state(state="PROGRESS", meta={"step": "processing", "message": "Analyzing video..."})
+        _update_task(self.request.id, status="STARTED", progress_step="processing")
+        from pipeline.processing.run_pipeline import process_video
+        try:
+            def on_progress(msg):
+                self.update_state(state="PROGRESS", meta={"step": "processing", "message": msg})
+                _update_task(self.request.id, progress_step=msg)
 
-        process_video(video_path_str, base_dir_str, file_hash=file_hash, progress_callback=on_progress)
-    except Exception as e:
-        logger.error(f"Processing failed: {e}", exc_info=True)
-        _update_task(self.request.id, status="FAILURE", error_message=str(e), progress_step="error")
-        raise e
+            process_video(video_path_str, base_dir_str, file_hash=file_hash, progress_callback=on_progress)
+        except Exception as e:
+            logger.error(f"Processing failed: {e}", exc_info=True)
+            _update_task(self.request.id, status="FAILURE", error_message=str(e), progress_step="error")
+            raise e
 
-    # ── Step 3: Read scene index ──────────────────────────────────────────────
-    self.update_state(state="PROGRESS", meta={"step": "organizing", "message": "Organizing clips..."})
-    _update_task(self.request.id, progress_step="organizing")
-    index_path = os.path.join(base_dir_str, "scene_indexes", f"{video_name}_scene_index.json")
-    if not os.path.exists(index_path):
-        _update_task(self.request.id, status="FAILURE", error_message="Scene index not generated", progress_step="error")
-        return {"status": "error", "message": "Scene index not generated"}
+        # ── Step 3: Read scene index ──────────────────────────────────────────────
+        self.update_state(state="PROGRESS", meta={"step": "organizing", "message": "Organizing clips..."})
+        _update_task(self.request.id, progress_step="organizing")
+        index_path = os.path.join(base_dir_str, "scene_indexes", f"{video_name}_scene_index.json")
+        if not os.path.exists(index_path):
+            _update_task(self.request.id, status="FAILURE", error_message="Scene index not generated", progress_step="error")
+            return {"status": "error", "message": "Scene index not generated"}
 
-    with open(index_path, "r", encoding="utf-8") as f:
-        scenes = json.load(f)
+        with open(index_path, "r", encoding="utf-8") as f:
+            scenes = json.load(f)
 
-    # ── Step 4: Determine dominant label ─────────────────────────────────────
-    from collections import Counter
-    confident_labels = [s.get("scene_label", "other") for s in scenes if s.get("reviewed") is True]
-    if not confident_labels:
-        confident_labels = [s.get("scene_label", "other") for s in scenes]
-    dominant_label = Counter(confident_labels).most_common(1)[0][0] if confident_labels else "other"
+        # ── Step 4: Determine dominant label ─────────────────────────────────────
+        from collections import Counter
+        confident_labels = [s.get("scene_label", "other") for s in scenes if s.get("reviewed") is True]
+        if not confident_labels:
+            confident_labels = [s.get("scene_label", "other") for s in scenes]
+        dominant_label = Counter(confident_labels).most_common(1)[0][0] if confident_labels else "other"
 
-    dominant_emotion_votes = Counter([s.get("dominant_emotion_overall") for s in scenes if s.get("dominant_emotion_overall")])
-    dominant_emotion = dominant_emotion_votes.most_common(1)[0][0] if dominant_emotion_votes else "none"
-    dominant_emotion_conf_samples = []
-    if dominant_emotion != "none":
-        for scene in scenes:
-            for sample in scene.get("emotion_timeline", []):
-                if sample.get("emotion") == dominant_emotion and sample.get("confidence") is not None:
-                    try:
-                        dominant_emotion_conf_samples.append(float(sample["confidence"]))
-                    except (TypeError, ValueError):
-                        continue
-    dominant_emotion_confidence = (
-        round(sum(dominant_emotion_conf_samples) / len(dominant_emotion_conf_samples), 2)
-        if dominant_emotion_conf_samples else None
-    )
-    avg_conf = sum(s.get("scene_confidence", 0) for s in scenes) / max(len(scenes), 1)
-    
-    ai_metadata = {
-        "dominant_label": dominant_label,
-        "dominant_emotion": dominant_emotion,
-        "dominant_emotion_confidence": dominant_emotion_confidence,
-        "average_confidence": round(avg_conf, 2),
-        "total_scenes_detected": len(scenes),
-        "label_distribution": dict(Counter([s.get("scene_label", "other") for s in scenes])),
-        "action_taken": scenes[0].get("scene_debug", {}).get("agent_action", "unknown") if scenes else "unknown",
-        "has_faces": any(s.get("faces", {}).get("face_present_any", False) for s in scenes)
-    }
+        dominant_emotion_votes = Counter([s.get("dominant_emotion_overall") for s in scenes if s.get("dominant_emotion_overall")])
+        dominant_emotion = dominant_emotion_votes.most_common(1)[0][0] if dominant_emotion_votes else "none"
+        dominant_emotion_conf_samples = []
+        if dominant_emotion != "none":
+            for scene in scenes:
+                for sample in scene.get("emotion_timeline", []):
+                    if sample.get("emotion") == dominant_emotion and sample.get("confidence") is not None:
+                        try:
+                            dominant_emotion_conf_samples.append(float(sample["confidence"]))
+                        except (TypeError, ValueError):
+                            continue
+        dominant_emotion_confidence = (
+            round(sum(dominant_emotion_conf_samples) / len(dominant_emotion_conf_samples), 2)
+            if dominant_emotion_conf_samples else None
+        )
+        avg_conf = sum(s.get("scene_confidence", 0) for s in scenes) / max(len(scenes), 1)
+        
+        # ── Step 4.5: Variety Check (Post-analysis Smart Detection) ──────────
+        label_dist = dict(Counter([s.get("scene_label", "other") for s in scenes]))
+        # If there are 3 or more distinct labels with significant presence, it's edited.
+        distinct_significant_labels = [l for l, count in label_dist.items() if count > 0]
+        if len(distinct_significant_labels) >= 3:
+            logger.info(f"High scene diversity ({len(distinct_significant_labels)} types) detected for {video_name}. Auto-categorizing as 'edited'.")
+            dominant_label = "edited"
+            action_taken = "auto_detected_by_variety"
+        else:
+            action_taken = scenes[0].get("scene_debug", {}).get("agent_action", "unknown") if scenes else "unknown"
+
+        ai_metadata = {
+            "dominant_label": dominant_label,
+            "dominant_emotion": dominant_emotion,
+            "dominant_emotion_confidence": dominant_emotion_confidence,
+            "average_confidence": round(avg_conf, 2),
+            "total_scenes_detected": len(scenes),
+            "label_distribution": label_dist,
+            "action_taken": action_taken,
+            "has_faces": any(s.get("faces", {}).get("face_present_any", False) for s in scenes)
+        }
+    else:
+        # ── Heuristic Edited Flow ──────────────────────────────────────────────────
+        dominant_label = "edited"
+        ai_metadata = {
+            "dominant_label": "edited",
+            "dominant_emotion": "none",
+            "dominant_emotion_confidence": None,
+            "average_confidence": 1.0,
+            "total_scenes_detected": 1,
+            "label_distribution": {"edited": 1},
+            "action_taken": "auto_detected_by_heuristics",
+            "has_faces": False
+        }
 
     # ── Step 5: Duplicate detection ───────────────────────────────────────────
     col = _get_col()
@@ -191,16 +254,26 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
             "duplicate_of": str(existing["_id"]),
         }
 
-    # ── Step 6: Move video to organized folder ────────────────────────────────
+    # ── Step 6: Move or Upload video to organized folder ────────────────────────────────
     from services import cloudinary_service
-    old_pub_id = f"editease/videos/{file_hash}/{safe_name}"
-    new_pub_id = f"editease/organized-videos/{dominant_label}/{file_hash}/{safe_name}"
-    cloudinary_url, actual_pub_id = cloudinary_service.move_video_returning_id(old_pub_id, new_pub_id)
+    if not is_edited_auto:
+        old_pub_id = f"editease/videos/{file_hash}/{safe_name}"
+        new_pub_id = f"editease/organized-videos/{dominant_label}/{file_hash}/{safe_name}"
+        cloudinary_url, actual_pub_id = cloudinary_service.move_video_returning_id(old_pub_id, new_pub_id)
 
-    if not cloudinary_url:
-        # Move failed — log and continue; local file will still be cleaned up
-        logger.error(f"Failed to move Cloudinary video for {video_name}")
-        actual_pub_id = new_pub_id  # use intended path so record is still useful
+        if not cloudinary_url:
+            # Move failed — log and continue; local file will still be cleaned up
+            logger.error(f"Failed to move Cloudinary video for {video_name}")
+            actual_pub_id = new_pub_id  # use intended path so record is still useful
+    else:
+        new_pub_id = f"editease/organized-videos/edited/{file_hash}/{safe_name}"
+        self.update_state(state="PROGRESS", meta={"step": "uploading", "message": "Uploading edited video..."})
+        try:
+            cloudinary_url, actual_pub_id = cloudinary_service.upload_video_returning_id(video_path_str, new_pub_id)
+        except Exception as e:
+            logger.error(f"Failed to upload edited video for {video_name}: {e}")
+            _update_task(self.request.id, status="FAILURE", error_message=str(e), progress_step="error")
+            raise e
 
     # ── Step 7: Write organized_videos record ─────────────────────────────────
     doc = build_doc(

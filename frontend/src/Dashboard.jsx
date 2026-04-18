@@ -1,9 +1,11 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
-import { BarChart3, CheckCircle, AlertCircle, Film, Users, Video, Scissors, CheckSquare, Activity, XOctagon, TrendingUp, Clock, Library, Copy, Upload } from 'lucide-react';
+import { BarChart3, CheckCircle, AlertCircle, Film, Users, Video, Scissors, CheckSquare, Activity, XOctagon, TrendingUp, Clock, Library, Copy, Upload, RefreshCw, FileVideo } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Link } from 'react-router-dom';
 import PageHeader from './components/PageHeader';
+import SystemHealthBanner from './components/SystemHealthBanner';
+import { relativeTime } from './hooks/useRelativeTime';
 import LoadingState from './components/LoadingState';
 import api from './lib/api';
 import { useToast } from './hooks/useToast.jsx';
@@ -27,9 +29,17 @@ function AnimatedNumber({ target }) {
 }
 
 /* ── Bento card with optional accent bar ── */
-function BentoCard({ children, span = 1, accent, style = {} }) {
-  return (
-    <div className="bento-card" style={{
+function BentoCard({ children, span = 1, accent, to, style = {} }) {
+  const content = (
+    <>
+      {accent && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: accent, borderRadius: '2px 2px 0 0' }} />}
+      {children}
+    </>
+  );
+
+  const props = {
+    className: "bento-card",
+    style: {
       background: 'var(--surface-panel)',
       border: '1px solid var(--border-subtle)',
       borderRadius: 'var(--radius-lg)',
@@ -38,15 +48,20 @@ function BentoCard({ children, span = 1, accent, style = {} }) {
       position: 'relative',
       overflow: 'hidden',
       transition: 'border-color 0.2s, box-shadow 0.2s',
+      cursor: to ? 'pointer' : undefined,
+      display: 'block',
+      textDecoration: 'none',
+      color: 'inherit',
       ...style,
-    }}
-    onMouseEnter={e => { e.currentTarget.style.borderColor = accent || 'var(--border-default)'; e.currentTarget.style.boxShadow = `var(--shadow-hover), 0 0 32px ${accent ? accent + '22' : 'transparent'}`; }}
-    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.boxShadow = 'none'; }}
-    >
-      {accent && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: accent, borderRadius: '2px 2px 0 0' }} />}
-      {children}
-    </div>
-  );
+    },
+    onMouseEnter: e => { e.currentTarget.style.borderColor = accent || 'var(--border-default)'; e.currentTarget.style.boxShadow = `var(--shadow-hover), 0 0 32px ${accent ? accent + '22' : 'transparent'}`; },
+    onMouseLeave: e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.boxShadow = 'none'; }
+  };
+
+  if (to) {
+    return <Link to={to} {...props}>{content}</Link>;
+  }
+  return <div {...props}>{content}</div>;
 }
 
 function StatLabel({ children }) {
@@ -63,6 +78,7 @@ function AdminOverview() {
   const toast = useToast();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState(null);
   const containerRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -71,7 +87,7 @@ function AdminOverview() {
     if (prefersReducedMotion) return;
 
     const ctx = gsap.context(() => {
-      gsap.from('.bento-card', {
+      gsap.from('.bento-card, .activity-feed', {
         y: 24,
         opacity: 0,
         duration: 0.6,
@@ -82,13 +98,18 @@ function AdminOverview() {
     return () => ctx.revert();
   }, [loading]);
 
-  useEffect(() => {
+  const fetchStats = () => {
+    setLoading(true);
     api.get('/admin/overview')
-      .then(res => { setStats(res.data); setLoading(false); })
+      .then(res => { setStats(res.data); setLastRefreshed(new Date().toISOString()); setLoading(false); })
       .catch(err => { toast.error(err.friendlyMessage || 'Failed to load stats'); setLoading(false); });
+  };
+
+  useEffect(() => {
+    fetchStats();
   }, []);
 
-  if (loading) return <LoadingState message="Loading system telemetry..." />;
+  if (loading && !stats) return <LoadingState message="Loading system telemetry..." />;
 
   const hasFailures = (stats?.tasks_failed || 0) > 0;
   const isRunning = (stats?.tasks_running || 0) > 0;
@@ -113,18 +134,32 @@ function AdminOverview() {
 
   return (
     <div ref={containerRef}>
-      <PageHeader title="Overview" description="System status and recent activity." />
+      <SystemHealthBanner stats={stats} />
+      <PageHeader 
+        title="Overview" 
+        description="System status and real-time activity." 
+        actions={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)' }}>
+            <span style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>
+              Updated {relativeTime(lastRefreshed)}
+            </span>
+            <button className="btn" onClick={fetchStats} disabled={loading}>
+              <RefreshCw size={14} className={loading ? 'spin' : ''} /> {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
+        }
+      />
 
       {/* ── Bento Grid ── */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
         gap: 'var(--space-20)',
         marginBottom: 'var(--space-24)'
       }}>
 
         {/* Wide: Total Clips — primary metric */}
-        <BentoCard span={2} accent="var(--accent)">
+        <BentoCard span={2} accent="var(--accent)" to="/app/organized-videos">
           <StatLabel><Scissors size={13} style={{verticalAlign:'middle',marginRight:4}} /> Clips Extracted</StatLabel>
           <StatValue value={stats?.total_clips} color="var(--accent)" />
           <div style={{ fontSize: 'var(--font-small)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
@@ -134,18 +169,20 @@ function AdminOverview() {
         </BentoCard>
 
         {/* Pending Review */}
-        <BentoCard accent="var(--warning)">
+        <BentoCard accent="var(--warning)" to="/app/review">
           <StatLabel><CheckSquare size={13} style={{verticalAlign:'middle',marginRight:4}} /> Pending Review</StatLabel>
           <StatValue value={stats?.pending_review} color="var(--warning)" />
-          {stats?.uncertain_clips > 0 && (
-            <div style={{ fontSize: 'var(--font-meta)', color: 'var(--warning)', display: 'flex', gap: 4 }}>
-              ⚑ {stats.uncertain_clips} uncertain
-            </div>
-          )}
+        </BentoCard>
+
+        {/* Uncertain Clips */}
+        <BentoCard accent={stats?.uncertain_clips > 0 ? "var(--danger)" : "var(--border-subtle)"} to="/app/review">
+          <StatLabel><AlertCircle size={13} style={{verticalAlign:'middle',marginRight:4}} /> Uncertain Clips</StatLabel>
+          <StatValue value={stats?.uncertain_clips} color={stats?.uncertain_clips > 0 ? "var(--danger)" : "var(--text-muted)"} />
+          {stats?.uncertain_clips > 0 && <div style={{ fontSize: 'var(--font-meta)', color: 'var(--danger)' }}>Review recommended</div>}
         </BentoCard>
 
         {/* Tasks */}
-        <BentoCard accent={hasFailures ? 'var(--danger)' : isRunning ? 'var(--accent)' : 'var(--border-subtle)'}>
+        <BentoCard accent={hasFailures ? 'var(--danger)' : isRunning ? 'var(--accent)' : 'var(--border-subtle)'} to="/app/admin/jobs">
           <StatLabel>
             <Activity size={13} style={{verticalAlign:'middle',marginRight:4}} /> Active Tasks
           </StatLabel>
@@ -159,14 +196,14 @@ function AdminOverview() {
         </BentoCard>
 
         {/* Users */}
-        <BentoCard>
+        <BentoCard to="/app/admin/users">
           <StatLabel><Users size={13} style={{verticalAlign:'middle',marginRight:4}} /> Total Users</StatLabel>
           <StatValue value={stats?.total_users} />
           <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-secondary)' }}>{stats?.active_users} active</div>
         </BentoCard>
 
         {/* Organized Videos */}
-        <BentoCard accent="var(--success)">
+        <BentoCard accent="var(--success)" to="/app/organized-videos">
           <StatLabel><Library size={13} style={{verticalAlign:'middle',marginRight:4}} /> Organized Videos</StatLabel>
           <StatValue value={stats?.total_organized_videos} color="var(--success)" />
           {(stats?.duplicate_videos || 0) > 0 && (
@@ -175,16 +212,50 @@ function AdminOverview() {
             </div>
           )}
         </BentoCard>
+      </div>
 
-        {/* Quick Actions — wide */}
-        <BentoCard span={2} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <StatLabel><Clock size={13} style={{verticalAlign:'middle',marginRight:4}} /> Quick Actions</StatLabel>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-12)', marginTop: 'var(--space-16)' }}>
-            <Link to="/app/admin/users" className="btn" style={{ flex: 1, minWidth: 120, justifyContent: 'center' }}>Manage Users</Link>
-            <Link to="/app/admin/jobs" className="btn" style={{ flex: 1, minWidth: 120, justifyContent: 'center' }}>Job Monitor</Link>
-            <Link to="/app/review" className="btn btn-primary" style={{ flex: 1, minWidth: 120, justifyContent: 'center' }}>Review Queue</Link>
+      {/* ── Recent Activity Feed ── */}
+      <h2 style={{ margin: 'var(--space-32) 0 var(--space-16)', fontSize: 'var(--font-title-section)' }}>Recent Activity</h2>
+      <div className="activity-feed" style={{ 
+        background: 'var(--surface-panel)', 
+        border: '1px solid var(--border-subtle)', 
+        borderRadius: 'var(--radius-lg)', 
+        padding: '0 var(--space-20)',
+        marginBottom: 'var(--space-32)'
+      }}>
+        {(!stats?.recent_organized_uploads?.length && !stats?.recent_failures?.length) ? (
+          <div style={{ padding: 'var(--space-32) 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-small)' }}>
+            No recent activity to display.
           </div>
-        </BentoCard>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {stats?.recent_failures?.map(job => (
+               <div key={job._id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)', padding: 'var(--space-16) 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                 <div style={{ background: 'rgba(218, 54, 51, 0.1)', color: 'var(--danger)', padding: 8, borderRadius: '50%' }}><AlertCircle size={16} /></div>
+                 <div style={{ flex: 1, fontSize: 'var(--font-small)' }}>
+                   <span style={{ fontWeight: 600, color: 'var(--danger)' }}>Job Failure: </span>
+                   <span style={{ color: 'var(--text-primary)' }}>{job.type} </span>
+                   <span style={{ color: 'var(--text-muted)' }}>failed processing {job.input_path ? job.input_path.split(/[\/\\]/).pop() : 'video'}</span>
+                 </div>
+                 <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>{relativeTime(job.updated_at)}</div>
+               </div>
+            ))}
+            {stats?.recent_organized_uploads?.map(upload => (
+               <div key={upload.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)', padding: 'var(--space-16) 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                 <div style={{ background: 'rgba(35, 134, 54, 0.1)', color: 'var(--success)', padding: 8, borderRadius: '50%' }}><FileVideo size={16} /></div>
+                 <div style={{ flex: 1, fontSize: 'var(--font-small)' }}>
+                   <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{upload.display_name} </span>
+                   <span style={{ color: 'var(--text-secondary)' }}>was organized as </span>
+                   <span className="badge success" style={{ padding: '2px 8px' }}>{upload.dominant_label}</span>
+                   {upload.uploaded_by && <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>by {upload.uploaded_by}</span>}
+                 </div>
+                 <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>{relativeTime(upload.created_at)}</div>
+               </div>
+            ))}
+            {/* Remove last border */}
+            <style>{`.activity-feed > div > div:last-child { border-bottom: none !important; }`}</style>
+          </div>
+        )}
       </div>
 
       {/* ── Figurative Charts ── */}

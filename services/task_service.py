@@ -20,6 +20,8 @@ def insert_task_record(task_id, task_type, initiated_by=None, input_path=None):
         "status": "PENDING",
         "created_at": now,
         "updated_at": now,
+        "started_at": None,
+        "completed_at": None,
         "initiated_by": initiated_by,
         "input_path": input_path,
         "output_path": None,
@@ -29,7 +31,16 @@ def insert_task_record(task_id, task_type, initiated_by=None, input_path=None):
     tasks_col.insert_one(doc)
 
 def update_task_record(task_id, **kwargs):
-    kwargs["updated_at"] = datetime.datetime.utcnow().isoformat()
+    now = datetime.datetime.utcnow().isoformat()
+    kwargs["updated_at"] = now
+    # Auto-set started_at on first STARTED transition
+    if kwargs.get("status") == "STARTED":
+        existing = tasks_col.find_one({"task_id": task_id}, {"started_at": 1})
+        if existing and not existing.get("started_at"):
+            kwargs["started_at"] = now
+    # Auto-set completed_at on terminal states
+    if kwargs.get("status") in ("SUCCESS", "FAILURE", "REVOKED"):
+        kwargs["completed_at"] = now
     tasks_col.update_one({"task_id": task_id}, {"$set": kwargs})
 
 def dispatch_process(file_path, user_id=None):
@@ -70,18 +81,39 @@ def get_paginated_jobs(page=1, limit=20, status=None, task_type=None):
     page = max(1, int(page))
     limit = max(1, min(int(limit), 200))
     skip = (page - 1) * limit
-    
+
     q = {}
     if status: q["status"] = status
     if task_type: q["type"] = task_type
-    
+
     cursor = tasks_col.find(q).sort("created_at", -1).skip(skip).limit(limit)
     jobs = []
     for j in cursor:
         j["_id"] = str(j["_id"])
+        # Compute duration in seconds if both timestamps exist
+        started = j.get("started_at")
+        completed = j.get("completed_at")
+        if started and completed:
+            try:
+                from dateutil import parser as dp
+                dur = (dp.parse(completed) - dp.parse(started)).total_seconds()
+                j["duration_seconds"] = round(dur, 1)
+            except Exception:
+                j["duration_seconds"] = None
+        else:
+            j["duration_seconds"] = None
         jobs.append(j)
+
     total = tasks_col.count_documents(q)
-    return {"jobs": jobs, "total": total, "page": page, "limit": limit}
+
+    # Live summary counts (unfiltered for ribbon)
+    summary = {
+        "running": tasks_col.count_documents({"status": {"$in": ["PENDING", "STARTED"]}}),
+        "succeeded": tasks_col.count_documents({"status": "SUCCESS"}),
+        "failed": tasks_col.count_documents({"status": "FAILURE"}),
+    }
+
+    return {"jobs": jobs, "total": total, "page": page, "limit": limit, "summary": summary}
 
 def get_job_by_task_id(task_id):
     job = tasks_col.find_one({"task_id": task_id})

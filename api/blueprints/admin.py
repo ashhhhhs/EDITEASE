@@ -26,6 +26,17 @@ def admin_overview():
             "created_at": doc.get("created_at"),
             "uploaded_by": doc.get("uploaded_by"),
         })
+
+    # Recent failed tasks for the activity feed
+    failed_cursor = tasks_col.find(
+        {"status": "FAILURE"},
+        {"task_id": 1, "type": 1, "input_path": 1, "created_at": 1, "updated_at": 1}
+    ).sort("updated_at", -1).limit(3)
+    recent_failures = []
+    for t in failed_cursor:
+        t["_id"] = str(t["_id"])
+        recent_failures.append(t)
+
     return jsonify({
         'total_users': user_counts['total_users'],
         'active_users': user_counts['active_users'],
@@ -39,14 +50,20 @@ def admin_overview():
         'duplicate_videos': total_duplicates,
         'organized_by_label': label_counts,
         'recent_organized_uploads': recent_organized,
+        'recent_failures': recent_failures,
     })
+
 
 @admin_bp.get('/users')
 @role_required(['admin'])
 def get_users():
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 20, type=int)
-    return jsonify(auth_service.get_paginated_users(page, limit))
+    search = request.args.get('search', '').strip()
+    role = request.args.get('role', '').strip()
+    status = request.args.get('status', '').strip()
+    return jsonify(auth_service.get_paginated_users(page, limit, search, role, status))
+
 
 @admin_bp.patch('/users/<target_id>/role')
 @role_required(['admin'])
@@ -60,6 +77,7 @@ def update_user_role_ep(target_id):
         return jsonify(res), res.get('status', 400)
     return jsonify(res)
 
+
 @admin_bp.patch('/users/<target_id>/status')
 @role_required(['admin'])
 def update_user_status_ep(target_id):
@@ -72,6 +90,7 @@ def update_user_status_ep(target_id):
         return jsonify(res), res.get('status', 400)
     return jsonify(res)
 
+
 @admin_bp.get('/jobs')
 @role_required(['admin'])
 def get_jobs():
@@ -83,6 +102,7 @@ def get_jobs():
         request.args.get('type'),
     ))
 
+
 @admin_bp.get('/jobs/<task_id>')
 @role_required(['admin'])
 def get_job_detail_ep(task_id):
@@ -91,3 +111,46 @@ def get_job_detail_ep(task_id):
     if not job:
         return jsonify({'error': 'Job not found'}), 404
     return jsonify(job)
+
+
+@admin_bp.post('/jobs/<task_id>/retry')
+@role_required(['admin'])
+def retry_job_ep(task_id):
+    """Re-dispatch a failed job of any type."""
+    from services.task_service import get_job_by_task_id, tasks_col, insert_task_record
+    from services.task_service import dispatch_process, dispatch_auto_organize
+
+    job = get_job_by_task_id(task_id)
+    if not job:
+        return jsonify({'error': 'Job not found'}), 404
+    if job.get('status') not in ('FAILURE', 'REVOKED'):
+        return jsonify({'error': 'Only failed or revoked jobs can be retried'}), 400
+
+    input_path = job.get('input_path')
+    initiated_by = job.get('initiated_by')
+    job_type = job.get('type', 'upload')
+
+    if job_type == 'auto_organize':
+        new_task = dispatch_auto_organize(input_path, initiated_by)
+    else:
+        new_task = dispatch_process(input_path, initiated_by)
+
+    return jsonify({'ok': True, 'new_task_id': new_task.id})
+
+
+@admin_bp.delete('/jobs/<task_id>')
+@role_required(['admin'])
+def cancel_job_ep(task_id):
+    """Cancel a pending or running job."""
+    from services.task_service import get_job_by_task_id, update_task_record
+    from api.celery_worker import celery_app
+
+    job = get_job_by_task_id(task_id)
+    if not job:
+        return jsonify({'error': 'Job not found'}), 404
+    if job.get('status') not in ('PENDING', 'STARTED'):
+        return jsonify({'error': 'Only pending or running jobs can be cancelled'}), 400
+
+    celery_app.control.revoke(task_id, terminate=True, signal='SIGTERM')
+    update_task_record(task_id, status='REVOKED', progress_step='Cancelled by admin')
+    return jsonify({'ok': True, 'revoked': task_id})

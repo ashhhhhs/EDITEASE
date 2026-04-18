@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, UploadCloud, Download, Library, Wand2, Shield, LogOut, CheckSquare, Users, Activity, AlertTriangle, Settings } from 'lucide-react';
+import { LayoutDashboard, UploadCloud, Download, Library, Wand2, Shield, LogOut, CheckSquare, Users, Activity, AlertTriangle, Settings, Zap } from 'lucide-react';
+import { Joyride, STATUS } from 'react-joyride';
 import api from './lib/api';
 
 function VerificationBanner({ currentUser }) {
@@ -137,7 +138,7 @@ export default function AppShell({ currentUser, onLogout }) {
   // Workspace nav — shown to all roles (primary tasks)
   const workspaceNav = [
     { name: 'Dashboard',    path: '/app/dashboard', icon: LayoutDashboard, roles: ['admin', 'reviewer', 'editor'] },
-    { name: 'Review Queue', path: '/app/review',     icon: CheckSquare,     roles: ['admin', 'reviewer'] },
+    { name: 'Review Queue', path: '/app/review',     icon: CheckSquare,     roles: ['admin', 'reviewer', 'editor'] },
     { name: 'Uploads',      path: '/app/uploads',    icon: UploadCloud,     roles: ['admin', 'editor'] },
     { name: 'Organized Videos', path: '/app/organized-videos', icon: Library, roles: ['admin', 'editor'] },
   ];
@@ -155,11 +156,105 @@ export default function AppShell({ currentUser, onLogout }) {
   const activeTitle = activeNav?.name || 'Dashboard';
   const activeDescription = navDescriptions[activeTitle] || 'Move through review, uploads, and exports from one shared workspace.';
 
+  // ── Tour Guide State ──
+  const [runTour, setRunTour] = useState(false);
+  const tourSteps = [
+    {
+      target: 'body',
+      placement: 'center',
+      content: (
+        <div style={{ textAlign: 'left' }}>
+          <h4 style={{ color: 'var(--accent)', marginBottom: '8px' }}>Welcome to EditEase! 🎬</h4>
+          <p>Let's take a quick 1-minute tour of your new automated video workflow.</p>
+        </div>
+      ),
+      disableBeacon: true,
+    },
+    {
+      target: '.tour-sidebar',
+      content: 'This is your mission control. You can move between different stages of the video pipeline from here.',
+      placement: 'right',
+    },
+    {
+      target: '.tour-nav-Dashboard',
+      content: 'The Dashboard gives you a birds-eye view of your project stats and recent activity.',
+      placement: 'right',
+    },
+    {
+      target: '.tour-nav-Uploads',
+      content: 'Start here! Drop your raw footage into the Uploads page. Our AI will automatically split scenes and organize them.',
+      placement: 'right',
+    },
+    {
+      target: '.tour-nav-Review-Queue',
+      content: 'Any clips the AI is uncertain about will land here. You can quickly verify or re-classify them in bulk.',
+      placement: 'right',
+    },
+    {
+      target: '.tour-nav-Organized-Videos',
+      content: 'Once processed, all your clips are beautifully organized into folders (Testimonials, B-Roll, etc.) ready for download.',
+      placement: 'right',
+    },
+    {
+      target: '.workspace-topbar',
+      content: 'The Topbar shows your current location and provides quick actions like returning to the homepage.',
+      placement: 'bottom',
+    },
+    {
+      target: '.tour-start-btn',
+      content: 'You can relaunch this tour anytime by clicking this button!',
+      placement: 'left',
+    }
+  ];
+
+  const handleJoyrideCallback = (data) => {
+    const { status } = data;
+    if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
+      setRunTour(false);
+    }
+  };
+
   return (
     <div className="app-container workspace-shell">
+      <Joyride
+        steps={tourSteps}
+        run={runTour}
+        continuous
+        showProgress
+        showSkipButton
+        callback={handleJoyrideCallback}
+        styles={{
+          options: {
+            primaryColor: 'var(--accent)',
+            backgroundColor: 'var(--surface-panel)',
+            textColor: 'var(--text-primary)',
+            arrowColor: 'var(--surface-panel)',
+            overlayColor: 'rgba(0, 0, 0, 0.75)',
+            zIndex: 10000,
+          },
+          tooltipContainer: {
+            textAlign: 'left',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid var(--border-default)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+          },
+          buttonNext: {
+            borderRadius: 'var(--radius-md)',
+            fontWeight: 600,
+            padding: '8px 16px',
+          },
+          buttonBack: {
+            color: 'var(--text-secondary)',
+            marginRight: 10,
+          },
+          buttonSkip: {
+            color: 'var(--text-muted)',
+          }
+        }}
+      />
       <div className="workspace-ambient workspace-ambient-a" />
       <div className="workspace-ambient workspace-ambient-b" />
-      <div className="sidebar workspace-sidebar">
+      <div className="sidebar workspace-sidebar tour-sidebar">
         {/* Logo */}
         <Link
           to="/"
@@ -181,9 +276,10 @@ export default function AppShell({ currentUser, onLogout }) {
             <div className="workspace-section-label">Workspace</div>
           {visibleWorkspace.map(item => {
             const isActive = location.pathname.startsWith(item.path);
+            const tourClass = `tour-nav-${item.name.replace(/\s+/g, '-')}`;
             return (
               <Link key={item.path} to={item.path}
-                className={`nav-item workspace-nav-item ${isActive ? 'active' : ''}`}
+                className={`nav-item workspace-nav-item ${isActive ? 'active' : ''} ${tourClass}`}
               >
                 <item.icon size={18} />
                 {item.name}
@@ -249,6 +345,14 @@ export default function AppShell({ currentUser, onLogout }) {
             <span className="workspace-topbar-subtitle">{activeDescription}</span>
           </div>
           <div className="workspace-topbar-actions">
+            <button 
+              className="btn workspace-ghost-btn tour-start-btn"
+              onClick={() => setRunTour(true)}
+              style={{ gap: '8px' }}
+            >
+              <Zap size={14} color="var(--accent)" fill="var(--accent)" style={{ opacity: 0.8 }} />
+              Tour Guide
+            </button>
             <Link
               to="/"
               className="btn workspace-home-btn"

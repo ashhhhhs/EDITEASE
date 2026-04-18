@@ -38,6 +38,7 @@ export const UploadProvider = ({ children }) => {
        const formData = new FormData();
        formData.append('file', files[nextIndex].fileObj);
 
+
        try {
            const res = await api.post('/auto_organize', formData, {
                headers: { 'Content-Type': 'multipart/form-data' }

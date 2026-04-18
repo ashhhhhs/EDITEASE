@@ -43,6 +43,8 @@ export default function Upload() {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+
+
   const startUploadQueue = () => {
     setIsProcessingQueue(true);
   };
