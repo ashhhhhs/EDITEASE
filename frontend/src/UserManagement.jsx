@@ -80,6 +80,8 @@ export default function UserManagement({ currentUser }) {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
   
   const [confirmAction, setConfirmAction] = useState({ isOpen: false, type: null, userId: null, payload: null });
 
@@ -91,7 +93,7 @@ export default function UserManagement({ currentUser }) {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/admin/users?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&role=${roleFilter}&status=${statusFilter}`);
+      const res = await api.get(`/admin/users?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&role=${roleFilter}&status=${statusFilter}&sort=${sortBy}&order=${sortOrder}`);
       setUsers(res.data.users || []);
       setTotal(res.data.total || 0);
     } catch (err) {
@@ -100,7 +102,7 @@ export default function UserManagement({ currentUser }) {
     setLoading(false);
   };
 
-  useEffect(() => { fetchUsers(); }, [page, debouncedSearch, roleFilter, statusFilter]);
+  useEffect(() => { fetchUsers(); }, [page, debouncedSearch, roleFilter, statusFilter, sortBy, sortOrder]);
 
   const initiateRoleChange = (userId, newRole) => {
     setConfirmAction({
@@ -201,6 +203,26 @@ export default function UserManagement({ currentUser }) {
                 <option value="all">Any Status</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
+              </select>
+            </div>
+            <div className="input-group">
+              <select value={`${sortBy}_${sortOrder}`} onChange={e => { 
+                const value = e.target.value;
+                const lastIndex = value.lastIndexOf('_');
+                const sort = value.substring(0, lastIndex);
+                const order = value.substring(lastIndex + 1);
+                setSortBy(sort);
+                setSortOrder(order);
+                setPage(1);
+              }}>
+                <option value="created_at_desc">Joined (Newest)</option>
+                <option value="created_at_asc">Joined (Oldest)</option>
+                <option value="last_login_at_desc">Last Seen (Recent)</option>
+                <option value="last_login_at_asc">Last Seen (Oldest)</option>
+                <option value="name_asc">Name (A-Z)</option>
+                <option value="name_desc">Name (Z-A)</option>
+                <option value="role_asc">Role (A-Z)</option>
+                <option value="role_desc">Role (Z-A)</option>
               </select>
             </div>
           </div>

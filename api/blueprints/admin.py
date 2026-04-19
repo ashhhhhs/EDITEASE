@@ -62,7 +62,9 @@ def get_users():
     search = request.args.get('search', '').strip()
     role = request.args.get('role', '').strip()
     status = request.args.get('status', '').strip()
-    return jsonify(auth_service.get_paginated_users(page, limit, search, role, status))
+    sort = request.args.get('sort', 'created_at').strip()
+    order = request.args.get('order', 'desc').strip()
+    return jsonify(auth_service.get_paginated_users(page, limit, search, role, status, sort, order))
 
 
 @admin_bp.patch('/users/<target_id>/role')

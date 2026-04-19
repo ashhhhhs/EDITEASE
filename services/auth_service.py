@@ -207,7 +207,7 @@ def reset_password(user_id, new_password):
 # User Management (admin)
 # ---------------------------------------------------------------------------
 
-def get_paginated_users(page=1, limit=20, search='', role='', status=''):
+def get_paginated_users(page=1, limit=20, search='', role='', status='', sort='created_at', order='desc'):
     page = max(1, int(page))
     limit = max(1, min(int(limit), 200))
     skip = (page - 1) * limit
@@ -227,10 +227,11 @@ def get_paginated_users(page=1, limit=20, search='', role='', status=''):
     elif status == 'inactive':
         query['is_active'] = False
 
+    sort_order = -1 if order == 'desc' else 1
     cursor = (
         users_col
         .find(query, {"password_hash": 0, "token": 0})
-        .sort("created_at", -1)
+        .sort(sort, sort_order)
         .skip(skip)
         .limit(limit)
     )

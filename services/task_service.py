@@ -93,10 +93,19 @@ def get_paginated_jobs(page=1, limit=20, status=None, task_type=None):
         # Compute duration in seconds if both timestamps exist
         started = j.get("started_at")
         completed = j.get("completed_at")
+        status = j.get("status")
         if started and completed:
             try:
                 from dateutil import parser as dp
                 dur = (dp.parse(completed) - dp.parse(started)).total_seconds()
+                j["duration_seconds"] = round(dur, 1)
+            except Exception:
+                j["duration_seconds"] = None
+        elif started and status in ("STARTED", "PENDING"):
+            # For running jobs, show elapsed time
+            try:
+                from dateutil import parser as dp
+                dur = (datetime.datetime.utcnow() - dp.parse(started)).total_seconds()
                 j["duration_seconds"] = round(dur, 1)
             except Exception:
                 j["duration_seconds"] = None

@@ -132,6 +132,25 @@ function AdminOverview() {
     { name: 'Uncertain Clips', value: stats.uncertain_clips },
   ].filter(d => d.value > 0) : [];
 
+  const activityFeed = [
+    ...(stats?.recent_failures || []).map(job => ({
+      id: job._id,
+      type: 'failure',
+      title: `Job Failure: ${job.type}`,
+      description: `failed processing ${job.input_path ? job.input_path.split(/[\/\\]/).pop() : 'video'}`,
+      timestamp: job.updated_at,
+      path: '/app/admin/jobs',
+    })),
+    ...(stats?.recent_organized_uploads || []).map(upload => ({
+      id: upload.id,
+      type: 'organized',
+      title: upload.display_name || 'Content Changes',
+      description: `was organized as ${upload.dominant_label}` + (upload.uploaded_by ? ` by ${upload.uploaded_by}` : ''),
+      timestamp: upload.created_at,
+      path: '/app/organized-videos',
+    })),
+  ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
   return (
     <div ref={containerRef}>
       <SystemHealthBanner stats={stats} />
@@ -223,37 +242,26 @@ function AdminOverview() {
         padding: '0 var(--space-20)',
         marginBottom: 'var(--space-32)'
       }}>
-        {(!stats?.recent_organized_uploads?.length && !stats?.recent_failures?.length) ? (
+        {activityFeed.length === 0 ? (
           <div style={{ padding: 'var(--space-32) 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-small)' }}>
             No recent activity to display.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {stats?.recent_failures?.map(job => (
-               <div key={job._id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)', padding: 'var(--space-16) 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                 <div style={{ background: 'rgba(218, 54, 51, 0.1)', color: 'var(--danger)', padding: 8, borderRadius: '50%' }}><AlertCircle size={16} /></div>
-                 <div style={{ flex: 1, fontSize: 'var(--font-small)' }}>
-                   <span style={{ fontWeight: 600, color: 'var(--danger)' }}>Job Failure: </span>
-                   <span style={{ color: 'var(--text-primary)' }}>{job.type} </span>
-                   <span style={{ color: 'var(--text-muted)' }}>failed processing {job.input_path ? job.input_path.split(/[\/\\]/).pop() : 'video'}</span>
+            {activityFeed.map(item => (
+               <Link key={item.id} to={item.path} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)', padding: 'var(--space-16) 0', borderBottom: '1px solid var(--border-subtle)', textDecoration: 'none', color: 'inherit' }}>
+                 <div style={{ background: item.type === 'failure' ? 'rgba(218, 54, 51, 0.1)' : 'rgba(35, 134, 54, 0.1)', color: item.type === 'failure' ? 'var(--danger)' : 'var(--success)', padding: 8, borderRadius: '50%' }}>
+                   {item.type === 'failure' ? <AlertCircle size={16} /> : <FileVideo size={16} />}
                  </div>
-                 <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>{relativeTime(job.updated_at)}</div>
-               </div>
-            ))}
-            {stats?.recent_organized_uploads?.map(upload => (
-               <div key={upload.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)', padding: 'var(--space-16) 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                 <div style={{ background: 'rgba(35, 134, 54, 0.1)', color: 'var(--success)', padding: 8, borderRadius: '50%' }}><FileVideo size={16} /></div>
                  <div style={{ flex: 1, fontSize: 'var(--font-small)' }}>
-                   <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{upload.display_name} </span>
-                   <span style={{ color: 'var(--text-secondary)' }}>was organized as </span>
-                   <span className="badge success" style={{ padding: '2px 8px' }}>{upload.dominant_label}</span>
-                   {upload.uploaded_by && <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>by {upload.uploaded_by}</span>}
+                   <span style={{ fontWeight: item.type === 'failure' ? 600 : 500, color: item.type === 'failure' ? 'var(--danger)' : 'var(--text-primary)' }}>{item.title}</span>
+                   <span style={{ color: 'var(--text-muted)', marginLeft: item.type === 'failure' ? 4 : 0 }}>{item.description}</span>
                  </div>
-                 <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>{relativeTime(upload.created_at)}</div>
-               </div>
+                 <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>{relativeTime(item.timestamp)}</div>
+               </Link>
             ))}
             {/* Remove last border */}
-            <style>{`.activity-feed > div > div:last-child { border-bottom: none !important; }`}</style>
+            <style>{`.activity-feed > div > a:last-child { border-bottom: none !important; }`}</style>
           </div>
         )}
       </div>
