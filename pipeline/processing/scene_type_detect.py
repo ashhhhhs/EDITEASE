@@ -9,17 +9,15 @@ Architecture overview
 4. Winner + softmax probability  →  (label, confidence)
 5. Optional SceneSmoothing for temporal stability across segments
 
-Why this beats a rule-based or scored-candidate approach
----------------------------------------------------------
-* No threshold gaps   – every scene always gets a continuous likelihood score.
-* No hand-crafted weights per scene – the Gaussian sigma encodes how
-  discriminative each feature is for each scene (tight sigma = must be close
-  to mu; wide sigma = "don't care much").
-* Confidence is a true probability (softmax over all scenes), not a hardcoded
-  constant or a hand-tuned linear sum.
-* New signals can be added by extending FEATURE_RANGES and SCENE_PROFILES
-  alone — no rule rewriting required.
-* All scenes compete simultaneously; the best statistical match wins.
+Improvements over v1
+--------------------
+* color_temperature signal  — distinguishes screen recordings / text slides (cool)
+  from b-roll / establishing shots (warm / varied).
+* face_aspect_ratio signal  — large centred face = presenter/testimonial;
+  many small faces = audience_reaction.
+* Both signals slot into FEATURE_RANGES + SCENE_PROFILES with no rule rewriting.
+* Feature vector is returned inside `debug` so the caller can log it to MongoDB
+  for offline Gaussian profile re-calibration once real data accumulates.
 """
 
 import os
@@ -27,6 +25,9 @@ from collections import Counter, deque
 
 import cv2
 import numpy as np
+from utils.logger import setup_logger
+
+logger = setup_logger("scene_type_detect")
 
 CASCADE_PATH = os.path.join(
     cv2.data.haarcascades, "haarcascade_frontalface_default.xml"  # type: ignore
@@ -35,45 +36,40 @@ CASCADE_PATH = os.path.join(
 
 # ---------------------------------------------------------------------------
 # Feature normalisation ceilings
-# Tune upper bounds here if your footage has different dynamic ranges.
 # ---------------------------------------------------------------------------
 FEATURE_RANGES = {
-    "face_dominance"     : 0.25,   # largest_face_area / frame_area
-    "face_count_norm"    : 6.0,    # raw face count
-    "motion_mean"        : 0.30,
-    "motion_peak"        : 0.40,
-    "motion_burst"       : 3.0,    # peak / (mean + ε) — how spikey motion is
-    "motion_consistency" : 0.12,   # std-dev of per-frame diffs (inverted later)
-    "edge_density"       : 0.20,
-    "sharpness"          : 500.0,
-    "text_density"       : 40.0,
-    "color_variance"     : 0.30,
+    "face_dominance"      : 0.25,   # largest_face_area / frame_area
+    "face_count_norm"     : 6.0,    # raw face count
+    "face_aspect_ratio"   : 2.5,    # h/w of dominant face (tall face → portrait shot)
+    "motion_mean"         : 0.30,
+    "motion_peak"         : 0.40,
+    "motion_burst"        : 3.0,    # peak / (mean + ε)
+    "motion_consistency"  : 0.12,   # std-dev of per-frame diffs (inverted later)
+    "edge_density"        : 0.20,
+    "sharpness"           : 500.0,
+    "text_density"        : 40.0,
+    "color_variance"      : 0.30,
+    "color_temperature"   : 1.0,    # 0 = cool (blueish UI), 1 = warm (natural footage)
 }
 
 
 # ---------------------------------------------------------------------------
-# Scene profiles
-#
-# Each entry is  feature_name: (mu, sigma)
-#   mu    – ideal normalised value for this scene  [0, 1]
-#   sigma – tolerance; small = feature must match closely;
-#           large = feature is less discriminative for this scene
-#
-# Features NOT listed for a scene contribute zero log-likelihood — they
-# neither help nor hurt that scene's score.
+# Scene profiles — (mu, sigma) per feature
 # ---------------------------------------------------------------------------
 SCENE_PROFILES = {
 
     "testimonial": {
-        # Single large face, camera nearly static
+        # Single large face, static camera, portrait framing
         "face_presence"      : (1.00, 0.05),
         "face_dominance"     : (0.80, 0.18),
         "face_count_norm"    : (0.17, 0.08),   # 1 face → 1/6 ≈ 0.17
+        "face_aspect_ratio"  : (0.65, 0.20),   # roughly portrait
         "motion_mean"        : (0.05, 0.07),
         "motion_peak"        : (0.08, 0.09),
-        "motion_consistency" : (0.90, 0.12),   # very consistent (inverted std)
+        "motion_consistency" : (0.90, 0.12),
         "text_density"       : (0.08, 0.15),
         "color_variance"     : (0.18, 0.12),
+        "color_temperature"  : (0.55, 0.25),   # neutral-to-warm
     },
 
     "presenter": {
@@ -81,10 +77,12 @@ SCENE_PROFILES = {
         "face_presence"      : (1.00, 0.05),
         "face_dominance"     : (0.35, 0.25),
         "face_count_norm"    : (0.17, 0.10),
+        "face_aspect_ratio"  : (0.55, 0.25),
         "motion_mean"        : (0.50, 0.22),
         "motion_peak"        : (0.55, 0.25),
         "motion_consistency" : (0.55, 0.25),
         "color_variance"     : (0.22, 0.14),
+        "color_temperature"  : (0.52, 0.28),
     },
 
     "audience_reaction": {
@@ -92,33 +90,37 @@ SCENE_PROFILES = {
         "face_presence"      : (1.00, 0.05),
         "face_count_norm"    : (0.65, 0.25),   # 4+ faces → ~0.65
         "face_dominance"     : (0.10, 0.08),   # each face is small
+        "face_aspect_ratio"  : (0.45, 0.30),   # mixed orientations
         "motion_mean"        : (0.25, 0.25),
         "color_variance"     : (0.28, 0.18),
+        "color_temperature"  : (0.50, 0.30),
     },
 
     "text_slide": {
-        # No faces, static, text-heavy, flat colours
+        # No faces, static, text-heavy, flat cool colours (projector / screen)
         "face_presence"      : (0.00, 0.05),
         "motion_mean"        : (0.04, 0.06),
         "motion_peak"        : (0.06, 0.08),
         "text_density"       : (0.82, 0.18),
-        "color_variance"     : (0.07, 0.09),   # flat palette
+        "color_variance"     : (0.07, 0.09),
         "sharpness"          : (0.40, 0.30),
         "edge_density"       : (0.45, 0.30),
+        "color_temperature"  : (0.25, 0.20),   # cool / desaturated
     },
 
     "screen_recording": {
-        # No faces, pixel-sharp UI, dense edges, low-moderate motion
+        # No faces, pixel-sharp UI, dense edges, low-moderate motion, cool palette
         "face_presence"      : (0.00, 0.05),
         "sharpness"          : (0.85, 0.15),
         "edge_density"       : (0.75, 0.18),
         "motion_mean"        : (0.18, 0.18),
         "color_variance"     : (0.12, 0.14),
         "text_density"       : (0.40, 0.30),
+        "color_temperature"  : (0.20, 0.18),   # distinctly cool (UI blues/grays)
     },
 
     "b-roll": {
-        # No faces, dynamic natural footage, rich colour
+        # No faces, dynamic natural footage, rich warm colour
         "face_presence"      : (0.00, 0.05),
         "motion_mean"        : (0.72, 0.22),
         "motion_peak"        : (0.75, 0.22),
@@ -126,6 +128,7 @@ SCENE_PROFILES = {
         "color_variance"     : (0.72, 0.18),
         "text_density"       : (0.05, 0.12),
         "sharpness"          : (0.35, 0.28),
+        "color_temperature"  : (0.70, 0.22),   # warm / natural
     },
 
     "establishing_shot": {
@@ -137,6 +140,7 @@ SCENE_PROFILES = {
         "color_variance"     : (0.50, 0.22),
         "text_density"       : (0.05, 0.10),
         "sharpness"          : (0.28, 0.24),
+        "color_temperature"  : (0.62, 0.25),   # natural / slightly warm
     },
 }
 
@@ -146,7 +150,7 @@ SCENE_PROFILES = {
 # ---------------------------------------------------------------------------
 
 def detect_faces_info(image_bgr):
-    """Return (face_count, largest_face_area_ratio)."""
+    """Return (face_count, largest_face_area_ratio, dominant_face_aspect_ratio)."""
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
     face_cascade = cv2.CascadeClassifier(CASCADE_PATH)
     faces = face_cascade.detectMultiScale(
@@ -154,10 +158,22 @@ def detect_faces_info(image_bgr):
     )
     h, w = gray.shape
     frame_area = float(h * w)
+
     if len(faces) == 0:
-        return 0, 0.0
+        logger.debug("[FACES] No faces detected in thumbnail")
+        return 0, 0.0, 0.0
+
     areas = [fw * fh for (_, _, fw, fh) in faces]
-    return int(len(faces)), float(max(areas) / frame_area)
+    largest_idx = int(np.argmax(areas))
+    _, _, fw, fh = faces[largest_idx]
+    aspect_ratio = float(fh) / (float(fw) + 1e-9)   # height/width of dominant face
+
+    logger.debug(
+        "[FACES] Detected %d face(s) | Dominance: %.2f%% | Aspect Ratio (h/w): %.2f",
+        len(faces), max(areas) / frame_area * 100, aspect_ratio
+    )
+
+    return int(len(faces)), float(max(areas) / frame_area), aspect_ratio
 
 
 def compute_edge_density(image_bgr):
@@ -203,10 +219,25 @@ def compute_color_variance(image_bgr):
     Blend of saturation and value std-dev in HSV.
     High = rich natural scene; low = flat slide / UI.
     """
-    hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
-    sat = hsv[:, :, 1].astype(np.float32) / 255.0
-    val = hsv[:, :, 2].astype(np.float32) / 255.0
-    return float(np.std(sat) * 0.5 + np.std(val) * 0.5)
+    hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV).astype(np.float32) / 255.0
+    sat_std = float(np.std(hsv[:, :, 1]))
+    val_std = float(np.std(hsv[:, :, 2]))
+    return float((sat_std + val_std) / 2.0)
+
+
+def compute_color_temperature(image_bgr):
+    """
+    Estimate warm vs cool colour bias in [0, 1].
+      0 = strongly cool (blue / grey UI, screen recordings, text slides)
+      1 = strongly warm (natural footage, skin tones, sunlit b-roll)
+
+    Method: compare mean red channel to mean blue channel, normalised.
+    """
+    b = float(np.mean(image_bgr[:, :, 0]))
+    r = float(np.mean(image_bgr[:, :, 2]))
+    total = r + b + 1e-9
+    # r / (r + b) ranges from 0 (all blue) to 1 (all red); 0.5 is neutral
+    return float(r / total)
 
 
 def estimate_motion(video_path, start_sec, end_sec, sample_points=8):
@@ -220,6 +251,7 @@ def estimate_motion(video_path, start_sec, end_sec, sample_points=8):
     """
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
+        logger.warning("[MOTION] Failed to open video: %s", video_path)
         return 0.0, 0.0, 0.0
 
     fps          = cap.get(cv2.CAP_PROP_FPS) or 25.0
@@ -239,16 +271,22 @@ def estimate_motion(video_path, start_sec, end_sec, sample_points=8):
             continue
         gray = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (320, 180))
         if prev is not None:
-            diffs.append(float(np.mean(cv2.absdiff(prev, gray))) / 255.0)
+            diffs.append(float(cv2.absdiff(prev, gray).mean()) / 255.0)
         prev = gray
 
     cap.release()
 
     if not diffs:
+        logger.debug("[MOTION] No motion samples extracted")
         return 0.0, 0.0, 0.0
 
     arr = np.array(diffs)
-    return float(arr.mean()), float(arr.max()), float(arr.std())
+    mean_m, peak_m, std_m = float(arr.mean()), float(arr.max()), float(arr.std())
+    logger.debug(
+        "[MOTION] Segment [%.1fs-%.1fs] | Mean: %.3f | Peak: %.3f | StdDev: %.3f",
+        start_sec, end_sec, mean_m, peak_m, std_m
+    )
+    return mean_m, peak_m, std_m
 
 
 # ---------------------------------------------------------------------------
@@ -256,9 +294,9 @@ def estimate_motion(video_path, start_sec, end_sec, sample_points=8):
 # ---------------------------------------------------------------------------
 
 def extract_features(
-    face_count, largest_face_ratio,
+    face_count, largest_face_ratio, face_aspect_ratio,
     mean_motion, peak_motion, motion_std,
-    edge_density, sharpness, text_density, color_variance,
+    edge_density, sharpness, text_density, color_variance, color_temperature,
 ):
     """Convert raw signals into a unified normalised feature dict."""
     def norm(value, ceiling):
@@ -269,16 +307,18 @@ def extract_features(
 
     return {
         "face_presence"      : 1.0 if face_count > 0 else 0.0,
-        "face_dominance"     : norm(largest_face_ratio, FEATURE_RANGES["face_dominance"]),
-        "face_count_norm"    : norm(face_count,         FEATURE_RANGES["face_count_norm"]),
-        "motion_mean"        : norm(mean_motion,        FEATURE_RANGES["motion_mean"]),
-        "motion_peak"        : norm(peak_motion,        FEATURE_RANGES["motion_peak"]),
-        "motion_burst"       : norm(burst,              FEATURE_RANGES["motion_burst"]),
+        "face_dominance"     : norm(largest_face_ratio,  FEATURE_RANGES["face_dominance"]),
+        "face_count_norm"    : norm(face_count,           FEATURE_RANGES["face_count_norm"]),
+        "face_aspect_ratio"  : norm(face_aspect_ratio,   FEATURE_RANGES["face_aspect_ratio"]),
+        "motion_mean"        : norm(mean_motion,          FEATURE_RANGES["motion_mean"]),
+        "motion_peak"        : norm(peak_motion,          FEATURE_RANGES["motion_peak"]),
+        "motion_burst"       : norm(burst,                FEATURE_RANGES["motion_burst"]),
         "motion_consistency" : consistency,
-        "edge_density"       : norm(edge_density,       FEATURE_RANGES["edge_density"]),
-        "sharpness"          : norm(sharpness,          FEATURE_RANGES["sharpness"]),
-        "text_density"       : norm(text_density,       FEATURE_RANGES["text_density"]),
-        "color_variance"     : norm(color_variance,     FEATURE_RANGES["color_variance"]),
+        "edge_density"       : norm(edge_density,         FEATURE_RANGES["edge_density"]),
+        "sharpness"          : norm(sharpness,            FEATURE_RANGES["sharpness"]),
+        "text_density"       : norm(text_density,         FEATURE_RANGES["text_density"]),
+        "color_variance"     : norm(color_variance,       FEATURE_RANGES["color_variance"]),
+        "color_temperature"  : float(np.clip(color_temperature, 0.0, 1.0)),
     }
 
 
@@ -312,7 +352,7 @@ def classify_scene(features):
 
     labels = list(log_scores.keys())
     raw    = np.array([log_scores[l] for l in labels], dtype=np.float64)
-    raw   -= raw.max()                  # numerical stability before exp
+    raw   -= raw.max()          # numerical stability before exp
     probs  = np.exp(raw)
     probs /= probs.sum()
 
@@ -320,6 +360,15 @@ def classify_scene(features):
     label      = labels[best_idx]
     confidence = float(np.clip(probs[best_idx], 0.40, 0.95))
     all_probs  = {l: round(float(p), 4) for l, p in zip(labels, probs)}
+
+    # Log classification results in a clean format
+    probs_str = " | ".join(
+        f"{l}: {all_probs[l]:.2%}" for l in sorted(all_probs.keys())
+    )
+    logger.debug(
+        "[CLASSIFY] Predicted: %s (%.1f%%) | All: [ %s ]",
+        label.upper(), confidence * 100, probs_str
+    )
 
     return label, round(confidence, 3), all_probs
 
@@ -367,49 +416,67 @@ def detect_scene_type(video_path, start_sec, end_sec, thumbnail_path=None, smoot
     Returns:
         label       – scene label string
         confidence  – probability in [0.40, 0.95]
-        debug       – raw signals, normalised features, and per-scene probabilities
+        debug       – raw signals, normalised features, per-scene probabilities,
+                      and the raw feature vector ready for MongoDB logging
     """
-    face_count = largest_face_ratio = 0
-    edge_density = sharpness = text_density = color_variance = 0.0
+    logger.info("━━━━ SCENE DETECTION START [%.1fs → %.1fs] ━━━━", start_sec, end_sec)
+    
+    face_count = largest_face_ratio = face_aspect_ratio = 0
+    edge_density = sharpness = text_density = color_variance = color_temperature = 0.0
 
     if thumbnail_path and os.path.exists(thumbnail_path):
         img = cv2.imread(thumbnail_path)
         if img is not None:
-            face_count, largest_face_ratio = detect_faces_info(img)
-            edge_density                   = compute_edge_density(img)
-            sharpness                      = compute_sharpness(img)
-            text_density                   = compute_text_density(img)
-            color_variance                 = compute_color_variance(img)
+            face_count, largest_face_ratio, face_aspect_ratio = detect_faces_info(img)
+            edge_density     = compute_edge_density(img)
+            sharpness        = compute_sharpness(img)
+            text_density     = compute_text_density(img)
+            color_variance   = compute_color_variance(img)
+            color_temperature = compute_color_temperature(img)
+        else:
+            logger.warning("[THUMBNAIL] Failed to load: %s", thumbnail_path)
+    else:
+        logger.debug("[THUMBNAIL] Not provided or missing")
 
     mean_motion, peak_motion, motion_std = estimate_motion(
         video_path, start_sec, end_sec, sample_points=8
     )
 
     features = extract_features(
-        face_count, largest_face_ratio,
+        face_count, largest_face_ratio, face_aspect_ratio,
         mean_motion, peak_motion, motion_std,
-        edge_density, sharpness, text_density, color_variance,
+        edge_density, sharpness, text_density, color_variance, color_temperature,
     )
 
     label, confidence, all_probs = classify_scene(features)
 
     if smoother is not None:
+        label_before = label
         label, confidence = smoother.smooth(label, confidence)
+        if label_before != label:
+            logger.debug("[SMOOTH] Overridden: %s → %s (conf: %.1f%%)", label_before.upper(), label.upper(), confidence * 100)
 
+    logger.info("━━━━ SCENE DETECTION DONE: %s (%.0f%%) ━━━━", label.upper(), confidence * 100)
+    
     debug = {
         "raw_signals": {
-            "face_count"         : int(face_count),
-            "largest_face_ratio" : round(float(largest_face_ratio), 4),
-            "mean_motion"        : round(float(mean_motion), 4),
-            "peak_motion"        : round(float(peak_motion), 4),
-            "motion_std"         : round(float(motion_std), 4),
-            "edge_density"       : round(float(edge_density), 4),
-            "sharpness"          : round(float(sharpness), 2),
-            "text_density"       : round(float(text_density), 2),
-            "color_variance"     : round(float(color_variance), 4),
+            "face_count"          : int(face_count),
+            "largest_face_ratio"  : round(float(largest_face_ratio), 4),
+            "face_aspect_ratio"   : round(float(face_aspect_ratio), 4),
+            "mean_motion"         : round(float(mean_motion), 4),
+            "peak_motion"         : round(float(peak_motion), 4),
+            "motion_std"          : round(float(motion_std), 4),
+            "edge_density"        : round(float(edge_density), 4),
+            "sharpness"           : round(float(sharpness), 2),
+            "text_density"        : round(float(text_density), 2),
+            "color_variance"      : round(float(color_variance), 4),
+            "color_temperature"   : round(float(color_temperature), 4),
         },
-        "normalised_features" : {k: round(v, 4) for k, v in features.items()},
-        "scene_probabilities" : all_probs,
+        "normalised_features"  : {k: round(v, 4) for k, v in features.items()},
+        "scene_probabilities"  : all_probs,
+        # ── Ready to log to MongoDB for offline profile re-calibration ──
+        # Pull this dict into your retraining script once human_label is set.
+        "feature_vector_for_training": {k: round(v, 6) for k, v in features.items()},
     }
 
     return label, float(confidence), debug

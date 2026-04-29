@@ -164,45 +164,45 @@ export default function AppShell({ currentUser, onLogout }) {
       placement: 'center',
       content: (
         <div style={{ textAlign: 'left' }}>
-          <h4 style={{ color: 'var(--accent)', marginBottom: '8px' }}>Welcome to EditEase! 🎬</h4>
-          <p>Let's take a quick 1-minute tour of your new automated video workflow.</p>
+          <h4 style={{ color: 'var(--accent)', marginBottom: '12px', fontSize: '1.15rem', fontWeight: 700 }}>Welcome to EditEase! 🎬</h4>
+          <p style={{ color: 'var(--text-secondary)', margin: '0', fontSize: '0.95rem', lineHeight: 1.6 }}>Let's take a quick 1-minute tour of your new automated video workflow.</p>
         </div>
       ),
       disableBeacon: true,
     },
     {
       target: '.tour-sidebar',
-      content: 'This is your mission control. You can move between different stages of the video pipeline from here.',
+      content: '🎯 Mission control center. Navigate between different stages of the video pipeline from here.',
       placement: 'right',
     },
     {
       target: '.tour-nav-Dashboard',
-      content: 'The Dashboard gives you a birds-eye view of your project stats and recent activity.',
+      content: '📊 Get a bird\'s-eye view of your project stats, recent activity, and system health at a glance.',
       placement: 'right',
     },
     {
       target: '.tour-nav-Uploads',
-      content: 'Start here! Drop your raw footage into the Uploads page. Our AI will automatically split scenes and organize them.',
+      content: '⬆️ Start here! Drop your raw footage and our AI automatically splits scenes and organizes them.',
       placement: 'right',
     },
     {
       target: '.tour-nav-Review-Queue',
-      content: 'Any clips the AI is uncertain about will land here. You can quickly verify or re-classify them in bulk.',
+      content: '🔍 Quick review station. Any clips the AI is uncertain about land here for your verification.',
       placement: 'right',
     },
     {
       target: '.tour-nav-Organized-Videos',
-      content: 'Once processed, all your clips are beautifully organized into folders (Testimonials, B-Roll, etc.) ready for download.',
+      content: '✨ Your organized clips beautifully sorted into folders (Testimonials, B-Roll, etc.) ready for download.',
       placement: 'right',
     },
     {
       target: '.workspace-topbar',
-      content: 'The Topbar shows your current location and provides quick actions like returning to the homepage.',
+      content: '📍 The topbar shows your current location and provides quick navigation actions.',
       placement: 'bottom',
     },
     {
       target: '.tour-start-btn',
-      content: 'You can relaunch this tour anytime by clicking this button!',
+      content: '⚡ Anytime you need a refresher, click here to relaunch this tour guide!',
       placement: 'left',
     }
   ];
@@ -226,30 +226,73 @@ export default function AppShell({ currentUser, onLogout }) {
         styles={{
           options: {
             primaryColor: 'var(--accent)',
-            backgroundColor: 'var(--surface-panel)',
+            backgroundColor: 'transparent',
             textColor: 'var(--text-primary)',
-            arrowColor: 'var(--surface-panel)',
-            overlayColor: 'rgba(0, 0, 0, 0.75)',
+            arrowColor: 'transparent',
+            overlayColor: 'rgba(0, 0, 0, 0.65)',
             zIndex: 10000,
           },
           tooltipContainer: {
             textAlign: 'left',
-            borderRadius: 'var(--radius-lg)',
-            border: '1px solid var(--border-default)',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+            borderRadius: '20px',
+            border: 'none',
+            boxShadow: 'none',
+            backdropFilter: 'none',
+            WebkitBackdropFilter: 'none',
+            padding: '24px 28px',
+            maxWidth: '420px',
+            background: 'transparent',
           },
           buttonNext: {
-            borderRadius: 'var(--radius-md)',
+            borderRadius: '12px',
             fontWeight: 600,
-            padding: '8px 16px',
+            padding: '10px 18px',
+            fontSize: '0.95rem',
+            backgroundColor: 'var(--accent)',
+            color: '#fff',
+            border: 'none',
+            boxShadow: '0 8px 24px rgba(88, 166, 255, 0.25)',
+            transition: 'all 0.2s ease',
           },
           buttonBack: {
             color: 'var(--text-secondary)',
-            marginRight: 10,
+            marginRight: 12,
+            backgroundColor: 'transparent',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            borderRadius: '12px',
+            padding: '10px 18px',
+            fontWeight: 500,
+            transition: 'all 0.2s ease',
+            cursor: 'pointer',
           },
           buttonSkip: {
-            color: 'var(--text-muted)',
-          }
+            color: 'var(--text-secondary)',
+            backgroundColor: 'transparent',
+            border: 'none',
+            fontSize: '0.95rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+            transition: 'color 0.2s ease',
+          },
+          tooltip: {
+            fontSize: '0.95rem',
+            lineHeight: '1.6',
+          },
+          tooltipTitle: {
+            fontSize: '1.05rem',
+            fontWeight: 700,
+            marginBottom: '8px',
+            color: 'var(--accent)',
+          },
+          badge: {
+            backgroundColor: 'rgba(88, 166, 255, 0.15)',
+            color: 'var(--accent)',
+            borderRadius: '8px',
+            padding: '4px 10px',
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            border: '1px solid rgba(88, 166, 255, 0.25)',
+          },
         }}
       />
       <div className="workspace-ambient workspace-ambient-a" />

@@ -156,3 +156,53 @@ def cancel_job_ep(task_id):
     celery_app.control.revoke(task_id, terminate=True, signal='SIGTERM')
     update_task_record(task_id, status='REVOKED', progress_step='Cancelled by admin')
     return jsonify({'ok': True, 'revoked': task_id})
+
+
+@admin_bp.get('/assignments')
+@role_required(['admin'])
+def get_assignments():
+    from services.clip_service import col
+    # Return distinct videos with their assigned editor (if any), and progress (clips reviewed / total clips)
+    pipeline = [
+        {"$group": {
+            "_id": "$video",
+            "total_clips": {"$sum": 1},
+            "reviewed_clips": {"$sum": {"$cond": [{"$eq": ["$reviewed", True]}, 1, 0]}},
+            "assigned_to": {"$first": "$assigned_to"}
+        }},
+        {"$sort": {"_id": 1}}
+    ]
+    videos = list(col.aggregate(pipeline))
+    return jsonify([
+        {
+            "video": v["_id"],
+            "total_clips": v["total_clips"],
+            "reviewed_clips": v["reviewed_clips"],
+            "assigned_to": v.get("assigned_to")
+        } for v in videos
+    ])
+
+
+@admin_bp.post('/assignments/assign')
+@role_required(['admin'])
+def assign_video():
+    data = request.get_json(force=True) or {}
+    video = data.get('video')
+    user_id = data.get('user_id') # Can be None to unassign
+    if not video:
+        return jsonify({'error': 'video is required'}), 400
+    
+    # Verify user_id is valid editor/reviewer
+    if user_id:
+        from services.auth_service import get_user_by_id
+        user = get_user_by_id(user_id)
+        if not user or user.get('role') not in ('editor', 'reviewer', 'admin'):
+            return jsonify({'error': 'Invalid user ID'}), 400
+            
+    from services.clip_service import col
+    res = col.update_many(
+        {"video": video},
+        {"$set": {"assigned_to": user_id}}
+    )
+    return jsonify({'ok': True, 'modified_count': res.modified_count})
+

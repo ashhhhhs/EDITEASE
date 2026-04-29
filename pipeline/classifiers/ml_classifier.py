@@ -11,79 +11,148 @@ import config
 
 logger = setup_logger("ml_classifier")
 
+# ---------------------------------------------------------------------------
+# Per-class confidence thresholds
+#
+# Why: a single global threshold (0.60) is too blunt. Some scene types are
+# inherently hard to separate (presenter vs testimonial) and need a tighter
+# gate; others (text_slide, screen_recording) are visually distinct and can
+# afford a looser gate.
+#
+# Tune these values as you accumulate labelled data. Start conservative and
+# relax when you see that a class rarely needs rule-based correction.
+# ---------------------------------------------------------------------------
+CLASS_THRESHOLDS = {
+    "testimonial"      : 0.65,
+    "presenter"        : 0.70,   # easily confused with testimonial
+    "audience_reaction": 0.72,
+    "text_slide"       : 0.52,   # highly distinctive visually
+    "screen_recording" : 0.52,
+    "b-roll"           : 0.60,
+    "establishing_shot": 0.60,
+}
+# Fallback threshold for any label not listed above (e.g. if the model was
+# retrained with new classes that haven't been tuned yet).
+DEFAULT_THRESHOLD = 0.62
+
+
 class MLClassifier(BaseClassifier):
     """
-    PyTorch/ML model classifier. 
-    Loads model, runs inference on thumbnail, falls back to rules if failed or low conf.
+    PyTorch/ML model classifier.
+    Loads model, runs inference on thumbnail.
+    Falls back to RuleBasedClassifier when:
+      - model file is missing
+      - inference throws an exception
+      - per-class confidence threshold is not met (and rule-based is more confident)
     """
+
     def __init__(self):
-        logger.info("Initializing ML scene classifier...")
+        logger.info("Initializing ML scene classifier…")
         self.fallback = RuleBasedClassifier()
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = None
-        self.idx_to_label = {}
-        
-        models_dir = os.path.join(config.BASE_DIR, "pipeline", "models")
-        model_path = os.path.join(models_dir, "scene_classifier.pth")
-        encoder_path = os.path.join(models_dir, "label_encoder.json")
-        
+        self.device   = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model    = None
+        self.idx_to_label: dict[str, str] = {}
+
+        models_dir    = os.path.join(config.BASE_DIR, "pipeline", "models")
+        model_path    = os.path.join(models_dir, "scene_classifier.pth")
+        encoder_path  = os.path.join(models_dir, "label_encoder.json")
+
         try:
             if os.path.exists(encoder_path):
                 with open(encoder_path, "r") as f:
                     self.idx_to_label = json.load(f)
-                    
+
             if os.path.exists(model_path) and self.idx_to_label:
                 self.model = models.resnet18(pretrained=False)
-                num_ftrs = self.model.fc.in_features
+                num_ftrs   = self.model.fc.in_features
                 self.model.fc = nn.Linear(num_ftrs, len(self.idx_to_label))
-                self.model.load_state_dict(torch.load(model_path, map_location=self.device, weights_only=True))
+                self.model.load_state_dict(
+                    torch.load(model_path, map_location=self.device, weights_only=True)
+                )
                 self.model.to(self.device)
                 self.model.eval()
-                
+
                 self.transform = transforms.Compose([
                     transforms.Resize((224, 224)),
                     transforms.ToTensor(),
-                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                    transforms.Normalize(
+                        mean=[0.485, 0.456, 0.406],
+                        std =[0.229, 0.224, 0.225],
+                    ),
                 ])
-                logger.info("Successfully loaded PyTorch ML model.")
+                logger.info("ML model loaded successfully (device=%s).", self.device)
             else:
-                logger.warning("Model paths not found. Ensure train_scene_classifier.py is run.")
-                
-        except Exception as e:
-            logger.error(f"Failed to load ML model: {e}")
+                logger.warning(
+                    "Model or encoder not found at %s — run train_scene_classifier.py first.",
+                    models_dir,
+                )
+
+        except Exception as exc:
+            logger.error("Failed to load ML model: %s", exc)
             self.model = None
 
-    def classify(self, video_path: str, start_sec: float, end_sec: float, thumbnail_path: str) -> tuple[str, float, dict]:
+    # ------------------------------------------------------------------
+    def classify(
+        self,
+        video_path: str,
+        start_sec: float,
+        end_sec: float,
+        thumbnail_path: str,
+    ) -> tuple[str, float, dict]:
+
+        # ── No model available ──────────────────────────────────────────
         if self.model is None or not thumbnail_path or not os.path.exists(thumbnail_path):
-            logger.debug("Falling back to RuleBasedClassifier")
-            scene_label, conf, debug = self.fallback.classify(video_path, start_sec, end_sec, thumbnail_path)
-            debug["classifier_used"] = "rule_based_fallback"
-            return scene_label, conf, debug
-            
+            logger.debug("ML model unavailable — falling back to RuleBasedClassifier.")
+            label, conf, debug = self.fallback.classify(video_path, start_sec, end_sec, thumbnail_path)
+            debug["classifier_used"] = "rule_based_no_model"
+            return label, conf, debug
+
+        # ── Run inference ───────────────────────────────────────────────
         try:
-            image = Image.open(thumbnail_path).convert("RGB")
-            input_tensor = self.transform(image).unsqueeze(0).to(self.device)
-            
+            image        = Image.open(thumbnail_path).convert("RGB")
+            input_tensor = self.transform(image).unsqueeze(0).to(self.device)  # type: ignore
+
             with torch.no_grad():
                 outputs = self.model(input_tensor)
-                probs = torch.nn.functional.softmax(outputs, dim=1)
-                conf, predicted = torch.max(probs, 1)
-                
-            pred_idx = str(predicted.item())
+                probs   = torch.nn.functional.softmax(outputs, dim=1)
+                conf_t, predicted = torch.max(probs, 1)
+
+            pred_idx    = str(predicted.item())
             scene_label = self.idx_to_label.get(pred_idx, "other")
-            
-            # Use fallback if confidence is too low
-            if conf.item() < 0.6:
-                lb, fallback_conf, debug = self.fallback.classify(video_path, start_sec, end_sec, thumbnail_path)
-                if fallback_conf > conf.item():
-                    debug["classifier_used"] = "rule_based_low_conf_fallback"
-                    return lb, fallback_conf, debug
-                    
-            debug = {"classifier_used": "ml_pytorch", "ml_conf": conf.item()}
-            return scene_label, conf.item(), debug
-            
-        except Exception as e:
-            logger.error(f"Inference error: {e}")
-            scene_label, conf, debug = self.fallback.classify(video_path, start_sec, end_sec, thumbnail_path)
+            ml_conf     = float(conf_t.item())
+
+            # ── Per-class threshold check ────────────────────────────────
+            threshold = CLASS_THRESHOLDS.get(scene_label, DEFAULT_THRESHOLD)
+
+            if ml_conf < threshold:
+                rb_label, rb_conf, rb_debug = self.fallback.classify(
+                    video_path, start_sec, end_sec, thumbnail_path
+                )
+                rb_debug["classifier_used"] = "rule_based_low_conf_fallback"
+                rb_debug["ml_label"]        = scene_label
+                rb_debug["ml_conf"]         = round(ml_conf, 4)
+                rb_debug["ml_threshold"]    = threshold
+                logger.debug(
+                    "ML conf %.3f < threshold %.2f for '%s' — using rule-based (%.3f).",
+                    ml_conf, threshold, scene_label, rb_conf,
+                )
+                return rb_label, rb_conf, rb_debug
+
+            # ── ML wins ─────────────────────────────────────────────────
+            all_probs = {
+                self.idx_to_label.get(str(i), str(i)): round(float(probs[0][i].item()), 4)
+                for i in range(probs.shape[1])
+            }
+            debug = {
+                "classifier_used" : "ml_pytorch",
+                "ml_conf"         : round(ml_conf, 4),
+                "ml_threshold"    : threshold,
+                "all_class_probs" : all_probs,
+            }
+            return scene_label, ml_conf, debug
+
+        except Exception as exc:
+            logger.error("Inference error: %s", exc)
+            label, conf, debug = self.fallback.classify(video_path, start_sec, end_sec, thumbnail_path)
             debug["classifier_used"] = "rule_based_error_fallback"
-            return scene_label, conf, debug
+            return label, conf, debug

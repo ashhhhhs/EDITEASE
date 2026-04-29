@@ -39,7 +39,7 @@ def process_video_task(self, video_path_str: str, base_dir_str: str):
     """
     from pipeline.processing.run_pipeline import process_video
     logger.info(f"Starting Celery task for video: {video_path_str}")
-    _update_task(self.request.id, status="STARTED", progress_step="processing")
+    _update_task(self.request.id, status="STARTED", progress_step="Preparing pipeline...")
     
     try:
         def on_progress(msg):
@@ -109,7 +109,7 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
     logger.info(f"Auto-organize started for: {video_name}")
 
     # ── Step 1: Compute file hash before any upload ───────────────────────────
-    _update_task(self.request.id, status="STARTED", progress_step="hashing")
+    _update_task(self.request.id, status="STARTED", progress_step="Generating secure file hash...")
     try:
         with open(video_path_str, "rb") as fh:
             file_hash = hashlib.sha256(fh.read()).hexdigest()
@@ -131,8 +131,8 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
 
     # ── Step 2: Process video (pipeline uses the hash-safe public ID) ─────────
     if not is_edited_auto:
-        self.update_state(state="PROGRESS", meta={"step": "processing", "message": "Analyzing video..."})
-        _update_task(self.request.id, status="STARTED", progress_step="processing")
+        self.update_state(state="PROGRESS", meta={"step": "processing", "message": "Initiating deep video analysis..."})
+        _update_task(self.request.id, status="STARTED", progress_step="Initiating deep video analysis...")
         from pipeline.processing.run_pipeline import process_video
         try:
             def on_progress(msg):
@@ -147,7 +147,7 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
 
         # ── Step 3: Read scene index ──────────────────────────────────────────────
         self.update_state(state="PROGRESS", meta={"step": "organizing", "message": "Organizing clips..."})
-        _update_task(self.request.id, progress_step="organizing")
+        _update_task(self.request.id, progress_step="Finalizing analysis and compiling scene index...")
         index_path = os.path.join(base_dir_str, "scene_indexes", f"{video_name}_scene_index.json")
         if not os.path.exists(index_path):
             _update_task(self.request.id, status="FAILURE", error_message="Scene index not generated", progress_step="error")
@@ -257,6 +257,7 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
     # ── Step 6: Move or Upload video to organized folder ────────────────────────────────
     from services import cloudinary_service
     if not is_edited_auto:
+        _update_task(self.request.id, progress_step=f"Organizing video into '{dominant_label}' category...")
         old_pub_id = f"editease/videos/{file_hash}/{safe_name}"
         new_pub_id = f"editease/organized-videos/{dominant_label}/{file_hash}/{safe_name}"
         cloudinary_url, actual_pub_id = cloudinary_service.move_video_returning_id(old_pub_id, new_pub_id)
@@ -268,6 +269,7 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
     else:
         new_pub_id = f"editease/organized-videos/edited/{file_hash}/{safe_name}"
         self.update_state(state="PROGRESS", meta={"step": "uploading", "message": "Uploading edited video..."})
+        _update_task(self.request.id, progress_step="Uploading fully edited video to cloud storage...")
         try:
             cloudinary_url, actual_pub_id = cloudinary_service.upload_video_returning_id(video_path_str, new_pub_id)
         except Exception as e:

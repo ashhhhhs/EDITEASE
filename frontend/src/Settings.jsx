@@ -121,7 +121,7 @@ function SecuritySection({ currentUser }) {
     setStatus({ loading: true, error: null, success: false });
     try {
       const res = await api.patch('/user/password', { current_password: currentPassword, new_password: newPassword });
-      localStorage.setItem('auth_token', res.data.token); // update the token!
+      localStorage.setItem('token', res.data.token); // update the token!
       setStatus({ loading: false, error: null, success: true });
       setCurrentPassword('');
       setNewPassword('');
@@ -177,7 +177,7 @@ function DangerZoneSection() {
     setLoading(true);
     try {
       const res = await api.post('/user/logout-all');
-      localStorage.setItem('auth_token', res.data.token);
+      localStorage.setItem('token', res.data.token);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch(err) {

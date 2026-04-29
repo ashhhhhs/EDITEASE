@@ -23,14 +23,26 @@ else:
 
 VIDEO_EXTENSIONS = (".mp4", ".mov", ".avi", ".mkv")
 
+# ---------------------------------------------------------------------------
+# Confidence bands for the agentic decision layer
+# ---------------------------------------------------------------------------
+CONF_AUTO_HIGH   = float(os.getenv("CONF_AUTO_HIGH",   "0.85"))  # ML auto-accepts above this
+CONF_FUSE_LOW    = float(os.getenv("CONF_FUSE_LOW",    "0.58"))  # fusion below this → uncertain
+ML_WEIGHT        = float(os.getenv("ML_WEIGHT",        "0.65"))  # ML share in weighted fusion
+RULE_WEIGHT      = 1.0 - ML_WEIGHT
+
+
+# ---------------------------------------------------------------------------
+# Face / emotion helpers
+# ---------------------------------------------------------------------------
 
 def has_face(img_path):
     img = cv2.imread(img_path)
     if img is None:
         return False
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray    = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     cascade = cv2.CascadeClassifier(
-        os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml") # type: ignore
+        os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")  # type: ignore
     )
     faces = cascade.detectMultiScale(gray, 1.1, 5, minSize=(40, 40))
     return len(faces) > 0
@@ -48,12 +60,16 @@ def make_json_safe(obj):
     return obj
 
 
+# ---------------------------------------------------------------------------
+# Frame extraction
+# ---------------------------------------------------------------------------
+
 def extract_frame(video_path, timestamp, out_path):
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         return False
 
-    fps = cap.get(cv2.CAP_PROP_FPS)
+    fps   = cap.get(cv2.CAP_PROP_FPS)
     total = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     if fps <= 0 or total <= 0:
         cap.release()
@@ -65,34 +81,58 @@ def extract_frame(video_path, timestamp, out_path):
     cap.release()
 
     if ret and frame is not None:
-        # Resize to max-width 1280 to prevent AI models and OpenCV from hanging on 4K/8K footage
+        # Resize to max-width 1280 to prevent AI models and OpenCV hanging on 4K/8K footage
         height, width = frame.shape[:2]
         if width > 1280:
-            scale = 1280 / width
-            new_width = 1280
-            new_height = int(height * scale)
-            frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_AREA)
-            
+            scale      = 1280 / width
+            frame      = cv2.resize(frame, (1280, int(height * scale)), interpolation=cv2.INTER_AREA)
+
         cv2.imwrite(out_path, frame)
         return True
     return False
 
 
+# ---------------------------------------------------------------------------
+# Adaptive emotion sampling
+# ---------------------------------------------------------------------------
+
+def _get_sample_count(duration_seconds: float) -> int:
+    """Scale sample count to scene length — avoids under-sampling long scenes."""
+    if duration_seconds < 3:
+        return 2
+    if duration_seconds < 10:
+        return 4
+    if duration_seconds < 30:
+        return 8
+    return 12   # cap — diminishing returns beyond this
+
+
 def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene_id):
     """
     Temporal emotion sampling inside a scene.
-    Enforces: if no face => emotion None.
+    - Sample count adapts to scene duration.
+    - Frames at the start/end are weighted more heavily for dominant emotion
+      (editorially more significant than mid-scene).
+    - Enforces: if no face => emotion None.
     """
-    sample_ratios = [0.2, 0.4, 0.6, 0.8]
-    emotion_timeline = []
-    emotion_votes = {}
-
-    face_hits = 0
-    total_samples = 0
     scene_duration = end_sec - start_sec
+    n_samples = _get_sample_count(scene_duration)
+
+    # Evenly spaced ratios; keep away from exact edges (0 / 1) to avoid black frames.
+    sample_ratios = np.linspace(0.1, 0.9, n_samples).tolist()
+
+    # Edge positions carry more editorial weight for dominant-emotion voting.
+    # First and last sample get weight 1.5×; the rest get 1.0×.
+    def _weight(i, total):
+        return 1.5 if i == 0 or i == total - 1 else 1.0
+
+    emotion_timeline  = []
+    emotion_votes: dict[str, float] = {}
+    face_hits         = 0
+    total_samples     = 0
 
     for i, ratio in enumerate(sample_ratios):
-        timestamp = start_sec + scene_duration * ratio
+        timestamp  = start_sec + scene_duration * ratio
         thumb_name = f"scene_{scene_id:03d}_emo_{i}.jpg"
         thumb_path = os.path.join(thumbs_dir, thumb_name)
 
@@ -106,92 +146,141 @@ def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene
 
         if not face_ok:
             emotion_timeline.append({
-                "time_ratio": ratio,
+                "time_ratio"   : round(ratio, 3),
                 "face_detected": False,
-                "emotion": None,
-                "confidence": None,
+                "emotion"      : None,
+                "confidence"   : None,
             })
             continue
 
         dominant, probs, conf = detect_emotion(thumb_path, enforce_detection=False)
         emotion_timeline.append({
-            "time_ratio": ratio,
+            "time_ratio"   : round(ratio, 3),
             "face_detected": True,
-            "emotion": dominant if dominant else None,
-            "confidence": conf if dominant else None,
+            "emotion"      : dominant if dominant else None,
+            "confidence"   : conf     if dominant else None,
         })
 
         if dominant:
-            emotion_votes[dominant] = emotion_votes.get(dominant, 0) + 1
+            w = _weight(i, n_samples)
+            emotion_votes[dominant] = emotion_votes.get(dominant, 0.0) + w
 
-    dominant_overall = max(emotion_votes, key=emotion_votes.get) if emotion_votes else None # type: ignore
-    face_present_any = face_hits > 0
-    face_present_ratio = (face_hits / total_samples) if total_samples > 0 else 0.0
+    dominant_overall    = max(emotion_votes, key=emotion_votes.get) if emotion_votes else None  # type: ignore
+    face_present_any    = face_hits > 0
+    face_present_ratio  = (face_hits / total_samples) if total_samples > 0 else 0.0
 
     return emotion_timeline, dominant_overall, face_present_any, face_present_ratio
 
 
-def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD, file_hash: str | None = None, progress_callback=None):
+# ---------------------------------------------------------------------------
+# Confidence-weighted fusion (ML + rule-based)
+# ---------------------------------------------------------------------------
+
+def _fuse_predictions(
+    ml_label: str,   ml_conf: float,
+    rb_label: str,   rb_conf: float,
+) -> tuple[str, float, bool, str]:
+    """
+    Combine ML and rule-based predictions when ML confidence is in the
+    medium band [CONF_FUSE_LOW, CONF_AUTO_HIGH).
+
+    Returns: (label, fused_confidence, uncertain, agent_action)
+    """
+    if ml_label == rb_label:
+        # Both agree — confidence is slightly boosted.
+        fused = min(0.95, (ml_conf * ML_WEIGHT + rb_conf * RULE_WEIGHT) + 0.05)
+        return ml_label, round(fused, 4), False, "auto_organized_agreed"
+
+    # Disagreement — weighted vote.
+    scores: dict[str, float] = {}
+    scores[ml_label]  = ml_conf * ML_WEIGHT
+    scores[rb_label]  = rb_conf * RULE_WEIGHT
+
+    winner      = max(scores, key=scores.get)  # type: ignore
+    fused_conf  = round(scores[winner], 4)
+    uncertain   = fused_conf < CONF_FUSE_LOW
+
+    action = "escalated_disagreement" if uncertain else "auto_organized_fused"
+    return winner, fused_conf, uncertain, action
+
+
+# ---------------------------------------------------------------------------
+# Main pipeline
+# ---------------------------------------------------------------------------
+
+def process_video(
+    video_path,
+    base_dir,
+    threshold=config.SCENE_DETECT_THRESHOLD,
+    file_hash: str | None = None,
+    progress_callback=None,
+):
     video_name = os.path.splitext(os.path.basename(video_path))[0]
-    logger.info(f"Processing video: {video_name}")
-    if progress_callback: progress_callback(f"Started analyzing {video_name}...")
+    logger.info("Processing video: %s", video_name)
+    if progress_callback:
+        progress_callback(f"Found video '{video_name}'. Preparing for deep analysis...")
 
     thumbs_dir = os.path.join(base_dir, "thumbnails", video_name)
     os.makedirs(thumbs_dir, exist_ok=True)
 
-    # Use hash-safe public ID when available (auto_organize flow) to prevent
-    # filename collisions at the first upload step — before any rename occurs.
     if file_hash:
         from database.organized_videos_schema import slugify
-        safe_name = slugify(video_name)
+        safe_name            = slugify(video_name)
         cloudinary_public_id = f"editease/videos/{file_hash}/{safe_name}"
     else:
         cloudinary_public_id = f"editease/videos/{video_name}"
 
-    logger.info("DEBUG: [STEP 1] Starting robust Cloudinary upload_large for %s", video_name)
+    logger.info("DEBUG: [STEP 1] Starting Cloudinary upload for %s", video_name)
     cloudinary_video_url = cloudinary_service.upload_video(
-        video_path,
-        public_id=cloudinary_public_id,
+        video_path, public_id=cloudinary_public_id,
     )
     if cloudinary_video_url:
         logger.info("Video uploaded to Cloudinary: %s", cloudinary_video_url)
-        if progress_callback: progress_callback("Secure backup complete. Detecting cuts...")
+        if progress_callback:
+            progress_callback("Cloud backup complete. Initiating cut detection...")
     else:
         logger.warning(
-            "Cloudinary video upload failed for %s, continuing with local path fallback",
-            video_name,
+            "Cloudinary upload failed for %s — continuing with local path.", video_name,
         )
-        if progress_callback: progress_callback("Backup failed. Processing locally...")
+        if progress_callback:
+            progress_callback("Backup failed. Proceeding with local cut detection...")
 
-    logger.info("DEBUG: [STEP 2] Starting scene detection (Heavy CPU task) for %s", video_name)
+    logger.info("DEBUG: [STEP 2] Scene detection for %s", video_name)
+    if progress_callback:
+        progress_callback("Scanning video to detect cuts and transitions...")
     scenes = find_scenes(video_path, threshold=threshold)
     if not scenes:
-        logger.warning("No scenes detected for %s, skipping", video_name)
-        if progress_callback: progress_callback("No distinct scenes found.")
+        logger.warning("No scenes detected for %s, skipping.", video_name)
+        if progress_callback:
+            progress_callback("Finished scanning. No distinct scenes found.")
         return
 
     merged = []
 
-    logger.info("DEBUG: [STEP 3] Entering scene processing loop. Found %s scenes.", len(scenes))
-    for idx, scene in enumerate(scenes, start=1):
-        logger.info("DEBUG: ---> Processing Scene %s of %s", idx, len(scenes))
-        start = scene[0].get_seconds()
-        end = scene[1].get_seconds()
-        mid = (start + end) / 2
+    logger.info("DEBUG: [STEP 3] Scene processing loop — %s scenes found.", len(scenes))
+    if progress_callback:
+        progress_callback(f"Cut detection complete. Found {len(scenes)} distinct scenes to analyze.")
 
+    for idx, scene in enumerate(scenes, start=1):
+        logger.info("DEBUG: ---> Scene %s / %s", idx, len(scenes))
+        start = scene[0].get_seconds()
+        end   = scene[1].get_seconds()
+        mid   = (start + end) / 2
+
+        # ── Thumbnail ──────────────────────────────────────────────────
         thumb_name = f"{video_name}_scene_{idx:03d}.jpg"
         thumb_path = os.path.join(thumbs_dir, thumb_name)
-        
-        logger.info("DEBUG:      Extracting and resizing thumbnail frame for scene %s", idx)
         extract_frame(video_path, mid, thumb_path)
 
-        logger.info("DEBUG:      Uploading scene %s thumbnail to Cloudinary...", idx)
         thumbnail_url = cloudinary_service.upload_image(
             thumb_path,
             public_id=f"editease/thumbnails/{video_name}_scene_{idx:03d}",
         )
 
-        logger.info("DEBUG:      Starting Emotion & Face sampling for scene %s...", idx)
+        # ── Emotion sampling ───────────────────────────────────────────
+        if progress_callback:
+            progress_callback(f"Analyzing Scene {idx}/{len(scenes)}: Extracting frames and checking for faces...")
+
         emotion_timeline, dominant_overall, face_any, face_ratio = sample_emotions_over_scene(
             video_path=video_path,
             start_sec=start,
@@ -200,7 +289,14 @@ def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD,
             scene_id=idx,
         )
 
-        logger.info("DEBUG:      Running AI Video Classification (ML/Rule-based) for scene %s...", idx)
+        if progress_callback:
+            if face_any:
+                emo_text = dominant_overall if dominant_overall else 'complex emotions'
+                progress_callback(f"Scene {idx}/{len(scenes)}: Found faces! Detected emotion: {emo_text}. Classifying scene type...")
+            else:
+                progress_callback(f"Scene {idx}/{len(scenes)}: No faces detected. Classifying scene type...")
+
+        # ── Classification ─────────────────────────────────────────────
         scene_label, scene_conf, scene_debug = scene_classifier.classify(
             video_path=video_path,
             start_sec=start,
@@ -208,76 +304,89 @@ def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD,
             thumbnail_path=thumb_path,
         )
 
-        # Agentic Decision Layer
-        reviewed = False
+        # ── Agentic Decision Layer ─────────────────────────────────────
+        reviewed  = False
         uncertain = True
-        
-        c_used = scene_debug.get("classifier_used", "")
-        if "rule_based" in c_used:
-            # Low confidence ML forced a fallback
-            scene_debug["agent_action"] = "escalated_low_conf"
-        else:
-            if scene_conf >= 0.85:
-                # High ML confidence -> Auto-organize
-                reviewed = True
-                uncertain = False
-                scene_debug["agent_action"] = "auto_organized_high_conf"
-            else:
-                # Medium confidence (0.60 - 0.85) -> Ask fallback
-                fallback_label, _, _ = RuleBasedClassifier().classify(video_path, start, end, thumb_path)
-                if fallback_label == scene_label:
-                    reviewed = True
-                    uncertain = False
-                    scene_debug["agent_action"] = "auto_organized_agreed"
-                else:
-                    scene_debug["agent_action"] = "escalated_disagreement"
+        c_used    = scene_debug.get("classifier_used", "")
 
+        if "rule_based" in c_used:
+            # ML was unavailable or fell back already — escalate.
+            scene_debug["agent_action"] = "escalated_low_conf"
+
+        elif scene_conf >= CONF_AUTO_HIGH:
+            # High-confidence ML — auto-accept.
+            reviewed  = True
+            uncertain = False
+            scene_debug["agent_action"] = "auto_organized_high_conf"
+
+        else:
+            # Medium confidence — run weighted fusion with rule-based.
+            rb_label, rb_conf, rb_debug = RuleBasedClassifier().classify(
+                video_path, start, end, thumb_path,
+            )
+            scene_label, scene_conf, uncertain, action = _fuse_predictions(
+                scene_label, scene_conf, rb_label, rb_conf,
+            )
+            reviewed = not uncertain
+            scene_debug["agent_action"]  = action
+            scene_debug["rb_label"]      = rb_label
+            scene_debug["rb_conf"]       = round(rb_conf, 4)
+            scene_debug["fused_conf"]    = round(scene_conf, 4)
+
+        # ── Build scene record ─────────────────────────────────────────
         merged.append(make_json_safe({
-            "video": video_name,
-            "video_path": video_path,
-            "cloudinary_url": cloudinary_video_url,
-            "scene_id": idx,
-            "start_sec": round(start, 3),
-            "end_sec": round(end, 3),
-            "duration_sec": round(end - start, 3),
-            "thumbnail": thumb_path,
-            "thumbnail_url": thumbnail_url,
-            "scene_label_auto": scene_label,
-            "dominant_emotion_auto": dominant_overall,
-            "scene_label": scene_label,
+            "video"              : video_name,
+            "video_path"         : video_path,
+            "cloudinary_url"     : cloudinary_video_url,
+            "scene_id"           : idx,
+            "start_sec"          : round(start, 3),
+            "end_sec"            : round(end, 3),
+            "duration_sec"       : round(end - start, 3),
+            "thumbnail"          : thumb_path,
+            "thumbnail_url"      : thumbnail_url,
+            "scene_label_auto"   : scene_label,
+            "dominant_emotion_auto" : dominant_overall,
+            "scene_label"        : scene_label,
             "dominant_emotion_overall": dominant_overall,
-            "scene_confidence": scene_conf,
-            "scene_debug": scene_debug,
+            "scene_confidence"   : scene_conf,
+            "scene_debug"        : scene_debug,
             "faces": {
-                "face_present_any": face_any,
+                "face_present_any"  : face_any,
                 "face_present_ratio": round(face_ratio, 3),
             },
-            "emotion_timeline": emotion_timeline,
-            "created_at": datetime.now().isoformat(),
-            "reviewed": reviewed,
-            "uncertain": uncertain,
-            "notes": "",
-            "manual_scene_label": None,
-            "manual_emotion": None,
+            "emotion_timeline"   : emotion_timeline,
+            "created_at"         : datetime.now().isoformat(),
+            "reviewed"           : reviewed,
+            "uncertain"          : uncertain,
+            "notes"              : "",
+            "manual_scene_label" : None,
+            "manual_emotion"     : None,
+            # ── Retraining fields ────────────────────────────────────
+            # human_label: filled by the review UI when a user corrects the label.
+            # feature_vector_for_training: the normalised signals used to classify
+            #   this scene; used by retrain_profiles.py to update Gaussian mu/sigma.
+            # used_for_training: set to True after this scene is consumed by retraining.
+            "human_label"               : None,
+            "feature_vector_for_training": scene_debug.get("normalised_features", {}),
+            "used_for_training"         : False,
         }))
 
-        logger.info("DEBUG:      Scene %s processing complete.", idx)
         logger.info(
-            "Scene %s: type=%s | dominant_emotion=%s",
-            idx,
-            scene_label,
-            dominant_overall,
+            "Scene %s: type=%s conf=%.2f | emotion=%s | action=%s",
+            idx, scene_label, scene_conf, dominant_overall,
+            scene_debug.get("agent_action", "?"),
         )
-        
+
         if progress_callback:
-            emo_str = f"Emotion: {dominant_overall}." if dominant_overall else "No faces."
+            emo_str    = f"Emotion: {dominant_overall}." if dominant_overall else "No prominent emotions."
             label_disp = scene_label.replace("_", " ").title()
-            progress_callback(f"Scene {idx}/{len(scenes)}: Classified as {label_disp}. {emo_str}")
+            progress_callback(f"Classified Scene {idx}/{len(scenes)} as '{label_disp}'. {emo_str}")
 
-    out_dir = os.path.join(base_dir, "scene_indexes")
+    # ── Write scene index JSON ─────────────────────────────────────────
+    out_dir  = os.path.join(base_dir, "scene_indexes")
     os.makedirs(out_dir, exist_ok=True)
-
     out_path = os.path.join(out_dir, f"{video_name}_scene_index.json")
+
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(merged, f, indent=2)
 
@@ -285,8 +394,13 @@ def process_video(video_path, base_dir, threshold=config.SCENE_DETECT_THRESHOLD,
 
     upsert_count = upsert_scene_docs(merged, source_name=os.path.basename(out_path))
     logger.info("Upserted %s scenes into MongoDB for %s", upsert_count, video_name)
-    if progress_callback: progress_callback("Indexing timeline directly into database...")
+    if progress_callback:
+        progress_callback("Finalizing scene timeline and indexing to database...")
 
+
+# ---------------------------------------------------------------------------
+# Batch runner
+# ---------------------------------------------------------------------------
 
 def run_batch():
     data_dir = config.DATA_DIR
@@ -301,8 +415,7 @@ def run_batch():
         if filename.lower().endswith(VIDEO_EXTENSIONS)
     ]
 
-    logger.info("Found %s videos", len(videos))
-
+    logger.info("Found %s videos.", len(videos))
     for video in videos:
         process_video(video, str(config.BASE_DIR))
 
