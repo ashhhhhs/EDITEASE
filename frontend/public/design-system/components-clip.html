@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>body{margin:0;padding:20px;background:var(--surface-base);font-family:var(--font-sans);color:var(--text-primary)}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .clip{position:relative;aspect-ratio:16/9;border-radius:8px;border:1px solid var(--border-subtle);overflow:hidden;background:#1a2030}
+  .clip.sel{border-color:#58a6ff;box-shadow:0 0 0 1px #58a6ff}
+  .bar{position:absolute;top:0;left:0;right:0;height:2px;background:rgba(255,255,255,.24)}
+  .badge{position:absolute;left:8px;bottom:8px;padding:2px 8px;border-radius:999px;font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.05em}
+  .a{background:rgba(63,185,80,.20);color:#3fb950}.p{background:rgba(88,166,255,.15);color:#58a6ff}.f{background:rgba(218,54,51,.18);color:#da3633}
+</style></head><body>
+<div class="grid">
+  <div class="clip" style="background:#1a2c1a"><div class="bar"></div><span class="badge a">APPROVED</span></div>
+  <div class="clip sel" style="background:#1a2030"><div class="bar"></div><span class="badge p">PENDING</span></div>
+  <div class="clip" style="background:#2c1a1a"><div class="bar"></div><span class="badge f">FLAGGED</span></div>
+  <div class="clip" style="background:#1a2c1a"><div class="bar"></div><span class="badge a">APPROVED</span></div>
+</div>
+</body></html>

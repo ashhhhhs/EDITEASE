@@ -1,27 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import api from './lib/api';
+import ErrorBoundary from './components/ErrorBoundary';
+import { UploadProvider } from './UploadContext';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
-import Login from './Login';
-import Register from './Register';
-import ForgotPassword from './ForgotPassword';
-import ResetPassword from './ResetPassword';
-import AppShell from './AppShell';
-import VerifyEmail from './VerifyEmail';
-
-import Dashboard from './Dashboard';
-import Inspector from './Inspector';
-import Upload from './Upload';
-import OrganizedVideos from './OrganizedVideos';
-import UserManagement from './UserManagement';
-import JobMonitor from './JobMonitor';
-import Landing from './Landing';
-import Settings from './Settings';
-import Invite from './Invite';
-import { UploadProvider } from './UploadContext';
+// Lazy load components for code splitting
+const Login = lazy(() => import('./Login'));
+const Register = lazy(() => import('./Register'));
+const ForgotPassword = lazy(() => import('./ForgotPassword'));
+const ResetPassword = lazy(() => import('./ResetPassword'));
+const AppShell = lazy(() => import('./AppShell'));
+const VerifyEmail = lazy(() => import('./VerifyEmail'));
+const Dashboard = lazy(() => import('./Dashboard'));
+const Inspector = lazy(() => import('./Inspector'));
+const Upload = lazy(() => import('./Upload'));
+const OrganizedVideos = lazy(() => import('./OrganizedVideos'));
+const UserManagement = lazy(() => import('./UserManagement'));
+const JobMonitor = lazy(() => import('./JobMonitor'));
+const Landing = lazy(() => import('./Landing'));
+const Settings = lazy(() => import('./Settings'));
+const Invite = lazy(() => import('./Invite'));
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
@@ -97,34 +98,53 @@ export default function App() {
     return <div style={{height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-color)', color: '#fff'}}>Loading...</div>;
   }
 
+  // Loading fallback for lazy-loaded components
+  const LoadingFallback = () => (
+    <div style={{height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-color)', color: '#fff'}}>
+      <div className="spin" style={{
+        width: '32px',
+        height: '32px',
+        border: '3px solid var(--border-subtle)',
+        borderTopColor: 'var(--accent)',
+        borderRadius: '50%',
+        marginRight: '12px'
+      }} />
+      Loading...
+    </div>
+  );
+
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          
-          <Route path="/login" element={!token ? <Login onLogin={handleLogin} /> : (currentUser?.email_verified ? <Navigate to="/app/dashboard" replace /> : <Login onLogin={handleLogin} currentUser={currentUser} onLogout={handleLogout} />)} />
-          
-          <Route path="/register" element={!token ? <Register onLogin={handleLogin} /> : <Navigate to="/app/dashboard" replace />} />
-          <Route path="/forgot-password" element={!token ? <ForgotPassword /> : <Navigate to="/app/dashboard" replace />} />
-          <Route path="/reset-password/:token" element={!token ? <ResetPassword /> : <Navigate to="/app/dashboard" replace />} />
-          <Route path="/verify-email/:token" element={<VerifyEmail onVerificationSuccess={handleVerificationSuccess} />} />
-          <Route path="/invite/:token" element={<Invite currentUser={currentUser} />} />
-          
-          <Route path="/app" element={token && currentUser ? <UploadProvider><AppShell currentUser={currentUser} onLogout={handleLogout} /></UploadProvider> : <Navigate to="/login" replace />}>
-            <Route path="dashboard" element={<VerifiedGuard><Dashboard currentUser={currentUser} /></VerifiedGuard>} />
-            <Route path="review" element={<RoleGuard allowedRoles={['admin', 'reviewer', 'editor']}><VerifiedGuard><Inspector /></VerifiedGuard></RoleGuard>} />
-            <Route path="admin/users" element={<RoleGuard allowedRoles={['admin']}><VerifiedGuard><UserManagement currentUser={currentUser} /></VerifiedGuard></RoleGuard>} />
-            <Route path="admin/jobs" element={<RoleGuard allowedRoles={['admin']}><VerifiedGuard><JobMonitor /></VerifiedGuard></RoleGuard>} />
-            <Route path="uploads" element={<RoleGuard allowedRoles={['admin', 'editor']}><VerifiedGuard><Upload /></VerifiedGuard></RoleGuard>} />
-            <Route path="organized-videos" element={<RoleGuard allowedRoles={['admin', 'editor']}><VerifiedGuard><OrganizedVideos /></VerifiedGuard></RoleGuard>} />
-            <Route path="settings" element={<VerifiedGuard><Settings currentUser={currentUser} /></VerifiedGuard>} />
-            <Route path="*" element={<Navigate to="dashboard" replace />} />
-          </Route>
-          
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </GoogleOAuthProvider>
+    <ErrorBoundary>
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <BrowserRouter>
+          <Suspense fallback={<LoadingFallback />}>
+            <Routes>
+              <Route path="/" element={<Landing />} />
+
+              <Route path="/login" element={!token ? <Login onLogin={handleLogin} /> : (currentUser?.email_verified ? <Navigate to="/app/dashboard" replace /> : <Login onLogin={handleLogin} currentUser={currentUser} onLogout={handleLogout} />)} />
+
+              <Route path="/register" element={!token ? <Register onLogin={handleLogin} /> : <Navigate to="/app/dashboard" replace />} />
+              <Route path="/forgot-password" element={!token ? <ForgotPassword /> : <Navigate to="/app/dashboard" replace />} />
+              <Route path="/reset-password/:token" element={!token ? <ResetPassword /> : <Navigate to="/app/dashboard" replace />} />
+              <Route path="/verify-email/:token" element={<VerifyEmail onVerificationSuccess={handleVerificationSuccess} />} />
+              <Route path="/invite/:token" element={<Invite currentUser={currentUser} />} />
+
+              <Route path="/app" element={token && currentUser ? <UploadProvider><AppShell currentUser={currentUser} onLogout={handleLogout} /></UploadProvider> : <Navigate to="/login" replace />}>
+                <Route path="dashboard" element={<VerifiedGuard><Dashboard currentUser={currentUser} /></VerifiedGuard>} />
+                <Route path="review" element={<RoleGuard allowedRoles={['admin', 'reviewer', 'editor']}><VerifiedGuard><Inspector /></VerifiedGuard></RoleGuard>} />
+                <Route path="admin/users" element={<RoleGuard allowedRoles={['admin']}><VerifiedGuard><UserManagement currentUser={currentUser} /></VerifiedGuard></RoleGuard>} />
+                <Route path="admin/jobs" element={<RoleGuard allowedRoles={['admin']}><VerifiedGuard><JobMonitor /></VerifiedGuard></RoleGuard>} />
+                <Route path="uploads" element={<RoleGuard allowedRoles={['admin', 'editor']}><VerifiedGuard><Upload /></VerifiedGuard></RoleGuard>} />
+                <Route path="organized-videos" element={<RoleGuard allowedRoles={['admin', 'editor']}><VerifiedGuard><OrganizedVideos /></VerifiedGuard></RoleGuard>} />
+                <Route path="settings" element={<VerifiedGuard><Settings currentUser={currentUser} /></VerifiedGuard>} />
+                <Route path="*" element={<Navigate to="dashboard" replace />} />
+              </Route>
+
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </GoogleOAuthProvider>
+    </ErrorBoundary>
   );
 }

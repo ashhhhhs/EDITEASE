@@ -11,6 +11,17 @@
   color: var(--text-primary);
 }
 
+/* ─── Mouse spotlight (v2 diorama) ───────────────── */
+.lp2-spot {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(420px circle at var(--gx, 50vw) var(--gy, 30vh),
+              rgba(88, 166, 255, 0.08), transparent 70%);
+  transition: background 0.4s var(--ease-cinematic, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
 /* ─── Scroll Progress & Curtain ──────────────────── */
 .scroll-progress {
   position: fixed;
@@ -137,6 +148,9 @@
 
 .landing-logo {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   text-decoration: none;
   color: var(--text-primary);
   font-size: 1.28rem;
@@ -144,8 +158,23 @@
   letter-spacing: -0.03em;
 }
 
+.landing-logo-mark {
+  display: block;
+  filter: drop-shadow(0 6px 18px rgba(88, 166, 255, 0.28));
+  transition: transform var(--duration-fast, 0.2s) var(--ease-cinematic, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+.landing-logo-text {
+  background: var(--gradient-brand, linear-gradient(135deg, #58a6ff, #a371f7));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  position: relative;
+}
+
 /* Glowing accent underline on hover */
-.landing-logo::after {
+.landing-logo-text::after {
   content: '';
   display: block;
   position: absolute;
@@ -153,12 +182,15 @@
   left: 0;
   height: 2px;
   width: 0;
-  background: linear-gradient(90deg, var(--accent), #a371f7);
+  background: linear-gradient(90deg, var(--accent), var(--purple, #a371f7));
   border-radius: 999px;
   transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.landing-logo:hover::after {
+.landing-logo:hover .landing-logo-text::after {
   width: 100%;
+}
+.landing-logo:hover .landing-logo-mark {
+  transform: rotate(-6deg) scale(1.05);
 }
 
 .landing-links {
@@ -310,7 +342,8 @@
   line-height: 1.7;
 }
 
-.hero-visual {
+.hero-visual,
+.lp2-hero-stage {
   position: relative;
   min-height: 620px;
   display: flex;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wand2, AlertTriangle, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
@@ -16,7 +16,9 @@ export default function Register({ onLogin }) {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [accountCreated, setAccountCreated] = useState(false);
 
   // Password strength
   const score = zxcvbn(password).score; // 0 to 4
@@ -41,24 +43,38 @@ export default function Register({ onLogin }) {
     }
     
     setError(null);
+    setSuccess(null);
     setLoading(true);
     
     try {
       const res = await axios.post(`${API_BASE}/register`, {
-        email,
+        email: email.trim().toLowerCase(),
         password,
         confirm_password: confirmPassword,
         name,
       });
       if (res.data.ok) {
-        // Auto sign-in after successful registration
-        const loginRes = await axios.post(`${API_BASE}/login`, { email, password });
-        if (loginRes.data.token) {
-          onLogin(loginRes.data.token, loginRes.data.user || loginRes.data);
+        try {
+          // Registration already succeeded; never report a later sign-in issue as signup failure.
+          const loginRes = await axios.post(`${API_BASE}/login`, {
+            email: email.trim().toLowerCase(),
+            password,
+          });
+          if (loginRes.data.token) {
+            onLogin(loginRes.data.token, loginRes.data.user || loginRes.data);
+            return;
+          }
+        } catch (loginErr) {
+          // Fall through to the verified account-created state below.
         }
+
+        setAccountCreated(true);
+        setSuccess('Account created. Sign in with this email, then verify your inbox to unlock uploads and organization.');
+      } else {
+        setError(res.data.error || 'Could not create your account. Please try again.');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed. The email might already be in use.');
+      setError(err.response?.data?.error || 'Could not create your account. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -97,9 +113,14 @@ export default function Register({ onLogin }) {
 
   return (
     <AuthShell
-      title="Create Account"
-      subtitle="Sign up to join EditEase"
+      title="Create your account"
+      subtitle="Start sorting footage in minutes, not hours."
+      asideEyebrow="Sign up"
+      asideHeadline="Built for teams that ship on tight schedules."
+      asideLede="Upload, analyze, review, and export — one pipeline from raw footage to organized clips."
+      split
       error={error}
+      success={success}
       maxWidth={440}
     >
         <div style={{ marginBottom: 'var(--space-24)', display: 'flex', justifyContent: 'center' }}>
@@ -195,8 +216,8 @@ export default function Register({ onLogin }) {
             </label>
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ marginTop: 'var(--space-12)', width: '100%', padding: 'var(--space-12)', fontSize: '1rem' }} disabled={loading || !agreedToTerms || password.length < 8 || !passwordsMatch}>
-            {loading ? <><Loader2 size={18} className="spin" /> Creating Account...</> : 'Get Started'}
+          <button type="submit" className="btn btn-primary" style={{ marginTop: 'var(--space-12)', width: '100%', padding: 'var(--space-12)', fontSize: '1rem' }} disabled={loading || accountCreated || !agreedToTerms || password.length < 8 || !passwordsMatch}>
+            {loading ? <><Loader2 size={18} className="spin" /> Creating Account...</> : accountCreated ? 'Account Created' : 'Get Started'}
           </button>
         </form>
 

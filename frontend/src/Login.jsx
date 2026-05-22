@@ -5,35 +5,60 @@ import { Link } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { API_BASE } from './config';
 import AuthShell from './components/AuthShell';
+import { useFormValidation, validationRules } from './hooks/useFormValidation';
+import { FormInput, FormButton } from './components/FormComponents';
 
 export default function Login({ onLogin, currentUser, onLogout }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // Form validation setup
+  const {
+    values,
+    errors,
+    touched,
+    isSubmitting,
+    handleChange,
+    handleBlur,
+    handleSubmit,
+    resetForm,
+  } = useFormValidation(
+    {
+      email: '',
+      password: '',
+    },
+    {
+      email: {
+        ...validationRules.required('Email is required'),
+        ...validationRules.email(),
+      },
+      password: {
+        ...validationRules.required('Password is required'),
+        ...validationRules.minLength(6, 'Password must be at least 6 characters'),
+      },
+    }
+  );
+
+  const handleFormSubmit = async (formValues) => {
     setError(null);
-    setLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}/login`, { email, password });
+      const res = await axios.post(`${API_BASE}/login`, {
+        email: formValues.email,
+        password: formValues.password,
+      });
       if (res.data.token) {
         onLogin(res.data.token, res.data.user || res.data);
+        resetForm();
       } else {
         setError(res.data.error || 'Login failed');
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Error connecting to server');
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleGoogleSuccess = async (credentialResponse) => {
     setError(null);
-    setLoading(true);
     try {
       const res = await axios.post(`${API_BASE}/auth/google`, {
         token: credentialResponse.credential
@@ -53,8 +78,6 @@ export default function Login({ onLogin, currentUser, onLogout }) {
       } else {
         setError(err.response?.data?.error || 'Error connecting to server');
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -64,17 +87,17 @@ export default function Login({ onLogin, currentUser, onLogout }) {
 
   if (currentUser && !currentUser.email_verified) {
     return (
-      <AuthShell 
-        title="Verify Your Email" 
+      <AuthShell
+        title="Verify Your Email"
         subtitle="You need to verify your email address to access your workspace."
       >
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-24)', color: 'var(--text-secondary)' }}>
           We've sent a verification link to <strong>{currentUser.email}</strong>.
           Please check your inbox and click the link to activate your account.
         </div>
-        <button 
-          onClick={onLogout} 
-          className="btn" 
+        <button
+          onClick={onLogout}
+          className="btn"
           style={{ width: '100%', justifyContent: 'center' }}
         >
           Sign Out
@@ -84,9 +107,11 @@ export default function Login({ onLogin, currentUser, onLogout }) {
   }
 
   return (
-    <AuthShell 
-      title="Welcome to EditEase" 
-      subtitle="Sign in to continue to your workspace" 
+    <AuthShell
+      title="Welcome back"
+      subtitle="Pick up where you left off in the review queue."
+      asideEyebrow="Sign in"
+      split
       error={error}
     >
       <div style={{ marginBottom: 'var(--space-24)', display: 'flex', justifyContent: 'center' }}>
@@ -100,26 +125,31 @@ export default function Login({ onLogin, currentUser, onLogout }) {
             width="320px"
           />
         </div>
-        
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)', marginBottom: 'var(--space-24)', color: 'var(--text-muted)' }}>
           <div style={{ flex: 1, height: '1px', background: 'var(--border-default)' }} />
           <span style={{ fontSize: '12px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>or</span>
           <div style={{ flex: 1, height: '1px', background: 'var(--border-default)' }} />
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-20)' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: 'var(--space-8)', fontSize: 'var(--font-small)', fontWeight: 500, color: 'var(--text-primary)' }}>Email</label>
-            <input 
-              type="email" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)} 
-              required 
-              placeholder="jane@example.com"
-              autoFocus
-            />
-          </div>
-          
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          handleSubmit(handleFormSubmit);
+        }} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-20)' }}>
+          <FormInput
+            name="email"
+            label="Email"
+            type="email"
+            value={values.email}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            error={errors.email}
+            touched={touched.email}
+            placeholder="jane@example.com"
+            required
+            autoFocus
+          />
+
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--space-8)' }}>
               <label style={{ fontSize: 'var(--font-small)', fontWeight: 500, color: 'var(--text-primary)' }}>Password</label>
@@ -128,15 +158,31 @@ export default function Login({ onLogin, currentUser, onLogout }) {
               </Link>
             </div>
             <div style={{ position: 'relative' }}>
-              <input 
-                type={showPassword ? "text" : "password"} 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-                required 
+              <input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                value={values.password}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                required
                 placeholder="Enter password"
-                style={{ paddingRight: '40px' }}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  paddingRight: '40px',
+                  backgroundColor: 'var(--surface-base)',
+                  border: `1px solid ${errors.password && touched.password ? 'var(--danger)' : 'var(--border-subtle)'}`,
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  color: 'var(--text-primary)',
+                  outline: 'none',
+                  transition: 'all 0.2s',
+                  ...(errors.password && touched.password && {
+                    boxShadow: '0 0 0 3px rgba(218, 54, 51, 0.1)',
+                  }),
+                }}
               />
-              <button 
+              <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, display: 'flex' }}
@@ -145,11 +191,47 @@ export default function Login({ onLogin, currentUser, onLogout }) {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            {errors.password && touched.password && (
+              <div
+                role="alert"
+                style={{
+                  marginTop: '6px',
+                  fontSize: '0.875rem',
+                  color: 'var(--danger)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                {errors.password}
+              </div>
+            )}
           </div>
-          
-          <button type="submit" className="btn btn-primary" style={{ marginTop: 'var(--space-8)', width: '100%', padding: 'var(--space-12)', fontSize: '1rem' }} disabled={loading}>
-            {loading ? <><Loader2 size={18} className="spin" /> Signing In...</> : 'Sign In'}
-          </button>
+
+          <FormButton
+            type="submit"
+            variant="primary"
+            size="large"
+            loading={isSubmitting}
+            disabled={isSubmitting}
+            style={{ marginTop: 'var(--space-8)', width: '100%' }}
+          >
+            {isSubmitting ? 'Signing In...' : 'Sign In'}
+          </FormButton>
         </form>
 
         <div style={{ textAlign: 'center', marginTop: 'var(--space-32)', fontSize: 'var(--font-small)', color: 'var(--text-secondary)' }}>

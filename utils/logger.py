@@ -11,6 +11,11 @@ def setup_logger(name: str) -> logging.Logger:
     # Prevent adding handlers multiple times if instantiated multiple times
     if not logger.handlers:
         logger.setLevel(logging.INFO)
+
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
         
         # Create console handler
         console_handler = logging.StreamHandler(sys.stdout)

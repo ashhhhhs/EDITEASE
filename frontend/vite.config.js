@@ -13,4 +13,30 @@ export default defineConfig({
       ],
     },
   },
+  build: {
+    // Optimize chunk splitting
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor chunks for better caching
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-vendor': ['lucide-react', 'recharts'],
+          'auth-vendor': ['@react-oauth/google'],
+          'utils-vendor': ['axios', 'gsap'],
+        },
+        // Prevent large chunks
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+      },
+    },
+    // Optimize chunk size warnings
+    chunkSizeWarningLimit: 1000,
+    // Enable source maps in production for debugging
+    sourcemap: false,
+  },
+  // Optimize dependencies
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom', 'axios'],
+  },
 })

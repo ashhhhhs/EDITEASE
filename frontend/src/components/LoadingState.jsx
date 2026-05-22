@@ -1,6 +1,22 @@
 import React from 'react';
 
 export default function LoadingState({ message = 'Loading...', type = 'default' }) {
+  if (type === 'cards') {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 'var(--space-20)', padding: 'var(--space-24)' }}>
+        {[1, 2, 3, 4, 5, 6].map(i => (
+          <div key={i} className="panel" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="skeleton" style={{ width: '100%', height: '60px', borderRadius: '0' }} />
+            <div style={{ padding: 'var(--space-12)' }}>
+              <div className="skeleton" style={{ width: '65%', height: '14px', marginBottom: '8px' }} />
+              <div className="skeleton" style={{ width: '40%', height: '12px' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   if (type === 'table') {
     return (
       <div style={{ padding: 'var(--space-24)', display: 'flex', flexDirection: 'column', gap: 'var(--space-16)' }}>

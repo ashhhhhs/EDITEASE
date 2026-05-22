@@ -5,7 +5,9 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import SplitType from 'split-type';
 import Lenis from 'lenis';
+import logoMark from './assets/logo-mark.svg';
 import './landing.css';
+import './landing-v2.css';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -164,16 +166,254 @@ function CapPanel({ cap }) {
   );
 }
 
+/* ─── 3D hooks ────────────────────────────────────────────────── */
+function useMouseTilt(strength = 1) {
+  const ref = useRef(null);
+  const target = useRef({ x: 0, y: 0 });
+  const current = useRef({ x: 0, y: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let raf;
+    const onMove = (e) => {
+      const r = el.getBoundingClientRect();
+      target.current.x = ((e.clientX - (r.left + r.width / 2)) / (window.innerWidth / 2)) * strength;
+      target.current.y = ((e.clientY - (r.top + r.height / 2)) / (window.innerHeight / 2)) * strength;
+    };
+    const tick = () => {
+      const k = 0.08;
+      current.current.x += (target.current.x - current.current.x) * k;
+      current.current.y += (target.current.y - current.current.y) * k;
+      el.style.setProperty('--mx', current.current.x.toFixed(3));
+      el.style.setProperty('--my', current.current.y.toFixed(3));
+      raf = requestAnimationFrame(tick);
+    };
+    window.addEventListener('mousemove', onMove);
+    raf = requestAnimationFrame(tick);
+    return () => { window.removeEventListener('mousemove', onMove); cancelAnimationFrame(raf); };
+  }, [strength]);
+  return ref;
+}
+
+function useIdleDrift(ref, period = 8000, amp = 1) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let raf;
+    const t0 = performance.now();
+    const tick = (t) => {
+      const phase = ((t - t0) / period) * Math.PI * 2;
+      el.style.setProperty('--idle-x', (Math.sin(phase) * amp).toFixed(3));
+      el.style.setProperty('--idle-y', (Math.cos(phase * 0.7) * amp).toFixed(3));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [ref, period, amp]);
+}
+
+function useReveal() {
+  useEffect(() => {
+    const els = document.querySelectorAll('[data-reveal]');
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.15 });
+    els.forEach(el => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+}
+
+/* ─── Film reel SVG ───────────────────────────────────────────── */
+const FilmReel = ({ size = 120 }) => (
+  <svg className="film-reel" viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
+    <defs>
+      <radialGradient id="reel-grad" cx="50%" cy="50%">
+        <stop offset="0%" stopColor="#0d1117"/>
+        <stop offset="60%" stopColor="#161b22"/>
+        <stop offset="100%" stopColor="#0d1117"/>
+      </radialGradient>
+    </defs>
+    <circle cx="50" cy="50" r="48" fill="url(#reel-grad)" stroke="rgba(255,255,255,.10)" />
+    <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,.05)" />
+    <g className="reel-spin" style={{ transformOrigin: '50px 50px' }}>
+      {[0, 60, 120, 180, 240, 300].map(a => (
+        <g key={a} transform={`rotate(${a} 50 50)`}>
+          <ellipse cx="50" cy="22" rx="9" ry="6" fill="rgba(13,17,23,.95)" stroke="rgba(255,255,255,.08)" />
+        </g>
+      ))}
+      <circle cx="50" cy="50" r="6" fill="#58a6ff" stroke="rgba(255,255,255,.15)" />
+    </g>
+  </svg>
+);
+
+/* ─── 3D Hero Diorama ─────────────────────────────────────────── */
+const HeroDiorama = () => {
+  const stageRef = useMouseTilt(1);
+  const idleRef = useRef(null);
+  useIdleDrift(idleRef, 9000, 1);
+
+  return (
+    <div className="diorama" ref={stageRef}>
+      <div className="diorama-spot" />
+      <div className="diorama-stage" ref={idleRef}>
+        <div className="layer plane-shadow" />
+        <div className="layer plane-sidebar">
+          <div className="ds-rail">
+            <div className="ds-rail-dot active" />
+            <div className="ds-rail-dot" />
+            <div className="ds-rail-dot" />
+            <div className="ds-rail-dot" />
+          </div>
+          <div className="ds-list">
+            <div className="ds-row active"><i /><span /></div>
+            <div className="ds-row"><i /><span /></div>
+            <div className="ds-row"><i /><span /></div>
+            <div className="ds-row"><i /><span /></div>
+            <div className="ds-row short"><i /><span /></div>
+          </div>
+        </div>
+        <div className="layer plane-canvas">
+          <div className="dc-bar">
+            <span className="dc-dot r" /><span className="dc-dot y" /><span className="dc-dot g" />
+            <span className="dc-title">editease / scene-board · take 04</span>
+            <span className="dc-rec"><span />REC</span>
+          </div>
+          <div className="dc-grid">
+            <div className="dc-shot wide">
+              <div className="dc-thumb tone-blue"><div className="dc-scan" /><div className="dc-noise" /></div>
+              <div className="dc-meta">
+                <span className="dc-tag tag-blue">DIALOGUE · 0:42</span>
+                <strong>Interview close-up</strong>
+              </div>
+            </div>
+            <div className="dc-shot">
+              <div className="dc-thumb tone-amber"><div className="dc-scan d2" /></div>
+              <div className="dc-meta">
+                <span className="dc-tag tag-amber">MOTION · 0:18</span>
+                <strong>Crowd energy</strong>
+              </div>
+            </div>
+            <div className="dc-shot">
+              <div className="dc-thumb tone-green"><div className="dc-scan d3" /></div>
+              <div className="dc-meta">
+                <span className="dc-tag tag-green">PRODUCT · 0:09</span>
+                <strong>Detail shot</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="layer plane-timeline">
+          <div className="tl-head">
+            <span className="tl-time">00:00:42:18</span>
+            <div className="tl-controls"><span /><span className="play" /><span /></div>
+            <span className="tl-rate">24 FPS</span>
+          </div>
+          <div className="tl-tracks">
+            <div className="tl-track">
+              <div className="tl-clip a" /><div className="tl-clip b" /><div className="tl-clip c" />
+            </div>
+            <div className="tl-track sub">
+              <div className="tl-clip d" /><div className="tl-clip e" />
+            </div>
+          </div>
+          <div className="tl-playhead" />
+        </div>
+        <div className="layer plane-tags">
+          <div className="float-tag tag-blue">
+            <span className="tag-dot" />
+            <div><b>+ Speaker tag</b><em>auto-detected</em></div>
+          </div>
+          <div className="float-tag tag-purple">
+            <span className="tag-dot" />
+            <div><b>4 emotions</b><em>warmth · focus · joy · calm</em></div>
+          </div>
+          <div className="float-tag tag-green">
+            <span className="tag-dot" />
+            <div><b>Approved</b><em>ready for export</em></div>
+          </div>
+        </div>
+        <div className="layer plane-reel">
+          <FilmReel size={140} />
+        </div>
+      </div>
+      <div className="diorama-floor" />
+    </div>
+  );
+};
+
+/* ─── 3D Capability card ──────────────────────────────────────── */
+const CapCard3D = ({ c, i }) => {
+  const ref = useRef(null);
+  const onMove = useCallback((e) => {
+    const el = ref.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty('--cx', (((e.clientX - r.left) / r.width) - 0.5).toFixed(3));
+    el.style.setProperty('--cy', (((e.clientY - r.top) / r.height) - 0.5).toFixed(3));
+  }, []);
+  const onLeave = useCallback(() => {
+    const el = ref.current; if (!el) return;
+    el.style.setProperty('--cx', '0'); el.style.setProperty('--cy', '0');
+  }, []);
+  const accents = ['blue', 'purple', 'green', 'blue'];
+  return (
+    <div
+      ref={ref}
+      className={`lp2-cap accent-${accents[i % 4]}`}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      data-reveal
+      style={{ '--rd': `${i * 90}ms` }}
+    >
+      <div className="lp2-cap-glow" />
+      <div className="lp2-cap-kicker mono-caps">{c.kicker}</div>
+      <h3 className="lp2-cap-title">{c.title}</h3>
+      <p className="lp2-cap-body">{c.desc}</p>
+      <div className="lp2-cap-arrow">→</div>
+    </div>
+  );
+};
+
+const CAPS_3D = [
+  { kicker: 'Vision',   title: 'Scene-aware indexing',    desc: 'Every shot fingerprinted with composition, motion, and color tags. No manual timecoding.' },
+  { kicker: 'Pipeline', title: '4-step ingest to export', desc: 'A single rail from raw upload to dataset, organized clips, or NLE handoff.' },
+  { kicker: 'Roles',    title: 'Reviewer, editor, admin', desc: 'Surface only what each role needs. Bulk-approve or moderate visually.' },
+  { kicker: 'Export',   title: 'Structured downloads',    desc: 'JSON / CSV manifests or auto-organized folders — batch-ready in one click.' },
+];
+
 /* ─── Main component ──────────────────────────────────────────── */
 export default function Landing() {
   const containerRef = useRef(null);
   const curtainRef = useRef(null);
   const deviceRef = useRef(null);
   const btnLaunchNavRef = useRef(null);
+  const pageSpotRef = useRef(null);
   const [activeCapIdx, setActiveCapIdx] = useState(0);
   const [activeHeroFrame, setActiveHeroFrame] = useState(0);
   const [curtainDone, setCurtainDone] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
   const isLoggedIn = !!localStorage.getItem('token');
+
+  useReveal();
+
+  /* scroll Y for diorama tilt */
+  useEffect(() => {
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => { setScrollY(window.scrollY); ticking = false; });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  /* page spotlight cursor */
+  const onSpotMove = useCallback((e) => {
+    pageSpotRef.current?.style.setProperty('--gx', `${e.clientX}px`);
+    pageSpotRef.current?.style.setProperty('--gy', `${e.clientY}px`);
+  }, []);
 
   const prefersReducedMotion =
     typeof window !== 'undefined' &&
@@ -379,10 +619,14 @@ export default function Landing() {
   return (
     <div
       className="landing-page"
-      ref={containerRef}
-      onMouseMove={onMouseMove}
+      ref={(el) => { containerRef.current = el; pageSpotRef.current = el; }}
+      onMouseMove={(e) => { onMouseMove(e); onSpotMove(e); }}
       onMouseLeave={onMouseLeave}
+      style={{ '--gx': '50vw', '--gy': '30vh' }}
     >
+      {/* mouse spotlight */}
+      <div className="lp2-spot" aria-hidden="true" />
+
       {/* scroll progress */}
       <div className="scroll-progress" aria-hidden="true" />
 
@@ -398,7 +642,10 @@ export default function Landing() {
       {/* ── nav ── */}
       <nav className="landing-nav">
         <div className="landing-container landing-nav-inner">
-          <Link to="/" className="landing-logo">EditEase</Link>
+          <Link to="/" className="landing-logo" aria-label="EditEase home">
+            <img src={logoMark} alt="" width="34" height="34" className="landing-logo-mark" />
+            <span className="landing-logo-text">EditEase</span>
+          </Link>
           <div className="landing-links">
             <a href="#how-it-works" className="landing-nav-link">How it works</a>
             <a href="#capabilities" className="landing-nav-link">Capabilities</a>
@@ -455,53 +702,11 @@ export default function Landing() {
             </div>
           </div>
 
-          <div className="hero-visual fade-up" aria-hidden="true">
-            <div className="hero-visual-glow" />
-            <div className="hero-device" ref={deviceRef}>
-              <div className="hero-device-topbar">
-                <div className="hero-device-dots">
-                  <span className="preview-dot" style={{ background: '#ff5f57' }} />
-                  <span className="preview-dot" style={{ background: '#febc2e' }} />
-                  <span className="preview-dot" style={{ background: '#28c840' }} />
-                </div>
-                <div className="hero-device-title">
-                  editease / live scene board<span className="typing-cursor">|</span>
-                </div>
-              </div>
-              <div className="hero-device-screen">
-                <div className="hero-device-scanline" aria-hidden="true" />
-                <div className="hero-device-sidebar">
-                  <div className="hero-device-sidebar-mark" />
-                  <span className="hero-device-sidebar-line active" />
-                  <span className="hero-device-sidebar-line" />
-                  <span className="hero-device-sidebar-line" />
-                  <span className="hero-device-sidebar-line short" />
-                </div>
-                <div className="hero-shot-grid">
-                  {orderedFrames.map((frame, idx) => (
-                    <article
-                      key={frame.title}
-                      className={`hero-shot-card ${idx === 0 ? 'hero-shot-card-wide' : ''}`}
-                      style={{ '--frame-tone': frame.tone, '--frame-image': `url("${frame.image}")` }}
-                    >
-                      <div className="hero-shot-image" />
-                      <div className="hero-shot-overlay" />
-                      <div className="hero-shot-meta">
-                        <span className="hero-shot-tag">{frame.tag}</span>
-                        <strong>{frame.title}</strong>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-                <div className="hero-timeline">
-                  <div className="hero-timeline-track" />
-                  <div className="hero-timeline-progress" />
-                  <div className="hero-timeline-marker marker-a" />
-                  <div className="hero-timeline-marker marker-b" />
-                  <div className="hero-timeline-marker marker-c" />
-                </div>
-              </div>
-            </div>
+          <div
+            className="lp2-hero-stage fade-up"
+            style={{ '--scroll-tilt': `${Math.min(scrollY * 0.04, 12)}deg` }}
+          >
+            <HeroDiorama />
           </div>
         </div>
       </section>
@@ -513,13 +718,13 @@ export default function Landing() {
             <div className="mono-caps">How it works</div>
             <p>One pipeline from raw footage to structured review-ready clips.</p>
           </div>
-          <div className="steps-progress-bar" />
-          <div className="steps-grid">
-            {STEPS.map(s => (
-              <div key={s.num} className="step-item">
-                <div className="step-num">{s.num}</div>
-                <div className="step-label">{s.label}</div>
-                <div className="step-body">{s.body}</div>
+          <div className="lp2-steps">
+            {STEPS.map((s, i) => (
+              <div key={s.num} className="lp2-step" data-reveal style={{ '--rd': `${i * 90}ms` }}>
+                <div className="lp2-step-num">{s.num}</div>
+                <div className="lp2-step-label">{s.label}</div>
+                <div className="lp2-step-body">{s.body}</div>
+                <div className="lp2-step-bar"><div /></div>
               </div>
             ))}
           </div>
@@ -533,22 +738,8 @@ export default function Landing() {
             <div className="mono-caps">What it does</div>
             <p>Built for teams that need visual intelligence, not a plain upload form.</p>
           </div>
-          <div className="capabilities-grid">
-            <div className="cap-list">
-              {CAPABILITIES.map((cap, idx) => (
-                <button
-                  key={cap.title}
-                  className={`cap-item ${idx === activeCapIdx ? 'active' : ''}`}
-                  onMouseEnter={() => setActiveCapIdx(idx)}
-                  onClick={() => setActiveCapIdx(idx)}
-                  style={{ '--cap-accent': cap.accent }}
-                >
-                  <cap.Icon size={22} className="cap-icon" />
-                  <span className="cap-title">{cap.title}</span>
-                </button>
-              ))}
-            </div>
-            <CapPanel cap={activeCap} />
+          <div className="lp2-caps">
+            {CAPS_3D.map((c, i) => <CapCard3D key={c.title} c={c} i={i} />)}
           </div>
         </div>
       </section>

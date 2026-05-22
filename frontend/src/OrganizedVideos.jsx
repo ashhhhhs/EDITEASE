@@ -98,6 +98,8 @@ function MetadataStrip({ ai }) {
   const scenes = ai.total_scenes_detected;
   const emotion = ai.dominant_emotion;
   const hasFaces = ai.has_faces;
+  const faceSceneCount = ai.face_scene_count;
+  const faceSceneRatio = ai.face_scene_ratio != null ? Math.round(ai.face_scene_ratio * 100) : null;
 
   return (
     <div style={{
@@ -141,7 +143,11 @@ function MetadataStrip({ ai }) {
       {hasFaces != null && (
         <div style={metaRowStyle}>
           <span style={metaKeyStyle}><Eye size={10} /> Faces</span>
-          <span style={metaValStyle}>{hasFaces ? 'Detected' : 'None'}</span>
+          <span style={metaValStyle}>
+            {hasFaces
+              ? `${faceSceneCount ?? 1}/${scenes ?? '?'} scenes${faceSceneRatio != null ? ` (${faceSceneRatio}%)` : ''}`
+              : 'None'}
+          </span>
         </div>
       )}
     </div>

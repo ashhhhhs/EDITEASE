@@ -87,8 +87,9 @@ export default function Inspector() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <PageHeader 
+      <PageHeader
         title="Moderation Queue"
+        eyebrow="REVIEW · QUEUE"
         description="Filter and batch-classify extracted scenes across all processed videos."
       />
 
@@ -101,18 +102,23 @@ export default function Inspector() {
             <h3 style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)', marginBottom: 'var(--space-16)', fontSize: 'var(--font-body)', fontWeight: 600 }}>
               <ListFilter size={16} color="var(--text-secondary)" /> Filters
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-12)' }}>
-              {[
-                { label: 'Review Status', value: fReviewed, setter: setFReviewed, opts: [['','All'],['true','Reviewed'],['false','Unreviewed']] },
-                { label: 'Uncertainty', value: fUncertain, setter: setFUncertain, opts: [['','All'],['true','Uncertain'],['false','Confident']] },
-              ].map(({ label, value, setter, opts }) => (
-                <div key={label}>
-                  <label style={{ display: 'block', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>{label}</label>
-                  <select value={value} onChange={e => setter(e.target.value)}>
-                    {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                  </select>
+            <div className="filter-bar" style={{ flexDirection: 'column', gap: 'var(--space-16)' }}>
+              <div>
+                <div className="mono-caps" style={{ marginBottom: 'var(--space-8)' }}>Review Status</div>
+                <div className="filter-chips">
+                  {[['', 'All'], ['true', 'Reviewed'], ['false', 'Unreviewed']].map(([v, l]) => (
+                    <button key={v} className={`chip${fReviewed === v ? ' active' : ''}`} onClick={() => setFReviewed(v)}>{l}</button>
+                  ))}
                 </div>
-              ))}
+              </div>
+              <div>
+                <div className="mono-caps" style={{ marginBottom: 'var(--space-8)' }}>Uncertainty</div>
+                <div className="filter-chips">
+                  {[['', 'All'], ['true', 'Uncertain'], ['false', 'Confident']].map(([v, l]) => (
+                    <button key={v} className={`chip${fUncertain === v ? ' active' : ''}`} onClick={() => setFUncertain(v)}>{l}</button>
+                  ))}
+                </div>
+              </div>
               <div>
                 <label style={{ display: 'block', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>Scene Type</label>
                 <select value={fLabel} onChange={e => setFLabel(e.target.value)}>
@@ -198,7 +204,7 @@ export default function Inspector() {
                   const isSelected = selectedKeys.has(key);
                   const thumb = thumbUrl(clip);
                   return (
-                    <div key={key} className={`clip-card stagger-item ${isSelected ? 'selected' : ''}`} onClick={() => toggleSelect(key)}>
+                    <div key={key} className={`clip-card stagger-item ${isSelected ? 'selected' : ''}`} onClick={() => toggleSelect(key)} style={isSelected ? { boxShadow: '0 0 0 2px var(--accent), 0 0 20px rgba(88,166,255,0.25)' } : {}}>
                       <div style={{ position: 'absolute', top: 'var(--space-8)', left: 'var(--space-8)', zIndex: 10 }}>
                         {isSelected ? <CheckSquareIcon size={20} color="var(--accent)" style={{ filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.6))' }} /> : <Square size={20} color="#fff" style={{ filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))' }} />}
                       </div>

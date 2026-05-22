@@ -68,7 +68,15 @@ function StatLabel({ children }) {
   return <div style={{ fontSize: 'var(--font-meta)', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 'var(--space-4)' }}>{children}</div>;
 }
 function StatValue({ value, color }) {
-  return <div style={{ fontSize: '2.5rem', fontWeight: 700, lineHeight: 1.1, color: color || 'var(--text-primary)', margin: 'var(--space-8) 0' }}>
+  return <div style={{
+    fontSize: '2.5rem',
+    fontWeight: 700,
+    lineHeight: 1.1,
+    color: color || 'var(--text-primary)',
+    margin: 'var(--space-8) 0',
+    fontVariantNumeric: 'tabular-nums',
+    letterSpacing: '-0.02em',
+  }}>
     <AnimatedNumber target={value || 0} />
   </div>;
 }

@@ -91,7 +91,9 @@ export const UploadProvider = ({ children }) => {
                                id: f.taskId, // Use taskId to correlate
                                status: res.data.status, 
                                error: res.data.status === 'FAILURE' ? 'Processing failed' : null,
-                               exportPath: res.data.status === 'SUCCESS' && res.data.result?.export_path ? res.data.result.export_path : null
+                               exportPath: res.data.status === 'SUCCESS' && res.data.result?.export_path ? res.data.result.export_path : null,
+                               aiMetadata: res.data.status === 'SUCCESS' ? (res.data.result?.ai_metadata || null) : null,
+                               dominantLabel: res.data.status === 'SUCCESS' ? (res.data.result?.dominant_label || null) : null,
                            };
                        } else {
                            // Still processing (STARTED, PROGRESS, etc.)
@@ -120,7 +122,9 @@ export const UploadProvider = ({ children }) => {
                                status: update.status, 
                                error: update.error !== undefined ? update.error : f.error,
                                progressMessage: update.progressMessage !== undefined ? update.progressMessage : f.progressMessage,
-                               exportPath: update.exportPath !== undefined ? update.exportPath : f.exportPath
+                               exportPath: update.exportPath !== undefined ? update.exportPath : f.exportPath,
+                               aiMetadata: update.aiMetadata !== undefined ? update.aiMetadata : f.aiMetadata,
+                               dominantLabel: update.dominantLabel !== undefined ? update.dominantLabel : f.dominantLabel
                            };
                        }
                        return f;

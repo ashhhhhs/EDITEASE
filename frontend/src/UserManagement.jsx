@@ -35,8 +35,8 @@ function InviteModal({ isOpen, onClose, onInvite }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
-      <div className="panel" style={{ width: '400px', backgroundColor: 'var(--surface-panel)', padding: 'var(--space-24)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-default)' }}>
+    <div className="modal-overlay">
+      <div className="modal-glass" style={{ width: '420px', padding: 'var(--space-24)' }}>
         <h3 style={{ margin: '0 0 var(--space-16) 0', fontSize: '18px', fontWeight: 600 }}>Invite Team Member</h3>
         <form onSubmit={handleSubmit}>
           {error && <div className="toast toast-error" style={{ marginBottom: 'var(--space-16)' }}>{error}</div>}
@@ -144,8 +144,9 @@ export default function UserManagement({ currentUser }) {
 
   return (
     <div>
-      <PageHeader 
-        title="User Management" 
+      <PageHeader
+        title="User Management"
+        eyebrow="TEAM · MEMBERS"
         description="Control access and permissions for all users across the platform."
         actions={
           <div style={{ display: 'flex', gap: 'var(--space-8)' }}>
@@ -184,49 +185,50 @@ export default function UserManagement({ currentUser }) {
       />
 
       <ContentSection style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: 'var(--space-16) var(--space-24)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.01)', flexWrap: 'wrap', gap: 'var(--space-12)' }}>
-          <div style={{ display: 'flex', gap: 'var(--space-12)', flex: 1, minWidth: '300px' }}>
-            <div className="input-group" style={{ flex: 1, position: 'relative' }}>
-               <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: 10 }} />
-               <input type="search" placeholder="Search by name or email..." value={search} onChange={e => {setSearch(e.target.value); setPage(1);}} style={{ paddingLeft: 36 }} />
+        <div style={{ padding: 'var(--space-16) var(--space-24)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: 'var(--space-12)', background: 'rgba(255,255,255,0.01)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-12)', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="filter-search" style={{ flex: '1 1 240px' }}>
+              <Search size={14} color="var(--text-muted)" />
+              <input type="search" placeholder="Search by name or email..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
             </div>
-            <div className="input-group">
-              <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }}>
-                <option value="all">Any Role</option>
-                <option value="admin">Admin</option>
-                <option value="reviewer">Reviewer</option>
-                <option value="editor">Editor</option>
-              </select>
+            <select value={`${sortBy}_${sortOrder}`} onChange={e => {
+              const value = e.target.value;
+              const lastIndex = value.lastIndexOf('_');
+              setSortBy(value.substring(0, lastIndex));
+              setSortOrder(value.substring(lastIndex + 1));
+              setPage(1);
+            }} style={{ padding: 'var(--space-8) var(--space-12)', width: 'auto' }}>
+              <option value="created_at_desc">Joined (Newest)</option>
+              <option value="created_at_asc">Joined (Oldest)</option>
+              <option value="last_login_at_desc">Last Seen (Recent)</option>
+              <option value="last_login_at_asc">Last Seen (Oldest)</option>
+              <option value="name_asc">Name (A–Z)</option>
+              <option value="name_desc">Name (Z–A)</option>
+            </select>
+            <span style={{ fontSize: 'var(--font-small)', color: 'var(--text-secondary)', marginLeft: 'auto' }}>Total: {total}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-24)', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
+              <span className="mono-caps" style={{ marginRight: 4 }}>Role</span>
+              <div className="filter-chips">
+                {['all', 'admin', 'reviewer', 'editor'].map(r => (
+                  <button key={r} className={`chip${roleFilter === r ? ' active' : ''}`} onClick={() => { setRoleFilter(r); setPage(1); }}>
+                    {r === 'all' ? 'Any' : r.charAt(0).toUpperCase() + r.slice(1)}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="input-group">
-              <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
-                <option value="all">Any Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-            <div className="input-group">
-              <select value={`${sortBy}_${sortOrder}`} onChange={e => { 
-                const value = e.target.value;
-                const lastIndex = value.lastIndexOf('_');
-                const sort = value.substring(0, lastIndex);
-                const order = value.substring(lastIndex + 1);
-                setSortBy(sort);
-                setSortOrder(order);
-                setPage(1);
-              }}>
-                <option value="created_at_desc">Joined (Newest)</option>
-                <option value="created_at_asc">Joined (Oldest)</option>
-                <option value="last_login_at_desc">Last Seen (Recent)</option>
-                <option value="last_login_at_asc">Last Seen (Oldest)</option>
-                <option value="name_asc">Name (A-Z)</option>
-                <option value="name_desc">Name (Z-A)</option>
-                <option value="role_asc">Role (A-Z)</option>
-                <option value="role_desc">Role (Z-A)</option>
-              </select>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
+              <span className="mono-caps" style={{ marginRight: 4 }}>Status</span>
+              <div className="filter-chips">
+                {['all', 'active', 'inactive'].map(s => (
+                  <button key={s} className={`chip${statusFilter === s ? ' active' : ''}`} onClick={() => { setStatusFilter(s); setPage(1); }}>
+                    {s === 'all' ? 'Any' : s.charAt(0).toUpperCase() + s.slice(1)}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          <span style={{ fontSize: 'var(--font-small)', color: 'var(--text-secondary)' }}>Total: {total}</span>
         </div>
 
         {loading ? (
@@ -247,11 +249,22 @@ export default function UserManagement({ currentUser }) {
                 </tr>
               </thead>
               <tbody>
-                {users.map(u => (
+                {users.map(u => {
+                  const initials = (u.username || u.name || '?').slice(0, 2).toUpperCase();
+                  const avatarClass = u.role === 'admin' ? 'avatar-gradient-admin' : u.role === 'reviewer' ? 'avatar-gradient-reviewer' : 'avatar-gradient-editor';
+                  const lastSeen = u.last_login_at ? new Date(u.last_login_at) : null;
+                  const minsAgo = lastSeen ? (Date.now() - lastSeen.getTime()) / 60000 : Infinity;
+                  const presenceClass = minsAgo < 5 ? 'presence-dot--active' : minsAgo < 60 ? 'presence-dot--recent' : 'presence-dot--idle';
+                  return (
                   <tr key={u._id}>
                     <td>
-                      <div style={{ fontWeight: '600' }}>{u.username || u.name}</div>
-                      <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginTop: 'var(--space-4)' }}>{u.email || 'No email'}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)' }}>
+                        <div className={avatarClass} style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 600, fontSize: 'var(--font-meta)', flexShrink: 0 }}>{initials}</div>
+                        <div>
+                          <div style={{ fontWeight: '600' }}>{u.username || u.name}</div>
+                          <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginTop: 2 }}>{u.email || 'No email'}</div>
+                        </div>
+                      </div>
                     </td>
                     <td><span className={`badge ${u.role === 'admin' ? 'info' : u.role === 'editor' ? 'success' : 'warning'}`}>{u.role}</span></td>
                     <td>
@@ -261,7 +274,12 @@ export default function UserManagement({ currentUser }) {
                       }
                     </td>
                     <td style={{ color: 'var(--text-secondary)' }}>{new Date(u.created_at).toLocaleDateString()}</td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{relativeTime(u.last_login_at)}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)', color: 'var(--text-secondary)' }}>
+                        <span className={`presence-dot ${presenceClass}`} />
+                        {relativeTime(u.last_login_at)}
+                      </div>
+                    </td>
                     <td>
                       {u.id !== currentUser.id && u._id !== currentUser.id ? (
                         <div style={{ display: 'flex', gap: 'var(--space-8)', alignItems: 'center' }}>
@@ -284,7 +302,8 @@ export default function UserManagement({ currentUser }) {
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

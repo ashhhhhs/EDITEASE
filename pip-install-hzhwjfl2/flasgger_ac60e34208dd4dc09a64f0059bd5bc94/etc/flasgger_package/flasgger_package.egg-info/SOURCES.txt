@@ -1,0 +1,11 @@
+MANIFEST.in
+setup.py
+flasgger_package/__init__.py
+flasgger_package/package_specs.yml
+flasgger_package/parameters.yml
+flasgger_package.egg-info/PKG-INFO
+flasgger_package.egg-info/SOURCES.txt
+flasgger_package.egg-info/dependency_links.txt
+flasgger_package.egg-info/not-zip-safe
+flasgger_package.egg-info/requires.txt
+flasgger_package.egg-info/top_level.txt

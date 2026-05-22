@@ -60,6 +60,20 @@ def make_json_safe(obj):
     return obj
 
 
+def log_pipeline_checkpoint(stage: str, video_name: str, status: str, **fields):
+    """Emit a structured checkpoint for cross-stage pipeline tracing."""
+    payload = {
+        "stage": stage,
+        "video": video_name,
+        "status": status,
+        **fields,
+    }
+    logger.info(
+        "PIPELINE_CHECKPOINT %s",
+        json.dumps(make_json_safe(payload), sort_keys=True, default=str),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Frame extraction
 # ---------------------------------------------------------------------------
@@ -217,6 +231,14 @@ def process_video(
 ):
     video_name = os.path.splitext(os.path.basename(video_path))[0]
     logger.info("Processing video: %s", video_name)
+    log_pipeline_checkpoint(
+        "ingestion",
+        video_name,
+        "started",
+        video_path=video_path,
+        base_dir=base_dir,
+        threshold=threshold,
+    )
     if progress_callback:
         progress_callback(f"Found video '{video_name}'. Preparing for deep analysis...")
 
@@ -231,26 +253,46 @@ def process_video(
         cloudinary_public_id = f"editease/videos/{video_name}"
 
     logger.info("DEBUG: [STEP 1] Starting Cloudinary upload for %s", video_name)
+    log_pipeline_checkpoint(
+        "cloud_upload",
+        video_name,
+        "started",
+        public_id=cloudinary_public_id,
+    )
     cloudinary_video_url = cloudinary_service.upload_video(
         video_path, public_id=cloudinary_public_id,
     )
     if cloudinary_video_url:
         logger.info("Video uploaded to Cloudinary: %s", cloudinary_video_url)
+        log_pipeline_checkpoint(
+            "cloud_upload",
+            video_name,
+            "completed",
+            cloudinary_url=cloudinary_video_url,
+        )
         if progress_callback:
             progress_callback("Cloud backup complete. Initiating cut detection...")
     else:
         logger.warning(
             "Cloudinary upload failed for %s — continuing with local path.", video_name,
         )
+        log_pipeline_checkpoint("cloud_upload", video_name, "fallback_local")
         if progress_callback:
             progress_callback("Backup failed. Proceeding with local cut detection...")
 
     logger.info("DEBUG: [STEP 2] Scene detection for %s", video_name)
+    log_pipeline_checkpoint(
+        "scene_detection",
+        video_name,
+        "started",
+        threshold=threshold,
+    )
     if progress_callback:
         progress_callback("Scanning video to detect cuts and transitions...")
     scenes = find_scenes(video_path, threshold=threshold)
     if not scenes:
         logger.warning("No scenes detected for %s, skipping.", video_name)
+        log_pipeline_checkpoint("scene_detection", video_name, "empty")
         if progress_callback:
             progress_callback("Finished scanning. No distinct scenes found.")
         return
@@ -258,6 +300,12 @@ def process_video(
     merged = []
 
     logger.info("DEBUG: [STEP 3] Scene processing loop — %s scenes found.", len(scenes))
+    log_pipeline_checkpoint(
+        "scene_detection",
+        video_name,
+        "completed",
+        scene_count=len(scenes),
+    )
     if progress_callback:
         progress_callback(f"Cut detection complete. Found {len(scenes)} distinct scenes to analyze.")
 
@@ -266,16 +314,34 @@ def process_video(
         start = scene[0].get_seconds()
         end   = scene[1].get_seconds()
         mid   = (start + end) / 2
+        log_pipeline_checkpoint(
+            "scene_processing",
+            video_name,
+            "started",
+            scene_id=idx,
+            start_sec=round(start, 3),
+            end_sec=round(end, 3),
+        )
 
         # ── Thumbnail ──────────────────────────────────────────────────
         thumb_name = f"{video_name}_scene_{idx:03d}.jpg"
         thumb_path = os.path.join(thumbs_dir, thumb_name)
-        extract_frame(video_path, mid, thumb_path)
-
-        thumbnail_url = cloudinary_service.upload_image(
-            thumb_path,
-            public_id=f"editease/thumbnails/{video_name}_scene_{idx:03d}",
+        thumb_ok = extract_frame(video_path, mid, thumb_path)
+        log_pipeline_checkpoint(
+            "frame_extraction",
+            video_name,
+            "completed" if thumb_ok else "failed",
+            scene_id=idx,
+            timestamp=round(mid, 3),
+            thumbnail=thumb_path,
         )
+
+        thumbnail_url = None
+        if thumb_ok:
+            thumbnail_url = cloudinary_service.upload_image(
+                thumb_path,
+                public_id=f"editease/thumbnails/{video_name}_scene_{idx:03d}",
+            )
 
         # ── Emotion sampling ───────────────────────────────────────────
         if progress_callback:
@@ -287,6 +353,16 @@ def process_video(
             end_sec=end,
             thumbs_dir=thumbs_dir,
             scene_id=idx,
+        )
+        log_pipeline_checkpoint(
+            "emotion_sampling",
+            video_name,
+            "completed",
+            scene_id=idx,
+            samples=len(emotion_timeline),
+            face_present=face_any,
+            face_ratio=round(face_ratio, 3),
+            dominant_emotion=dominant_overall,
         )
 
         if progress_callback:
@@ -303,21 +379,30 @@ def process_video(
             end_sec=end,
             thumbnail_path=thumb_path,
         )
+        log_pipeline_checkpoint(
+            "ml_classification",
+            video_name,
+            "completed",
+            scene_id=idx,
+            label=scene_label,
+            confidence=round(float(scene_conf), 4),
+            classifier_used=scene_debug.get("classifier_used", "unknown"),
+        )
 
         # ── Agentic Decision Layer ─────────────────────────────────────
         reviewed  = False
         uncertain = True
         c_used    = scene_debug.get("classifier_used", "")
 
-        if "rule_based" in c_used:
-            # ML was unavailable or fell back already — escalate.
-            scene_debug["agent_action"] = "escalated_low_conf"
-
-        elif scene_conf >= CONF_AUTO_HIGH:
-            # High-confidence ML — auto-accept.
+        if scene_conf >= CONF_AUTO_HIGH:
+            # High-confidence (ML or Rule-Based) — auto-accept.
             reviewed  = True
             uncertain = False
             scene_debug["agent_action"] = "auto_organized_high_conf"
+
+        elif "rule_based" in c_used:
+            # ML fell back and confidence is still below high threshold — escalate.
+            scene_debug["agent_action"] = "escalated_ml_fallback"
 
         else:
             # Medium confidence — run weighted fusion with rule-based.
@@ -332,6 +417,18 @@ def process_video(
             scene_debug["rb_label"]      = rb_label
             scene_debug["rb_conf"]       = round(rb_conf, 4)
             scene_debug["fused_conf"]    = round(scene_conf, 4)
+
+        log_pipeline_checkpoint(
+            "rule_evaluation",
+            video_name,
+            "completed",
+            scene_id=idx,
+            label=scene_label,
+            confidence=round(float(scene_conf), 4),
+            reviewed=reviewed,
+            uncertain=uncertain,
+            action=scene_debug.get("agent_action", "unknown"),
+        )
 
         # ── Build scene record ─────────────────────────────────────────
         merged.append(make_json_safe({
@@ -386,14 +483,52 @@ def process_video(
     out_dir  = os.path.join(base_dir, "scene_indexes")
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"{video_name}_scene_index.json")
+    log_pipeline_checkpoint(
+        "scene_index_storage",
+        video_name,
+        "started",
+        scene_count=len(merged),
+        output_path=out_path,
+    )
 
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(merged, f, indent=2)
 
     logger.info("Saved scene index to %s", out_path)
+    log_pipeline_checkpoint(
+        "scene_index_storage",
+        video_name,
+        "completed",
+        scene_count=len(merged),
+        output_path=out_path,
+    )
 
-    upsert_count = upsert_scene_docs(merged, source_name=os.path.basename(out_path))
+    log_pipeline_checkpoint(
+        "database_storage",
+        video_name,
+        "started",
+        scene_count=len(merged),
+    )
+    try:
+        upsert_count = upsert_scene_docs(merged, source_name=os.path.basename(out_path))
+    except Exception as exc:
+        log_pipeline_checkpoint(
+            "database_storage",
+            video_name,
+            "failed",
+            scene_count=len(merged),
+            error=str(exc),
+        )
+        logger.error("Scene database storage failed for %s: %s", video_name, exc, exc_info=True)
+        raise
     logger.info("Upserted %s scenes into MongoDB for %s", upsert_count, video_name)
+    log_pipeline_checkpoint(
+        "database_storage",
+        video_name,
+        "completed",
+        scene_count=len(merged),
+        upsert_count=upsert_count,
+    )
     if progress_callback:
         progress_callback("Finalizing scene timeline and indexing to database...")
 

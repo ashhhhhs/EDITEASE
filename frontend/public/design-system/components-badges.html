@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>body{margin:0;padding:24px 20px;background:var(--surface-base);font-family:var(--font-sans)}
+  .row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  .badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:500;border:1px solid;gap:6px}
+  .lbl{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:8px}
+  .role{padding:6px 12px;text-transform:capitalize}
+  .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+</style></head><body>
+<div class="lbl">Status badges</div>
+<div class="row">
+  <span class="badge" style="background:rgba(35,134,54,.10);color:#3fb950;border-color:rgba(35,134,54,.20)"><span class="dot"></span>Online</span>
+  <span class="badge" style="background:rgba(35,134,54,.10);color:#3fb950;border-color:rgba(35,134,54,.20)">APPROVED</span>
+  <span class="badge" style="background:rgba(88,166,255,.10);color:#58a6ff;border-color:rgba(88,166,255,.20)">PENDING</span>
+  <span class="badge" style="background:rgba(218,54,51,.10);color:#da3633;border-color:rgba(218,54,51,.20)">FLAGGED</span>
+  <span class="badge" style="background:rgba(210,153,34,.10);color:#d29922;border-color:rgba(210,153,34,.20)">UNCERTAIN</span>
+</div>
+<div class="lbl">Role badges (info variant)</div>
+<div class="row">
+  <span class="badge role" style="background:rgba(88,166,255,.10);color:#58a6ff;border-color:rgba(88,166,255,.20)">admin</span>
+  <span class="badge role" style="background:rgba(88,166,255,.10);color:#58a6ff;border-color:rgba(88,166,255,.20)">reviewer</span>
+  <span class="badge role" style="background:rgba(88,166,255,.10);color:#58a6ff;border-color:rgba(88,166,255,.20)">editor</span>
+</div>
+</body></html>

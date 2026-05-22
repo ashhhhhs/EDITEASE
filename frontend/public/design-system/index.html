@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EditEase — Design System</title>
+  <link rel="stylesheet" href="../colors_and_type.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      padding: 64px clamp(24px, 6vw, 80px);
+      background: var(--surface-base);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      background-image:
+        radial-gradient(circle at 12% 0%, rgba(88, 166, 255, 0.08), transparent 40%),
+        radial-gradient(circle at 88% 6%, rgba(163, 113, 247, 0.08), transparent 36%);
+    }
+    .wrap { max-width: 1280px; margin: 0 auto; }
+    header {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      flex-wrap: wrap; gap: 24px; margin-bottom: 48px;
+    }
+    .kicker {
+      font-family: var(--font-mono); font-size: 12px;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      color: var(--text-muted); margin-bottom: 12px;
+    }
+    h1 {
+      font-size: clamp(2.4rem, 5vw, 4rem);
+      letter-spacing: -0.04em; line-height: 1; margin: 0;
+      background: linear-gradient(135deg, #58a6ff 0%, #a371f7 60%, #d29922 120%);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+    }
+    .lede {
+      max-width: 560px; color: var(--text-secondary);
+      font-size: 1rem; line-height: 1.7; margin: 0;
+    }
+    section { margin-bottom: 64px; }
+    h2 {
+      font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em;
+      margin: 0 0 20px; color: var(--text-primary);
+      display: flex; align-items: center; gap: 12px;
+    }
+    h2::before {
+      content: ''; width: 6px; height: 6px; border-radius: 999px;
+      background: var(--accent); box-shadow: 0 0 10px var(--accent);
+    }
+    .grid {
+      display: grid; gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+    .card {
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 0; border-radius: 14px; overflow: hidden;
+      background: var(--surface-panel);
+      border: 1px solid var(--border-subtle);
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                  border-color 0.2s ease, box-shadow 0.2s ease;
+      text-decoration: none; color: inherit;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(88, 166, 255, 0.35);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    }
+    .card iframe {
+      width: 100%; height: 200px; border: 0;
+      background: var(--surface-base);
+      border-bottom: 1px solid var(--border-subtle);
+      pointer-events: none;
+    }
+    .meta { padding: 14px 16px 16px; }
+    .meta .name {
+      font-size: 0.95rem; font-weight: 600; color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+    .meta .path {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--text-muted); letter-spacing: 0.04em;
+    }
+    footer {
+      margin-top: 80px; padding-top: 24px;
+      border-top: 1px solid var(--border-subtle);
+      color: var(--text-muted); font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <div class="kicker">EditEase · Design System</div>
+        <h1>Living style guide</h1>
+      </div>
+      <p class="lede">A browseable index of tokens, type, and components used across the EditEase web app. Click any tile to open the standalone preview.</p>
+    </header>
+
+    <section>
+      <h2>Brand &amp; atmosphere</h2>
+      <div class="grid">
+        <a class="card" href="brand-logo.html"><iframe src="brand-logo.html"></iframe><div class="meta"><div class="name">Brand logo</div><div class="path">brand-logo.html</div></div></a>
+        <a class="card" href="brand-glow-atmosphere.html"><iframe src="brand-glow-atmosphere.html"></iframe><div class="meta"><div class="name">Glow &amp; atmosphere</div><div class="path">brand-glow-atmosphere.html</div></div></a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Color</h2>
+      <div class="grid">
+        <a class="card" href="colors-surfaces.html"><iframe src="colors-surfaces.html"></iframe><div class="meta"><div class="name">Surfaces</div><div class="path">colors-surfaces.html</div></div></a>
+        <a class="card" href="colors-text.html"><iframe src="colors-text.html"></iframe><div class="meta"><div class="name">Text</div><div class="path">colors-text.html</div></div></a>
+        <a class="card" href="colors-status.html"><iframe src="colors-status.html"></iframe><div class="meta"><div class="name">Status</div><div class="path">colors-status.html</div></div></a>
+        <a class="card" href="colors-accent-purple.html"><iframe src="colors-accent-purple.html"></iframe><div class="meta"><div class="name">Accent / purple</div><div class="path">colors-accent-purple.html</div></div></a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Typography</h2>
+      <div class="grid">
+        <a class="card" href="type-display.html"><iframe src="type-display.html"></iframe><div class="meta"><div class="name">Display</div><div class="path">type-display.html</div></div></a>
+        <a class="card" href="type-headings.html"><iframe src="type-headings.html"></iframe><div class="meta"><div class="name">Headings</div><div class="path">type-headings.html</div></div></a>
+        <a class="card" href="type-body-mono.html"><iframe src="type-body-mono.html"></iframe><div class="meta"><div class="name">Body &amp; mono</div><div class="path">type-body-mono.html</div></div></a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Spacing, radius &amp; motion</h2>
+      <div class="grid">
+        <a class="card" href="spacing-scale.html"><iframe src="spacing-scale.html"></iframe><div class="meta"><div class="name">Spacing scale</div><div class="path">spacing-scale.html</div></div></a>
+        <a class="card" href="radius-shadow.html"><iframe src="radius-shadow.html"></iframe><div class="meta"><div class="name">Radius &amp; shadow</div><div class="path">radius-shadow.html</div></div></a>
+        <a class="card" href="motion-easing.html"><iframe src="motion-easing.html"></iframe><div class="meta"><div class="name">Motion &amp; easing</div><div class="path">motion-easing.html</div></div></a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Components</h2>
+      <div class="grid">
+        <a class="card" href="components-buttons.html"><iframe src="components-buttons.html"></iframe><div class="meta"><div class="name">Buttons</div><div class="path">components-buttons.html</div></div></a>
+        <a class="card" href="components-badges.html"><iframe src="components-badges.html"></iframe><div class="meta"><div class="name">Badges</div><div class="path">components-badges.html</div></div></a>
+        <a class="card" href="components-inputs.html"><iframe src="components-inputs.html"></iframe><div class="meta"><div class="name">Inputs</div><div class="path">components-inputs.html</div></div></a>
+        <a class="card" href="components-cards.html"><iframe src="components-cards.html"></iframe><div class="meta"><div class="name">Cards</div><div class="path">components-cards.html</div></div></a>
+        <a class="card" href="components-nav.html"><iframe src="components-nav.html"></iframe><div class="meta"><div class="name">Nav</div><div class="path">components-nav.html</div></div></a>
+        <a class="card" href="components-stat.html"><iframe src="components-stat.html"></iframe><div class="meta"><div class="name">Stat</div><div class="path">components-stat.html</div></div></a>
+        <a class="card" href="components-clip.html"><iframe src="components-clip.html"></iframe><div class="meta"><div class="name">Clip card</div><div class="path">components-clip.html</div></div></a>
+        <a class="card" href="components-empty-state.html"><iframe src="components-empty-state.html"></iframe><div class="meta"><div class="name">Empty state</div><div class="path">components-empty-state.html</div></div></a>
+      </div>
+    </section>
+
+    <footer>
+      Source of truth for tokens: <code>frontend/src/index.css</code>. Preview pages reference <code>/colors_and_type.css</code>.
+    </footer>
+  </div>
+</body>
+</html>

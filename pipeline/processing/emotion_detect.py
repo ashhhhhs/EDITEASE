@@ -1,11 +1,30 @@
 import os
 import sys
-from deepface import DeepFace
 
 from utils.logger import setup_logger
 from utils.exceptions import EmotionDetectionError
 
 logger = setup_logger("emotion_detect")
+
+DeepFace = None
+_deepface_import_error = None
+
+
+def _ensure_deepface_available():
+    global DeepFace, _deepface_import_error
+    if DeepFace is not None or _deepface_import_error is not None:
+        return
+
+    try:
+        from deepface import DeepFace as _DeepFace
+        DeepFace = _DeepFace
+    except Exception as exc:
+        _deepface_import_error = exc
+        logger.error(
+            "DeepFace import failed: %s. Emotion detection will be skipped.",
+            exc,
+        )
+
 
 def detect_emotion(image_path, enforce_detection=False):
     """
@@ -14,6 +33,10 @@ def detect_emotion(image_path, enforce_detection=False):
       emotion_probs (dict | None)
       confidence (float | None)  # dominant emotion probability
     """
+    _ensure_deepface_available()
+    if _deepface_import_error is not None:
+        return None, None, None
+
     try:
         result = DeepFace.analyze(
             img_path=image_path,

@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>body{margin:0;padding:24px 20px;background:var(--surface-base);color:var(--text-primary);font-family:var(--font-sans)}
+  svg{display:block;margin:0 auto 14px;background:var(--surface-panel);border:1px solid var(--border-subtle);border-radius:10px}
+  .legend{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;font-size:13px}
+  .legend div{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary)}
+  b{color:var(--text-primary)}
+</style></head><body>
+<svg width="660" height="80" viewBox="0 0 660 80" fill="none">
+  <path d="M0 60 C 165 60, 165 20, 660 20" stroke="#58a6ff" stroke-width="2" fill="none"/>
+  <circle cx="0" cy="60" r="4" fill="#58a6ff"/><circle cx="660" cy="20" r="4" fill="#58a6ff"/>
+  <text x="20" y="74" font-family="JetBrains Mono" font-size="10" fill="#8b949e">cubic-bezier(0.16, 1, 0.3, 1)  —  cinematic</text>
+</svg>
+<div class="legend">
+  <div><span><b>fade-up</b></span><span>0.55s · cinematic</span></div>
+  <div><span><b>page enter</b></span><span>0.55s · y 18→0</span></div>
+  <div><span><b>card lift</b></span><span>−3px · 0.3s</span></div>
+  <div><span><b>thumb scale</b></span><span>1.04 · 0.5s</span></div>
+  <div><span><b>curtain lift</b></span><span>0.95s · expo.inOut</span></div>
+  <div><span><b>marquee</b></span><span>35s · linear</span></div>
+</div>
+</body></html>

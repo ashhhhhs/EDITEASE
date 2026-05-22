@@ -51,6 +51,7 @@ class MLClassifier(BaseClassifier):
         self.fallback = RuleBasedClassifier()
         self.device   = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model    = None
+        self.transform = None
         self.idx_to_label: dict[str, str] = {}
 
         models_dir    = os.path.join(config.BASE_DIR, "pipeline", "models")
@@ -63,7 +64,7 @@ class MLClassifier(BaseClassifier):
                     self.idx_to_label = json.load(f)
 
             if os.path.exists(model_path) and self.idx_to_label:
-                self.model = models.resnet18(pretrained=False)
+                self.model = models.resnet18(weights=None)
                 num_ftrs   = self.model.fc.in_features
                 self.model.fc = nn.Linear(num_ftrs, len(self.idx_to_label))
                 self.model.load_state_dict(
@@ -92,6 +93,48 @@ class MLClassifier(BaseClassifier):
             self.model = None
 
     # ------------------------------------------------------------------
+    def prepare_image_tensor(self, thumbnail_path: str) -> torch.Tensor:
+        """Load and transform a thumbnail into the model input tensor."""
+        if self.transform is None:
+            raise RuntimeError("ML transform is unavailable because the model did not load")
+        if not thumbnail_path or not os.path.exists(thumbnail_path):
+            raise FileNotFoundError(f"Thumbnail not found: {thumbnail_path}")
+
+        image = Image.open(thumbnail_path).convert("RGB")
+        return self.transform(image).unsqueeze(0).to(self.device)  # type: ignore[operator]
+
+    # ------------------------------------------------------------------
+    def predict_thumbnail(self, thumbnail_path: str) -> tuple[str, float, dict]:
+        """
+        Run raw ML inference for a thumbnail without rule-based fallback.
+
+        This keeps model-quality tests focused on the PyTorch classifier rather
+        than blending model predictions with the rule-based fallback path.
+        """
+        if self.model is None:
+            raise RuntimeError("ML model is unavailable")
+
+        input_tensor = self.prepare_image_tensor(thumbnail_path)
+
+        with torch.no_grad():
+            outputs = self.model(input_tensor)
+            probs   = torch.nn.functional.softmax(outputs, dim=1)
+            conf_t, predicted = torch.max(probs, 1)
+
+        pred_idx    = str(predicted.item())
+        scene_label = self.idx_to_label.get(pred_idx, "other")
+        ml_conf     = float(conf_t.item())
+        all_probs = {
+            self.idx_to_label.get(str(i), str(i)): round(float(probs[0][i].item()), 4)
+            for i in range(probs.shape[1])
+        }
+
+        return scene_label, ml_conf, {
+            "ml_conf"        : round(ml_conf, 4),
+            "all_class_probs": all_probs,
+        }
+
+    # ------------------------------------------------------------------
     def classify(
         self,
         video_path: str,
@@ -109,17 +152,7 @@ class MLClassifier(BaseClassifier):
 
         # ── Run inference ───────────────────────────────────────────────
         try:
-            image        = Image.open(thumbnail_path).convert("RGB")
-            input_tensor = self.transform(image).unsqueeze(0).to(self.device)  # type: ignore
-
-            with torch.no_grad():
-                outputs = self.model(input_tensor)
-                probs   = torch.nn.functional.softmax(outputs, dim=1)
-                conf_t, predicted = torch.max(probs, 1)
-
-            pred_idx    = str(predicted.item())
-            scene_label = self.idx_to_label.get(pred_idx, "other")
-            ml_conf     = float(conf_t.item())
+            scene_label, ml_conf, ml_debug = self.predict_thumbnail(thumbnail_path)
 
             # ── Per-class threshold check ────────────────────────────────
             threshold = CLASS_THRESHOLDS.get(scene_label, DEFAULT_THRESHOLD)
@@ -139,15 +172,11 @@ class MLClassifier(BaseClassifier):
                 return rb_label, rb_conf, rb_debug
 
             # ── ML wins ─────────────────────────────────────────────────
-            all_probs = {
-                self.idx_to_label.get(str(i), str(i)): round(float(probs[0][i].item()), 4)
-                for i in range(probs.shape[1])
-            }
             debug = {
                 "classifier_used" : "ml_pytorch",
                 "ml_conf"         : round(ml_conf, 4),
                 "ml_threshold"    : threshold,
-                "all_class_probs" : all_probs,
+                "all_class_probs" : ml_debug["all_class_probs"],
             }
             return scene_label, ml_conf, debug
 

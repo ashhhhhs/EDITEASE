@@ -7,7 +7,7 @@ import SplitType from 'split-type';
  * Integrates cinematic SplitType text tumble for titles and GSAP layout fading
  * with strict checks for memory cleanup and reduced-motion states.
  */
-export default function PageHeader({ title, description, actions, breadcrumbs }) {
+export default function PageHeader({ title, description, actions, breadcrumbs, eyebrow, gradientTitle }) {
   const headerRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -86,8 +86,13 @@ export default function PageHeader({ title, description, actions, breadcrumbs })
         </div>
       )}
 
+      {/* Eyebrow */}
+      {eyebrow && (
+        <div className="mono-caps" style={{ color: 'var(--accent)', opacity: 0.8 }}>{eyebrow}</div>
+      )}
+
       {/* Title */}
-      <h1 className="display-title">{title}</h1>
+      <h1 className={`display-title${gradientTitle ? ' display-title--gradient' : ''}`}>{title}</h1>
 
       {/* Description */}
       {description && (

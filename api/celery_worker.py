@@ -1,4 +1,5 @@
 import os
+from collections import Counter
 from celery import Celery
 from pymongo import MongoClient
 import datetime
@@ -85,6 +86,106 @@ def check_if_edited_by_filename(filename: str) -> bool:
     return bool(re.search(pattern, filename.lower()))
 
 
+def build_ai_metadata_from_scenes(scenes: list[dict], video_name: str = "") -> tuple[str, dict]:
+    """
+    Summarize processed scenes into the organized video label and metadata.
+
+    Kept pure so the rule set can be unit-tested without Celery, Cloudinary,
+    MongoDB writes, or a full video-processing run.
+    """
+    scenes = [scene for scene in scenes if isinstance(scene, dict)]
+
+    confident_labels = [
+        scene.get("scene_label", "other")
+        for scene in scenes
+        if scene.get("reviewed") is True
+    ]
+    if not confident_labels:
+        confident_labels = [scene.get("scene_label", "other") for scene in scenes]
+
+    dominant_label = Counter(confident_labels).most_common(1)[0][0] if confident_labels else "other"
+
+    dominant_emotion_votes = Counter(
+        scene.get("dominant_emotion_overall")
+        for scene in scenes
+        if scene.get("dominant_emotion_overall")
+    )
+    dominant_emotion = (
+        dominant_emotion_votes.most_common(1)[0][0]
+        if dominant_emotion_votes else "none"
+    )
+
+    dominant_emotion_conf_samples = []
+    if dominant_emotion != "none":
+        for scene in scenes:
+            for sample in scene.get("emotion_timeline") or []:
+                if (
+                    sample.get("emotion") == dominant_emotion
+                    and sample.get("confidence") is not None
+                ):
+                    try:
+                        dominant_emotion_conf_samples.append(float(sample["confidence"]))
+                    except (TypeError, ValueError):
+                        continue
+
+    dominant_emotion_confidence = (
+        round(sum(dominant_emotion_conf_samples) / len(dominant_emotion_conf_samples), 2)
+        if dominant_emotion_conf_samples else None
+    )
+
+    scene_confidences = []
+    for scene in scenes:
+        try:
+            scene_confidences.append(float(scene.get("scene_confidence", 0) or 0))
+        except (TypeError, ValueError):
+            scene_confidences.append(0.0)
+    avg_conf = sum(scene_confidences) / max(len(scenes), 1)
+
+    face_scene_count = sum(
+        1 for scene in scenes
+        if scene.get("faces", {}).get("face_present_any", False)
+    )
+    face_sample_hits = 0
+    face_sample_total = 0
+    for scene in scenes:
+        timeline = scene.get("emotion_timeline") or []
+        face_sample_total += len(timeline)
+        face_sample_hits += sum(1 for sample in timeline if sample.get("face_detected") is True)
+
+    label_dist = dict(Counter(scene.get("scene_label", "other") for scene in scenes))
+    distinct_significant_labels = [label for label, count in label_dist.items() if count > 0]
+    if len(distinct_significant_labels) >= 3:
+        logger.info(
+            "High scene diversity (%s types) detected for %s. Auto-categorizing as 'edited'.",
+            len(distinct_significant_labels),
+            video_name or "video",
+        )
+        dominant_label = "edited"
+        action_taken = "auto_detected_by_variety"
+    else:
+        action_taken = (
+            scenes[0].get("scene_debug", {}).get("agent_action", "unknown")
+            if scenes else "unknown"
+        )
+
+    ai_metadata = {
+        "dominant_label": dominant_label,
+        "dominant_emotion": dominant_emotion,
+        "dominant_emotion_confidence": dominant_emotion_confidence,
+        "average_confidence": round(avg_conf, 2),
+        "total_scenes_detected": len(scenes),
+        "label_distribution": label_dist,
+        "action_taken": action_taken,
+        "has_faces": face_scene_count > 0,
+        "face_scene_count": face_scene_count,
+        "face_scene_ratio": round(face_scene_count / max(len(scenes), 1), 3),
+        "face_sample_hits": face_sample_hits,
+        "face_sample_total": face_sample_total,
+        "face_sample_ratio": round(face_sample_hits / max(face_sample_total, 1), 3),
+    }
+    return dominant_label, ai_metadata
+
+
 @celery_app.task(bind=True, name="auto_organize_task")
 def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: str | None = None):
     """
@@ -157,50 +258,10 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
             scenes = json.load(f)
 
         # ── Step 4: Determine dominant label ─────────────────────────────────────
-        from collections import Counter
-        confident_labels = [s.get("scene_label", "other") for s in scenes if s.get("reviewed") is True]
-        if not confident_labels:
-            confident_labels = [s.get("scene_label", "other") for s in scenes]
-        dominant_label = Counter(confident_labels).most_common(1)[0][0] if confident_labels else "other"
-
-        dominant_emotion_votes = Counter([s.get("dominant_emotion_overall") for s in scenes if s.get("dominant_emotion_overall")])
-        dominant_emotion = dominant_emotion_votes.most_common(1)[0][0] if dominant_emotion_votes else "none"
-        dominant_emotion_conf_samples = []
-        if dominant_emotion != "none":
-            for scene in scenes:
-                for sample in scene.get("emotion_timeline", []):
-                    if sample.get("emotion") == dominant_emotion and sample.get("confidence") is not None:
-                        try:
-                            dominant_emotion_conf_samples.append(float(sample["confidence"]))
-                        except (TypeError, ValueError):
-                            continue
-        dominant_emotion_confidence = (
-            round(sum(dominant_emotion_conf_samples) / len(dominant_emotion_conf_samples), 2)
-            if dominant_emotion_conf_samples else None
+        dominant_label, ai_metadata = build_ai_metadata_from_scenes(
+            scenes,
+            video_name=video_name,
         )
-        avg_conf = sum(s.get("scene_confidence", 0) for s in scenes) / max(len(scenes), 1)
-        
-        # ── Step 4.5: Variety Check (Post-analysis Smart Detection) ──────────
-        label_dist = dict(Counter([s.get("scene_label", "other") for s in scenes]))
-        # If there are 3 or more distinct labels with significant presence, it's edited.
-        distinct_significant_labels = [l for l, count in label_dist.items() if count > 0]
-        if len(distinct_significant_labels) >= 3:
-            logger.info(f"High scene diversity ({len(distinct_significant_labels)} types) detected for {video_name}. Auto-categorizing as 'edited'.")
-            dominant_label = "edited"
-            action_taken = "auto_detected_by_variety"
-        else:
-            action_taken = scenes[0].get("scene_debug", {}).get("agent_action", "unknown") if scenes else "unknown"
-
-        ai_metadata = {
-            "dominant_label": dominant_label,
-            "dominant_emotion": dominant_emotion,
-            "dominant_emotion_confidence": dominant_emotion_confidence,
-            "average_confidence": round(avg_conf, 2),
-            "total_scenes_detected": len(scenes),
-            "label_distribution": label_dist,
-            "action_taken": action_taken,
-            "has_faces": any(s.get("faces", {}).get("face_present_any", False) for s in scenes)
-        }
     else:
         # ── Heuristic Edited Flow ──────────────────────────────────────────────────
         dominant_label = "edited"
@@ -212,7 +273,12 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
             "total_scenes_detected": 1,
             "label_distribution": {"edited": 1},
             "action_taken": "auto_detected_by_heuristics",
-            "has_faces": False
+            "has_faces": False,
+            "face_scene_count": 0,
+            "face_scene_ratio": 0.0,
+            "face_sample_hits": 0,
+            "face_sample_total": 0,
+            "face_sample_ratio": 0.0,
         }
 
     # ── Step 5: Duplicate detection ───────────────────────────────────────────
@@ -252,6 +318,8 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
             "video": video_name,
             "dominant_label": existing["dominant_label"],
             "duplicate_of": str(existing["_id"]),
+            "export_path": existing.get("cloudinary_public_id"),
+            "ai_metadata": ai_metadata,
         }
 
     # ── Step 6: Move or Upload video to organized folder ────────────────────────────────
@@ -306,6 +374,7 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
         "video": video_name,
         "dominant_label": dominant_label,
         "export_path": actual_pub_id,
+        "ai_metadata": ai_metadata,
     }
 
 

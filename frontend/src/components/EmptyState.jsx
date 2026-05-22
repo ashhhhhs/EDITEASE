@@ -23,12 +23,13 @@ export default function EmptyState({
         width: '64px',
         height: '64px',
         borderRadius: '50%',
-        backgroundColor: 'var(--surface-panel)',
+        background: 'linear-gradient(var(--surface-panel), var(--surface-panel)) padding-box, var(--gradient-brand) border-box',
+        border: '2px solid transparent',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 'var(--space-20)',
-        boxShadow: 'var(--shadow-card)'
+        boxShadow: '0 0 32px rgba(88,166,255,0.1), var(--shadow-card)'
       }}>
         <Icon size={32} color="var(--text-secondary)" />
       </div>

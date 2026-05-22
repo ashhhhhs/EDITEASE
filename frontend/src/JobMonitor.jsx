@@ -98,9 +98,15 @@ export default function JobMonitor() {
         description="Real-time Celery task tracking for server-side processing workflows."
         actions={
           <div style={{ display: 'flex', gap: 'var(--space-12)', alignItems: 'center' }}>
-            <span style={{ fontSize: 'var(--font-meta)', display: 'flex', gap: 'var(--space-8)' }}>
-              <span style={{ color: 'var(--accent)', fontWeight: 500 }}>{summary.running} Running</span>
-              <span style={{ color: 'var(--danger)', fontWeight: 500 }}>{summary.failed} Failed</span>
+            <span style={{ display: 'flex', gap: 'var(--space-8)' }}>
+              <span className="stat-pill stat-pill--running">
+                <span className="pulse-dot" style={{ background: 'var(--accent)' }} />
+                {summary.running} Running
+              </span>
+              <span className="stat-pill stat-pill--failed">
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--danger)', display: 'inline-block', flexShrink: 0 }} />
+                {summary.failed} Failed
+              </span>
             </span>
             <button className="btn icon-only" onClick={fetchJobs} title="Refresh jobs" style={{ padding: 8 }}>
               <RefreshCw size={14} />
@@ -161,7 +167,7 @@ export default function JobMonitor() {
               </thead>
               <tbody>
                 {jobs.map(j => (
-                  <tr key={j._id} className={j.status === 'FAILURE' ? 'row-failure' : ''}>
+                  <tr key={j._id} className={j.status === 'FAILURE' ? 'status-row--failed' : j.status === 'SUCCESS' ? 'status-row--success' : (j.status === 'STARTED' || j.status === 'PENDING') ? 'status-row--running' : ''}>
                     <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--font-meta)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
                         <span title={j.task_id}>{j.task_id.split('-')[0]}...</span>
