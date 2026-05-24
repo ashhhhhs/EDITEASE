@@ -1,0 +1,55 @@
+﻿On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   Requirements.txt
+	modified:   api/blueprints/admin.py
+	modified:   api/blueprints/auth.py
+	modified:   api/blueprints/media.py
+	modified:   api/decorators.py
+	modified:   config.py
+	modified:   frontend/package-lock.json
+	modified:   frontend/package.json
+	modified:   frontend/src/App.jsx
+	modified:   frontend/src/AppShell.jsx
+	modified:   frontend/src/Dashboard.jsx
+	modified:   frontend/src/EditorView.jsx
+	modified:   frontend/src/Inspector.jsx
+	modified:   frontend/src/Landing.jsx
+	modified:   frontend/src/Login.jsx
+	modified:   frontend/src/Register.jsx
+	modified:   frontend/src/Upload.jsx
+	modified:   frontend/src/UserManagement.jsx
+	modified:   frontend/src/index.css
+	modified:   frontend/src/landing.css
+	modified:   services/auth_service.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	EDITEASE_tests2.txt
+	EDITEASE_tests_out.txt
+	err.txt
+	frontend/src/ForgotPassword.jsx
+	frontend/src/Invite.jsx
+	frontend/src/ResetPassword.jsx
+	frontend/src/Settings.jsx
+	frontend/src/VerifyEmail.jsx
+	git_status.txt
+	output.txt
+	pytest_report.xml
+	pytest_report_2.xml
+	pytest_report_3.xml
+	pytest_report_4.xml
+	scene_indexes/grok-video-1aea32f5-5dd8-4d97-8ed2-3031fdabece8_scene_index.json
+	services/invitation_service.py
+	services/reset_token_service.py
+	services/verification_service.py
+	test_report_5.txt
+	tests/test_auth.py
+	tests/test_phase5.py
+	tests/test_runner.py
+	thumbnails/grok-video-1aea32f5-5dd8-4d97-8ed2-3031fdabece8/
+
+no changes added to commit (use "git add" and/or "git commit -a")
