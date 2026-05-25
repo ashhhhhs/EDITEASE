@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Activity, XCircle, CheckCircle2, Loader2, ChevronLeft, ChevronRight, FileVideo, Copy, RefreshCw, XSquare, PlayCircle } from 'lucide-react';
+import { Activity, XCircle, CheckCircle2, Loader2, ChevronLeft, ChevronRight, FileVideo, Copy, RefreshCw, XSquare, PlayCircle, UserRound } from 'lucide-react';
 import PageHeader from './components/PageHeader';
 import ContentSection from './components/ContentSection';
 import LoadingState from './components/LoadingState';
@@ -159,6 +159,7 @@ export default function JobMonitor() {
                   <th>Task ID</th>
                   <th>Type</th>
                   <th>Status</th>
+                  <th>Triggered By</th>
                   <th>Path / Output</th>
                   <th>Timing</th>
                   <th>Duration</th>
@@ -187,6 +188,19 @@ export default function JobMonitor() {
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: 'var(--space-8)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
                           {j.progress_step}
                         </div>
+                      )}
+                    </td>
+                    <td>
+                      {j.initiated_by_user ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)', minWidth: 160 }}>
+                          <UserRound size={14} color="var(--text-muted)" />
+                          <div>
+                            <div style={{ fontSize: 'var(--font-small)', fontWeight: 600 }}>{j.initiated_by_user.name || 'Unnamed user'}</div>
+                            <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)' }}>{j.initiated_by_user.email || j.initiated_by_user.role}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 'var(--font-small)', color: 'var(--text-muted)' }}>System</span>
                       )}
                     </td>
                     <td style={{ maxWidth: '300px' }}>

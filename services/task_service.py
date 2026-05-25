@@ -5,12 +5,44 @@ from api.celery_worker import celery_app, process_video_task, auto_organize_task
 from utils.logger import setup_logger
 from pymongo import MongoClient
 import datetime
+from bson import ObjectId
 
 logger = setup_logger("task_service")
 
 client = MongoClient(config.MONGO_URI)
 db = client[config.DB_NAME]
 tasks_col = db["tasks"]
+
+
+def _attach_initiator_users(jobs):
+    user_ids = []
+    for job in jobs:
+        initiated_by = job.get("initiated_by")
+        if initiated_by and ObjectId.is_valid(str(initiated_by)):
+            user_ids.append(ObjectId(str(initiated_by)))
+
+    if not user_ids:
+        for job in jobs:
+            job["initiated_by_user"] = None
+        return jobs
+
+    users_col = tasks_col.database["users"]
+    users = users_col.find(
+        {"_id": {"$in": list(set(user_ids))}},
+        {"name": 1, "email": 1, "role": 1},
+    )
+    users_by_id = {str(user["_id"]): user for user in users}
+
+    for job in jobs:
+        initiated_by = job.get("initiated_by")
+        user = users_by_id.get(str(initiated_by)) if initiated_by else None
+        job["initiated_by_user"] = {
+            "id": str(user["_id"]),
+            "name": user.get("name"),
+            "email": user.get("email"),
+            "role": user.get("role", "editor"),
+        } if user else None
+    return jobs
 
 def insert_task_record(task_id, task_type, initiated_by=None, input_path=None):
     now = datetime.datetime.utcnow().isoformat()
@@ -113,6 +145,7 @@ def get_paginated_jobs(page=1, limit=20, status=None, task_type=None):
             j["duration_seconds"] = None
         jobs.append(j)
 
+    jobs = _attach_initiator_users(jobs)
     total = tasks_col.count_documents(q)
 
     # Live summary counts (unfiltered for ribbon)
@@ -128,4 +161,5 @@ def get_job_by_task_id(task_id):
     job = tasks_col.find_one({"task_id": task_id})
     if job:
         job["_id"] = str(job["_id"])
+        _attach_initiator_users([job])
     return job

@@ -1296,6 +1296,40 @@ tr.row-failure td:first-child {
   font-variant-numeric: tabular-nums;
 }
 
+.admin-bento-grid,
+.editor-stats-grid,
+.reviewer-dashboard-grid,
+.dashboard-chart-grid {
+  display: grid;
+  gap: var(--space-20);
+  margin-bottom: var(--space-24);
+}
+
+.admin-bento-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.editor-stats-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.reviewer-dashboard-grid,
+.dashboard-chart-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .editor-stats-grid,
+  .reviewer-dashboard-grid,
+  .dashboard-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bento-card {
+    grid-column: span 1 !important;
+  }
+}
+
 .badge.success {
   background: rgba(35, 134, 54, 0.1);
   color: var(--success);

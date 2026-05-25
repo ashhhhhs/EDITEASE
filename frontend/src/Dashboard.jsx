@@ -178,12 +178,7 @@ function AdminOverview() {
       />
 
       {/* ── Bento Grid ── */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: 'var(--space-20)',
-        marginBottom: 'var(--space-24)'
-      }}>
+      <div className="admin-bento-grid">
 
         {/* Wide: Total Clips — primary metric */}
         <BentoCard span={2} accent="var(--accent)" to="/app/organized-videos">
@@ -275,7 +270,7 @@ function AdminOverview() {
       </div>
 
       {/* ── Figurative Charts ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-20)' }}>
+      <div className="dashboard-chart-grid">
         <BentoCard>
           <h3 style={{ margin: '0 0 var(--space-8) 0', fontSize: 'var(--font-title-card)' }}>Review Pipeline Status</h3>
           <p style={{ margin: '0 0 var(--space-16) 0', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)' }}>Distribution of raw clips by human review state.</p>
@@ -421,7 +416,7 @@ function EditorDashboard({ currentUser }) {
       )}
 
       {/* ── Stat cards ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-20)', marginBottom: 'var(--space-24)' }}>
+      <div className="editor-stats-grid">
         <BentoCard accent="var(--accent)">
           <StatLabel><Upload size={13} style={{verticalAlign:'middle',marginRight:4}} /> Total Uploaded</StatLabel>
           <StatValue value={stats?.total} />
@@ -492,7 +487,7 @@ function ReviewerDashboard({ currentUser }) {
         description="Your role is focused on checking assigned AI decisions and keeping review notes accurate."
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(220px, 1fr))', gap: 'var(--space-20)', marginBottom: 'var(--space-24)' }}>
+      <div className="reviewer-dashboard-grid">
         <BentoCard accent="var(--warning)" to="/app/review">
           <StatLabel><CheckSquare size={13} style={{verticalAlign:'middle',marginRight:4}} /> Assigned Review Queue</StatLabel>
           <div style={{ fontSize: 'var(--font-title-card)', color: 'var(--text-primary)', margin: 'var(--space-12) 0' }}>

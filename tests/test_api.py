@@ -147,6 +147,46 @@ def test_reviewer_role_is_assignable(client, monkeypatch):
     assert rv.get_json()["new_role"] == "reviewer"
 
 
+def test_job_list_includes_initiating_user(monkeypatch):
+    """Admin job payloads should identify who triggered each task."""
+    import mongomock
+    from bson import ObjectId
+    from services import task_service
+
+    fake_db = mongomock.MongoClient()["editease"]
+    fake_tasks = fake_db["tasks"]
+    fake_users = fake_db["users"]
+    user_id = ObjectId()
+
+    fake_users.insert_one({
+        "_id": user_id,
+        "name": "Clip Reviewer",
+        "email": "reviewer@example.com",
+        "role": "reviewer",
+    })
+    fake_tasks.insert_one({
+        "task_id": "task-123",
+        "type": "upload",
+        "status": "SUCCESS",
+        "created_at": "2026-05-25T10:00:00",
+        "updated_at": "2026-05-25T10:01:00",
+        "started_at": "2026-05-25T10:00:00",
+        "completed_at": "2026-05-25T10:01:00",
+        "initiated_by": str(user_id),
+        "input_path": "demo.mp4",
+    })
+    monkeypatch.setattr(task_service, "tasks_col", fake_tasks)
+
+    data = task_service.get_paginated_jobs()
+
+    assert data["jobs"][0]["initiated_by_user"] == {
+        "id": str(user_id),
+        "name": "Clip Reviewer",
+        "email": "reviewer@example.com",
+        "role": "reviewer",
+    }
+
+
 def test_cloudinary_service_upload_mock(monkeypatch):
     """Cloudinary upload helper should return the secure CDN URL from the SDK."""
     monkeypatch.setattr(cloudinary_service, "is_configured", lambda: True)
