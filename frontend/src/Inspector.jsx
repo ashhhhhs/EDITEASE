@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, CheckSquare, Search, Save, Settings2, Video, Square, CheckSquare as CheckSquareIcon, ListFilter, Send, ShieldCheck, XCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckSquare, Search, Save, Settings2, Video, Square, CheckSquare as CheckSquareIcon, ListFilter, Send, ShieldCheck, XCircle, UserPlus } from 'lucide-react';
 import { SCENE_LABELS, EMOTIONS } from './constants';
 import PageHeader from './components/PageHeader';
 import LoadingState from './components/LoadingState';
@@ -23,6 +23,7 @@ export default function Inspector({ currentUser }) {
   const [fReviewed, setFReviewed] = useState('false');
   const [fUncertain, setFUncertain] = useState('');
   const [fRequest, setFRequest] = useState(() => searchParams.get('request') || '');
+  const [fAssignedToMe, setFAssignedToMe] = useState(() => searchParams.get('assigned_to_me') || '');
   
   const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [bLabel, setBLabel] = useState('');
@@ -32,6 +33,24 @@ export default function Inspector({ currentUser }) {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [requestReason, setRequestReason] = useState('');
   const [requestLoading, setRequestLoading] = useState(false);
+  const [reviewAssignees, setReviewAssignees] = useState([]);
+  const [selectedAssignee, setSelectedAssignee] = useState('');
+  const [assignmentNote, setAssignmentNote] = useState('');
+
+  useEffect(() => {
+    if (currentUser?.role !== 'admin') return;
+    Promise.all([
+      api.get('/admin/users?limit=200&role=editor&status=active'),
+      api.get('/admin/users?limit=200&role=reviewer&status=active'),
+    ])
+      .then(([editorsRes, reviewersRes]) => {
+        setReviewAssignees([
+          ...(editorsRes.data.users || []),
+          ...(reviewersRes.data.users || []),
+        ]);
+      })
+      .catch(err => toast.error(err.friendlyMessage || 'Failed to load reviewers'));
+  }, [currentUser?.role, toast]);
 
   const fetchClips = async () => {
     setLoading(true);
@@ -42,6 +61,7 @@ export default function Inspector({ currentUser }) {
       if (fReviewed) url += `&reviewed=${fReviewed}`;
       if (fUncertain) url += `&uncertain=${fUncertain}`;
       if (fRequest) url += `&review_request_status=${fRequest}`;
+      if (fAssignedToMe) url += `&assigned_to_me=${fAssignedToMe}`;
       const res = await api.get(url);
       setClips(res.data.results || []);
       setTotal(res.data.total || 0);
@@ -124,6 +144,27 @@ export default function Inspector({ currentUser }) {
     setRequestLoading(false);
   };
 
+  const handleAssignRequests = async () => {
+    if (selectedKeys.size === 0) { toast.warning('No clips selected'); return; }
+    if (!selectedAssignee) { toast.warning('Choose an editor or reviewer'); return; }
+
+    setRequestLoading(true);
+    try {
+      const res = await api.post('/review/requests/assign', {
+        scene_keys: Array.from(selectedKeys),
+        assignee_id: selectedAssignee,
+        note: assignmentNote.trim(),
+      });
+      const assigneeName = res.data.assignee?.name || res.data.assignee?.email || 'selected reviewer';
+      toast.success(`Assigned ${res.data.assigned_count || 0} request${res.data.assigned_count === 1 ? '' : 's'} to ${assigneeName}`);
+      setAssignmentNote('');
+      fetchClips();
+    } catch (err) {
+      toast.error(err.friendlyMessage || 'Failed to assign review requests');
+    }
+    setRequestLoading(false);
+  };
+
   const totalPages = Math.ceil(total / limit) || 1;
   const thumbUrl = (clip) => clip?._id ? `${API_BASE}/thumbnail/${clip._id}` : null;
 
@@ -164,8 +205,16 @@ export default function Inspector({ currentUser }) {
               <div>
                 <div className="mono-caps" style={{ marginBottom: 'var(--space-8)' }}>Admin Request</div>
                 <div className="filter-chips">
-                  {[['', 'All'], ['open', 'Open'], ['resolved', 'Resolved'], ['dismissed', 'Dismissed'], ['__NONE__', 'None']].map(([v, l]) => (
+                  {[['', 'All'], ['open', 'Open'], ['assigned', 'Assigned'], ['resolved', 'Resolved'], ['dismissed', 'Dismissed'], ['__NONE__', 'None']].map(([v, l]) => (
                     <button key={v} className={`chip${fRequest === v ? ' active' : ''}`} onClick={() => setFRequest(v)}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="mono-caps" style={{ marginBottom: 'var(--space-8)' }}>Assignment</div>
+                <div className="filter-chips">
+                  {[['', 'All'], ['true', 'Mine']].map(([v, l]) => (
+                    <button key={v} className={`chip${fAssignedToMe === v ? ' active' : ''}`} onClick={() => setFAssignedToMe(v)}>{l}</button>
                   ))}
                 </div>
               </div>
@@ -224,6 +273,26 @@ export default function Inspector({ currentUser }) {
               {currentUser?.role === 'admin' ? (
                 <>
                   <div className="mono-caps" style={{ marginBottom: 'var(--space-8)' }}>Admin Review Requests</div>
+                  <label style={{ display: 'block', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>Forward To</label>
+                  <select value={selectedAssignee} onChange={e => setSelectedAssignee(e.target.value)} style={{ marginBottom: 'var(--space-8)' }}>
+                    <option value="">Choose editor/reviewer...</option>
+                    {reviewAssignees.map(user => (
+                      <option key={user._id || user.id} value={user._id || user.id}>
+                        {user.name || user.username || user.email} ({user.role})
+                      </option>
+                    ))}
+                  </select>
+                  <textarea
+                    value={assignmentNote}
+                    onChange={e => setAssignmentNote(e.target.value)}
+                    maxLength={500}
+                    placeholder="Optional note for the reviewer/editor"
+                    rows={3}
+                    style={{ resize: 'vertical', minHeight: 72, marginBottom: 'var(--space-8)' }}
+                  />
+                  <button className="btn btn-primary" onClick={handleAssignRequests} disabled={requestLoading || !selectedAssignee} style={{ width: '100%', marginBottom: 'var(--space-12)' }}>
+                    <UserPlus size={14} /> {requestLoading ? 'Assigning...' : 'Assign Selected'}
+                  </button>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-8)' }}>
                     <button className="btn" onClick={() => handleResolveRequests('resolved')} disabled={requestLoading}>
                       <ShieldCheck size={14} /> Resolve
@@ -277,7 +346,7 @@ export default function Inspector({ currentUser }) {
             {loading ? (
               <LoadingState type="grid" />
             ) : clips.length === 0 ? (
-              <EmptyState icon={Search} title="No Clips Found" message="Adjust your filters or reset to browse all clips." action={<button className="btn btn-primary" onClick={() => { setFLabel(''); setFEmotion(''); setFReviewed(''); setFUncertain(''); setFRequest(''); setPage(1); fetchClips(); }}>Reset Filters</button>} />
+              <EmptyState icon={Search} title="No Clips Found" message="Adjust your filters or reset to browse all clips." action={<button className="btn btn-primary" onClick={() => { setFLabel(''); setFEmotion(''); setFReviewed(''); setFUncertain(''); setFRequest(''); setFAssignedToMe(''); setPage(1); fetchClips(); }}>Reset Filters</button>} />
             ) : (
               <div className="clip-grid">
                 {clips.map(clip => {
@@ -301,11 +370,17 @@ export default function Inspector({ currentUser }) {
                           <span className={`badge ${clip.reviewed ? 'success' : 'danger'}`} style={{ fontSize: '0.65rem' }}>{clip.reviewed ? 'Reviewed' : 'Pending'}</span>
                           {clip.uncertain && <span className="badge warning" style={{ fontSize: '0.65rem' }}>Uncertain</span>}
                           {clip.review_request_status === 'open' && <span className="badge info" style={{ fontSize: '0.65rem' }}>Admin Requested</span>}
+                          {clip.review_request_status === 'assigned' && <span className="badge warning" style={{ fontSize: '0.65rem' }}>Assigned Review</span>}
                           {clip.review_request_status === 'resolved' && <span className="badge success" style={{ fontSize: '0.65rem' }}>Request Resolved</span>}
                         </div>
-                        {clip.review_request_status === 'open' && (
+                        {(clip.review_request_status === 'open' || clip.review_request_status === 'assigned') && (
                           <div style={{ marginTop: 'var(--space-8)', fontSize: 'var(--font-meta)', color: 'var(--text-muted)', lineHeight: 1.35 }}>
                             {clip.review_request_reason || 'Admin review requested'}
+                            {clip.review_request_status === 'assigned' && clip.review_assigned_to_name && (
+                              <div style={{ marginTop: 4, color: 'var(--warning)' }}>
+                                Forwarded to {clip.review_assigned_to_name}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

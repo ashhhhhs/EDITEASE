@@ -126,6 +126,13 @@ def search_clips(filters, limit=100, current_user=None):
         else:
             q["review_request_status"] = review_request_status
 
+    assigned_to_me = filters.get("assigned_to_me")
+    if assigned_to_me is not None and current_user:
+        if isinstance(assigned_to_me, str):
+            assigned_to_me = assigned_to_me.lower() in ("true", "1", "yes")
+        if assigned_to_me:
+            q["assigned_to"] = current_user.get("id")
+
     min_duration = filters.get("min_duration")
     max_duration = filters.get("max_duration")
     if min_duration is not None or max_duration is not None:
@@ -200,6 +207,39 @@ def resolve_review_requests(keys, status, note="", current_user=None):
         {"$set": update_fields},
     )
     return {"ok": True, "resolved_count": res.modified_count, "fields": update_fields}
+
+
+def assign_review_requests(keys, assignee, note="", current_user=None):
+    if not keys:
+        return {"error": "scene_keys required", "status": 400}
+    if not current_user or current_user.get("role") != "admin":
+        return {"error": "Only admins can assign review requests.", "status": 403}
+    if not assignee or assignee.get("role") not in ("editor", "reviewer") or not assignee.get("is_active", True):
+        return {"error": "Assignee must be an active editor or reviewer.", "status": 400}
+
+    now = datetime.datetime.utcnow().isoformat()
+    assignee_id = assignee.get("id") or assignee.get("_id")
+    update_fields = {
+        "assigned_to": str(assignee_id),
+        "review_request_status": "assigned",
+        "review_assigned_at": now,
+        "review_assigned_by": current_user.get("id"),
+        "review_assigned_to": str(assignee_id),
+        "review_assigned_to_name": assignee.get("name"),
+        "review_assigned_to_email": assignee.get("email"),
+        "review_assigned_to_role": assignee.get("role"),
+        "review_assignment_note": (note or "").strip()[:500],
+    }
+    res = col.update_many(
+        {"_key": {"$in": keys}, "review_request_status": {"$in": ["open", "assigned"]}},
+        {"$set": update_fields},
+    )
+    return {"ok": True, "assigned_count": res.modified_count, "assignee": {
+        "id": str(assignee_id),
+        "name": assignee.get("name"),
+        "email": assignee.get("email"),
+        "role": assignee.get("role"),
+    }, "fields": update_fields}
 
 def bulk_update_clips(keys, update_data, current_user=None):
     if not keys:

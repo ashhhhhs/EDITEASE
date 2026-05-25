@@ -127,6 +127,7 @@ export default function AppShell({ currentUser, onLogout }) {
   const location = useLocation();
   const role = currentUser?.role || 'editor';
   const [openReviewRequests, setOpenReviewRequests] = useState(0);
+  const [assignedReviewRequests, setAssignedReviewRequests] = useState(0);
   const navDescriptions = {
     Dashboard: 'Your creative hub. Track recent ingests and see what the system is organizing for you.',
     'Review Queue': 'Quickly review and sort ambiguous clips so they land in the right folders.',
@@ -175,6 +176,30 @@ export default function AppShell({ currentUser, onLogout }) {
 
     fetchOpenReviewRequests();
     const timer = setInterval(fetchOpenReviewRequests, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [role, location.pathname]);
+
+  React.useEffect(() => {
+    if (!['editor', 'reviewer'].includes(role)) {
+      setAssignedReviewRequests(0);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchAssignedReviewRequests = async () => {
+      try {
+        const res = await api.get('/search?review_request_status=assigned&assigned_to_me=true&limit=1');
+        if (!cancelled) setAssignedReviewRequests(res.data.total || 0);
+      } catch {
+        if (!cancelled) setAssignedReviewRequests(0);
+      }
+    };
+
+    fetchAssignedReviewRequests();
+    const timer = setInterval(fetchAssignedReviewRequests, 30000);
     return () => {
       cancelled = true;
       clearInterval(timer);
@@ -421,6 +446,16 @@ export default function AppShell({ currentUser, onLogout }) {
               >
                 <Bell size={14} />
                 <span>{openReviewRequests} review request{openReviewRequests === 1 ? '' : 's'}</span>
+              </Link>
+            )}
+            {role !== 'admin' && assignedReviewRequests > 0 && (
+              <Link
+                to="/app/review?request=assigned&assigned_to_me=true"
+                className="workspace-notification-pill"
+                title="Assigned review requests"
+              >
+                <Bell size={14} />
+                <span>{assignedReviewRequests} assigned review{assignedReviewRequests === 1 ? '' : 's'}</span>
               </Link>
             )}
             <button 

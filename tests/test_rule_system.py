@@ -309,6 +309,38 @@ def test_reviewer_search_is_scoped_to_assigned_clips(monkeypatch):
     assert result["query"]["assigned_to"] == "reviewer-1"
 
 
+def test_search_can_filter_to_current_user_assignments(monkeypatch):
+    class FakeCursor:
+        def sort(self, *_args):
+            return self
+
+        def skip(self, *_args):
+            return self
+
+        def limit(self, *_args):
+            return self
+
+        def __iter__(self):
+            return iter([])
+
+    class FakeCollection:
+        def count_documents(self, query):
+            return 0
+
+        def find(self, query):
+            return FakeCursor()
+
+    monkeypatch.setattr(clip_service, "col", FakeCollection())
+
+    result = clip_service.search_clips(
+        {"review_request_status": "assigned", "assigned_to_me": "true"},
+        current_user={"id": "editor-1", "role": "editor"},
+    )
+
+    assert result["query"]["review_request_status"] == "assigned"
+    assert result["query"]["assigned_to"] == "editor-1"
+
+
 def test_reviewer_cannot_update_unassigned_clip(monkeypatch):
     class FakeCollection:
         def find_one(self, query):
@@ -410,3 +442,41 @@ def test_admin_resolves_review_requests(monkeypatch):
     assert fake_col.query == {"_key": {"$in": ["demo::1"]}, "review_request_status": "open"}
     assert fake_col.update["$set"]["review_request_status"] == "resolved"
     assert fake_col.update["$set"]["review_resolved_by"] == "admin-1"
+
+
+def test_admin_assigns_review_request_to_reviewer(monkeypatch):
+    class FakeUpdateResult:
+        modified_count = 2
+
+    class FakeCollection:
+        def update_many(self, query, update):
+            self.query = query
+            self.update = update
+            return FakeUpdateResult()
+
+    fake_col = FakeCollection()
+    monkeypatch.setattr(clip_service, "col", fake_col)
+
+    result = clip_service.assign_review_requests(
+        ["demo::1", "demo::2"],
+        {
+            "id": "reviewer-1",
+            "name": "Reviewer One",
+            "email": "reviewer@example.com",
+            "role": "reviewer",
+            "is_active": True,
+        },
+        "Please check editing quality.",
+        current_user={"id": "admin-1", "role": "admin"},
+    )
+
+    assert result["ok"] is True
+    assert result["assigned_count"] == 2
+    assert fake_col.query == {
+        "_key": {"$in": ["demo::1", "demo::2"]},
+        "review_request_status": {"$in": ["open", "assigned"]},
+    }
+    assert fake_col.update["$set"]["assigned_to"] == "reviewer-1"
+    assert fake_col.update["$set"]["review_request_status"] == "assigned"
+    assert fake_col.update["$set"]["review_assigned_to_role"] == "reviewer"
+    assert fake_col.update["$set"]["review_assignment_note"] == "Please check editing quality."

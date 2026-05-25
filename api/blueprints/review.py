@@ -8,7 +8,7 @@ review_bp = Blueprint('review', __name__)
 @review_bp.get('/search')
 @role_required(['admin', 'editor', 'reviewer'])
 def search():
-    filters = {k: request.args.get(k) for k in ['scene_label', 'emotion', 'video', 'reviewed', 'uncertain', 'review_request_status', 'min_duration', 'max_duration']}
+    filters = {k: request.args.get(k) for k in ['scene_label', 'emotion', 'video', 'reviewed', 'uncertain', 'review_request_status', 'assigned_to_me', 'min_duration', 'max_duration']}
     filters['page'] = request.args.get('page', 1, type=int)
     filters = {k: v for k, v in filters.items() if v is not None}
     limit = request.args.get('limit', 100, type=int)
@@ -57,6 +57,27 @@ def resolve_review_requests_ep():
     res = clip_service.resolve_review_requests(
         data.get('scene_keys', []),
         data.get('status', ''),
+        data.get('note', ''),
+        current_user=g.user,
+    )
+    if 'error' in res:
+        return jsonify(res), res.get('status', 400)
+    return jsonify(res)
+
+
+@review_bp.post('/review/requests/assign')
+@role_required(['admin'])
+def assign_review_requests_ep():
+    from services.auth_service import get_user_by_id
+
+    data = request.get_json(force=True) or {}
+    assignee = get_user_by_id(data.get('assignee_id'))
+    if not assignee:
+        return jsonify({'error': 'Assignee not found'}), 404
+
+    res = clip_service.assign_review_requests(
+        data.get('scene_keys', []),
+        assignee,
         data.get('note', ''),
         current_user=g.user,
     )

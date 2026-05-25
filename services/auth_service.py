@@ -253,6 +253,23 @@ def get_user_summary_counts():
     }
 
 
+def get_user_by_id(user_id):
+    """Return a public user document by id for assignment workflows."""
+    from bson import ObjectId
+    try:
+        obj_id = ObjectId(user_id)
+    except Exception:
+        return None
+
+    users_col = _get_users_col()
+    user = users_col.find_one({"_id": obj_id}, {"password_hash": 0, "token": 0})
+    if not user:
+        return None
+    user["_id"] = str(user["_id"])
+    user["id"] = user["_id"]
+    return user
+
+
 def _get_admin_count():
     users_col = _get_users_col()
     return users_col.count_documents({"role": "admin", "is_active": True})
