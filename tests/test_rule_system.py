@@ -397,12 +397,10 @@ def test_search_reconciles_completed_requests_for_requester(monkeypatch):
 
     class FakeCollection:
         def __init__(self):
-            self.reconcile_query = None
-            self.reconcile_update = None
+            self.reconcile_calls = []
 
         def update_many(self, query, update):
-            self.reconcile_query = query
-            self.reconcile_update = update
+            self.reconcile_calls.append((query, update))
             return FakeUpdateResult()
 
         def count_documents(self, query):
@@ -424,7 +422,7 @@ def test_search_reconciles_completed_requests_for_requester(monkeypatch):
     )
 
     assert result["query"]["review_request_status"] == "resolved"
-    assert fake_col.reconcile_query == {
+    assert fake_col.reconcile_calls[0][0] == {
         "reviewed": True,
         "review_request_status": {"$in": ["open", "assigned"]},
         "$or": [
@@ -432,8 +430,17 @@ def test_search_reconciles_completed_requests_for_requester(monkeypatch):
             {"review_requested_by": "editor-1"},
         ],
     }
-    assert fake_col.reconcile_update["$set"]["review_request_status"] == "resolved"
-    assert fake_col.reconcile_update["$set"]["review_resolution_seen_by_requester"] is False
+    assert fake_col.reconcile_calls[0][1]["$set"]["review_request_status"] == "resolved"
+    assert fake_col.reconcile_calls[0][1]["$set"]["review_resolution_seen_by_requester"] is False
+    assert fake_col.reconcile_calls[1][0] == {
+        "reviewed": {"$ne": True},
+        "review_request_status": "resolved",
+        "$or": [
+            {"assigned_to": "editor-1"},
+            {"review_requested_by": "editor-1"},
+        ],
+    }
+    assert fake_col.reconcile_calls[1][1]["$set"]["reviewed"] is True
 
 
 def test_reviewer_cannot_update_unassigned_clip(monkeypatch):

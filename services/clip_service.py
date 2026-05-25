@@ -74,24 +74,32 @@ def _reconcile_completed_review_requests(current_user=None):
         return 0
 
     role = current_user.get("role")
-    query = {
-        "reviewed": True,
-        "review_request_status": {"$in": ["open", "assigned"]},
-    }
+    scope = {}
     if role == "reviewer":
-        query["assigned_to"] = current_user.get("id")
+        scope["assigned_to"] = current_user.get("id")
     elif role == "editor":
-        query["$or"] = [
+        scope["$or"] = [
             {"assigned_to": current_user.get("id")},
             {"review_requested_by": current_user.get("id")},
         ]
     elif role != "admin":
         return 0
 
+    completed_query = {
+        "reviewed": True,
+        "review_request_status": {"$in": ["open", "assigned"]},
+        **scope,
+    }
+    resolved_unreviewed_query = {
+        "reviewed": {"$ne": True},
+        "review_request_status": "resolved",
+        **scope,
+    }
+
     now = datetime.datetime.utcnow().isoformat()
     try:
-        res = col.update_many(
-            query,
+        completed_res = col.update_many(
+            completed_query,
             {
                 "$set": {
                     "review_request_status": "resolved",
@@ -103,7 +111,16 @@ def _reconcile_completed_review_requests(current_user=None):
                 }
             },
         )
-        return res.modified_count
+        resolved_res = col.update_many(
+            resolved_unreviewed_query,
+            {
+                "$set": {
+                    "reviewed": True,
+                    "review_resolution_note": "Auto-marked reviewed because the request was already resolved.",
+                }
+            },
+        )
+        return completed_res.modified_count + resolved_res.modified_count
     except Exception as e:
         logger.error(f"Failed to reconcile completed review requests: {e}")
         return 0
