@@ -253,6 +253,7 @@ def process_video(
     base_dir,
     threshold=config.SCENE_DETECT_THRESHOLD,
     file_hash: str | None = None,
+    user_id: str | None = None,
     progress_callback=None,
 ):
     video_name = os.path.splitext(os.path.basename(video_path))[0]
@@ -459,6 +460,7 @@ def process_video(
         # ── Build scene record ─────────────────────────────────────────
         merged.append(make_json_safe({
             "video"              : video_name,
+            "uploaded_by"         : user_id,
             "video_path"         : video_path,
             "cloudinary_url"     : cloudinary_video_url,
             "scene_id"           : idx,

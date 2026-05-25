@@ -52,20 +52,48 @@ def _apply_review_scope(query, current_user=None):
     if not current_user:
         return query
 
+    user_id = current_user.get("id")
     role = current_user.get("role")
     if role == "reviewer":
-        query["assigned_to"] = current_user.get("id")
+        query["assigned_to"] = user_id
+    elif role == "editor":
+        _add_or_clause(query, [
+            {"uploaded_by": user_id},
+            {"assigned_to": user_id},
+            {"review_requested_by": user_id},
+            {"review_resolved_by": user_id},
+        ])
+    elif role == "admin":
+        _add_or_clause(query, [
+            {"uploaded_by": user_id},
+            {"review_request_status": {"$in": ["open", "assigned"]}},
+            {"review_requested_by": user_id},
+            {"review_resolved_by": user_id},
+        ])
     return query
 
 
 def _can_review_doc(doc, current_user=None):
     if not current_user:
         return True
+    user_id = current_user.get("id")
     role = current_user.get("role")
-    if role in ("admin", "editor"):
-        return True
+    if role == "admin":
+        return (
+            doc.get("uploaded_by") == user_id
+            or doc.get("review_request_status") in ("open", "assigned")
+            or doc.get("review_requested_by") == user_id
+            or doc.get("review_resolved_by") == user_id
+        )
+    if role == "editor":
+        return (
+            doc.get("uploaded_by") == user_id
+            or doc.get("assigned_to") == user_id
+            or doc.get("review_requested_by") == user_id
+            or doc.get("review_resolved_by") == user_id
+        )
     if role == "reviewer":
-        return doc.get("assigned_to") == current_user.get("id")
+        return doc.get("assigned_to") == user_id
     return False
 
 
@@ -401,6 +429,7 @@ def resolve_review_requests(keys, status, note="", current_user=None):
         update_fields["reviewed"] = True
 
     query = {"_key": {"$in": keys}, "review_request_status": {"$in": ["open", "assigned"]}}
+    query = _apply_review_scope(query, current_user)
     audit_docs = _fetch_docs(query)
     res = col.update_many(query, {"$set": update_fields})
     _push_audit_entries(
@@ -436,6 +465,7 @@ def assign_review_requests(keys, assignee, note="", current_user=None):
         "review_assignment_note": (note or "").strip()[:500],
     }
     query = {"_key": {"$in": keys}, "review_request_status": {"$in": ["open", "assigned"]}}
+    query = _apply_review_scope(query, current_user)
     audit_docs = _fetch_docs(query)
     res = col.update_many(query, {"$set": update_fields})
     _push_audit_entries(
@@ -505,6 +535,7 @@ def request_peer_review(keys, assignee, reason, current_user=None):
     }
 
     query = {"_key": {"$in": keys}}
+    query = _apply_review_scope(query, current_user)
     audit_docs = _fetch_docs(query)
     res = col.update_many(query, {"$set": update_fields})
     _push_audit_entries(

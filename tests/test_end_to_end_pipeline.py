@@ -129,6 +129,7 @@ def test_process_video_traces_raw_video_through_storage(tmp_path, monkeypatch, c
         str(video_path),
         str(tmp_path),
         threshold=12.0,
+        user_id="editor-1",
         progress_callback=progress_messages.append,
     )
 
@@ -146,6 +147,7 @@ def test_process_video_traces_raw_video_through_storage(tmp_path, monkeypatch, c
     for expected_id, doc in enumerate(scene_docs, start=1):
         assert doc["scene_id"] == expected_id
         assert doc["video"] == "raw_pipeline"
+        assert doc["uploaded_by"] == "editor-1"
         assert doc["scene_label"] == "testimonial"
         assert doc["cloudinary_url"] == "https://example.test/video.mp4"
         assert Path(doc["thumbnail"]).exists()

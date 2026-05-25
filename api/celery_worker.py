@@ -34,7 +34,7 @@ celery_app.conf.update(
 )
 
 @celery_app.task(bind=True, name="process_video_task")
-def process_video_task(self, video_path_str: str, base_dir_str: str):
+def process_video_task(self, video_path_str: str, base_dir_str: str, user_id: str | None = None):
     """
     Background task to run the EditEase video processing pipeline.
     """
@@ -47,7 +47,7 @@ def process_video_task(self, video_path_str: str, base_dir_str: str):
             self.update_state(state="PROGRESS", meta={"step": "processing", "message": msg})
             _update_task(self.request.id, progress_step=msg)
 
-        process_video(video_path_str, base_dir_str, progress_callback=on_progress)
+        process_video(video_path_str, base_dir_str, user_id=user_id, progress_callback=on_progress)
         logger.info(f"Finished Celery task for video: {video_path_str}")
         _update_task(self.request.id, status="SUCCESS", progress_step="done")
         return {"status": "success", "video_path": video_path_str}
@@ -252,7 +252,7 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
                 self.update_state(state="PROGRESS", meta={"step": "processing", "message": msg})
                 _update_task(self.request.id, progress_step=msg)
 
-            process_video(video_path_str, base_dir_str, file_hash=file_hash, progress_callback=on_progress)
+            process_video(video_path_str, base_dir_str, file_hash=file_hash, user_id=user_id, progress_callback=on_progress)
         except Exception as e:
             logger.error(f"Processing failed: {e}", exc_info=True)
             _update_task(self.request.id, status="FAILURE", error_message=str(e), progress_step="error")
@@ -408,6 +408,5 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
         "export_path": actual_pub_id,
         "ai_metadata": ai_metadata,
     }
-
 
 

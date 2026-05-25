@@ -1,7 +1,7 @@
 """Media blueprint: /upload, /export, /thumbnail, /video_clip, /task_status,
 /auto_organize, /open_folder, /organized-videos, /organized-videos/download-batch"""
 import os
-from flask import Blueprint, request, jsonify, send_file, redirect
+from flask import Blueprint, request, jsonify, send_file, redirect, g
 import cloudinary.api
 import cloudinary.utils
 import config
@@ -74,7 +74,8 @@ def upload_video():
     file_path = config.DATA_DIR / file.filename
     file.save(str(file_path))
     logger.info(f'Video saved locally to {file_path}')
-    task = task_service.dispatch_process(str(file_path))
+    user_id = str(g.user['id']) if g.user else None
+    task = task_service.dispatch_process(str(file_path), user_id=user_id)
     return jsonify({'status': 'uploaded', 'message': 'Processing started', 'video_path': str(file_path), 'task_id': task.id})
 
 @media_bp.post('/auto_organize')

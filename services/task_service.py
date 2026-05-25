@@ -77,7 +77,7 @@ def update_task_record(task_id, **kwargs):
 
 def dispatch_process(file_path, user_id=None):
     """Dispatch standard process_video task."""
-    task = process_video_task.delay(file_path, str(config.BASE_DIR))
+    task = process_video_task.delay(file_path, str(config.BASE_DIR), user_id)
     insert_task_record(task.id, "upload", initiated_by=user_id, input_path=file_path)
     logger.info(f"Dispatched process task {task.id} for {file_path}")
     return task

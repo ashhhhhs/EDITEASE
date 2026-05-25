@@ -309,6 +309,43 @@ def test_reviewer_search_is_scoped_to_assigned_clips(monkeypatch):
     assert result["query"]["assigned_to"] == "reviewer-1"
 
 
+def test_editor_search_is_scoped_to_owned_and_review_related_clips(monkeypatch):
+    class FakeCursor:
+        def sort(self, *_args):
+            return self
+
+        def skip(self, *_args):
+            return self
+
+        def limit(self, *_args):
+            return self
+
+        def __iter__(self):
+            return iter([])
+
+    class FakeCollection:
+        def count_documents(self, query):
+            return 0
+
+        def find(self, query):
+            return FakeCursor()
+
+    monkeypatch.setattr(clip_service, "col", FakeCollection())
+
+    result = clip_service.search_clips(
+        {"reviewed": "false"},
+        current_user={"id": "editor-1", "role": "editor"},
+    )
+
+    assert result["query"]["reviewed"] is False
+    assert result["query"]["$or"] == [
+        {"uploaded_by": "editor-1"},
+        {"assigned_to": "editor-1"},
+        {"review_requested_by": "editor-1"},
+        {"review_resolved_by": "editor-1"},
+    ]
+
+
 def test_search_can_filter_to_current_user_assignments(monkeypatch):
     class FakeCursor:
         def sort(self, *_args):
@@ -491,7 +528,15 @@ def test_editor_can_request_admin_review(monkeypatch):
 
     assert result["ok"] is True
     assert result["requested_count"] == 2
-    assert fake_col.query == {"_key": {"$in": ["demo::1", "demo::2"]}}
+    assert fake_col.query == {
+        "_key": {"$in": ["demo::1", "demo::2"]},
+        "$or": [
+            {"uploaded_by": "editor-1"},
+            {"assigned_to": "editor-1"},
+            {"review_requested_by": "editor-1"},
+            {"review_resolved_by": "editor-1"},
+        ],
+    }
     assert fake_col.update["$set"]["review_request_status"] == "open"
     assert fake_col.update["$set"]["review_requested_by"] == "editor-1"
     assert fake_col.update["$set"]["review_request_reason"] == "Please confirm this label before export."
@@ -593,6 +638,12 @@ def test_admin_resolves_review_requests(monkeypatch):
     assert fake_col.query == {
         "_key": {"$in": ["demo::1"]},
         "review_request_status": {"$in": ["open", "assigned"]},
+        "$or": [
+            {"uploaded_by": "admin-1"},
+            {"review_request_status": {"$in": ["open", "assigned"]}},
+            {"review_requested_by": "admin-1"},
+            {"review_resolved_by": "admin-1"},
+        ],
     }
     assert fake_col.update["$set"]["review_request_status"] == "resolved"
     assert fake_col.update["$set"]["review_resolved_by"] == "admin-1"
@@ -658,6 +709,12 @@ def test_admin_assigns_review_request_to_reviewer(monkeypatch):
     assert fake_col.query == {
         "_key": {"$in": ["demo::1", "demo::2"]},
         "review_request_status": {"$in": ["open", "assigned"]},
+        "$or": [
+            {"uploaded_by": "admin-1"},
+            {"review_request_status": {"$in": ["open", "assigned"]}},
+            {"review_requested_by": "admin-1"},
+            {"review_resolved_by": "admin-1"},
+        ],
     }
     assert fake_col.update["$set"]["assigned_to"] == "reviewer-1"
     assert fake_col.update["$set"]["review_request_status"] == "assigned"
@@ -698,7 +755,15 @@ def test_editor_requests_peer_review(monkeypatch):
 
     assert result["ok"] is True
     assert result["requested_count"] == 1
-    assert fake_col.query == {"_key": {"$in": ["demo::1"]}}
+    assert fake_col.query == {
+        "_key": {"$in": ["demo::1"]},
+        "$or": [
+            {"uploaded_by": "editor-1"},
+            {"assigned_to": "editor-1"},
+            {"review_requested_by": "editor-1"},
+            {"review_resolved_by": "editor-1"},
+        ],
+    }
     assert fake_col.update["$set"]["assigned_to"] == "editor-2"
     assert fake_col.update["$set"]["review_request_status"] == "assigned"
     assert fake_col.update["$set"]["review_requested_by"] == "editor-1"
@@ -768,6 +833,7 @@ def test_update_clip_appends_label_audit(monkeypatch):
                 "scene_id": 1,
                 "scene_label": "b-roll",
                 "scene_confidence": 0.71,
+                "uploaded_by": "editor-1",
                 "faces": {"face_present_any": False},
             }
             self.raw_update = None
@@ -902,7 +968,15 @@ def test_admin_bulk_mark_reviewed_auto_resolves_open_requests(monkeypatch):
     assert result["ok"] is True
     assert result["updated_count"] == 1
     assert result["auto_resolved_count"] == 1
-    assert fake_col.calls[0][0] == {"_key": {"$in": ["demo::1"]}}
+    assert fake_col.calls[0][0] == {
+        "_key": {"$in": ["demo::1"]},
+        "$or": [
+            {"uploaded_by": "admin-1"},
+            {"review_request_status": {"$in": ["open", "assigned"]}},
+            {"review_requested_by": "admin-1"},
+            {"review_resolved_by": "admin-1"},
+        ],
+    }
     assert fake_col.calls[1][0] == {
         "_key": {"$in": ["demo::1"]},
         "review_request_status": {"$in": ["open", "assigned"]},
