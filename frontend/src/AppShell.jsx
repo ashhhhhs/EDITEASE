@@ -168,7 +168,7 @@ export default function AppShell({ currentUser, onLogout }) {
     let cancelled = false;
     const fetchOpenReviewRequests = async () => {
       try {
-        const res = await api.get('/search?review_request_status=open&limit=1');
+        const res = await api.get('/search?review_request_status=open&reviewed=false&limit=1');
         if (!cancelled) setOpenReviewRequests(res.data.total || 0);
       } catch {
         if (!cancelled) setOpenReviewRequests(0);
@@ -194,7 +194,7 @@ export default function AppShell({ currentUser, onLogout }) {
     let cancelled = false;
     const fetchAssignedReviewRequests = async () => {
       try {
-        const res = await api.get('/search?review_request_status=assigned&assigned_to_me=true&limit=1');
+        const res = await api.get('/search?review_request_status=assigned&assigned_to_me=true&reviewed=false&limit=1');
         if (!cancelled) setAssignedReviewRequests(res.data.total || 0);
       } catch {
         if (!cancelled) setAssignedReviewRequests(0);

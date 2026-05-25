@@ -69,6 +69,46 @@ def _can_review_doc(doc, current_user=None):
     return False
 
 
+def _reconcile_completed_review_requests(current_user=None):
+    if not current_user or not hasattr(col, "update_many"):
+        return 0
+
+    role = current_user.get("role")
+    query = {
+        "reviewed": True,
+        "review_request_status": {"$in": ["open", "assigned"]},
+    }
+    if role == "reviewer":
+        query["assigned_to"] = current_user.get("id")
+    elif role == "editor":
+        query["$or"] = [
+            {"assigned_to": current_user.get("id")},
+            {"review_requested_by": current_user.get("id")},
+        ]
+    elif role != "admin":
+        return 0
+
+    now = datetime.datetime.utcnow().isoformat()
+    try:
+        res = col.update_many(
+            query,
+            {
+                "$set": {
+                    "review_request_status": "resolved",
+                    "review_resolved_at": now,
+                    "review_resolved_by": "system",
+                    "review_resolution_note": "Auto-resolved because the clip was already marked reviewed.",
+                    "review_resolution_seen_by_requester": False,
+                    "review_resolution_seen_at": None,
+                }
+            },
+        )
+        return res.modified_count
+    except Exception as e:
+        logger.error(f"Failed to reconcile completed review requests: {e}")
+        return 0
+
+
 def _add_or_clause(query, clauses):
     if "$or" not in query:
         query["$or"] = clauses
@@ -156,6 +196,16 @@ def search_clips(filters, limit=100, current_user=None):
         if max_duration is not None:
             q["duration_sec"]["$lte"] = float(max_duration)
             
+    if (
+        current_user
+        and (
+            filters.get("review_request_status") in ("open", "assigned", "resolved")
+            or filters.get("assigned_to_me") is not None
+            or filters.get("requested_by_me") is not None
+        )
+    ):
+        _reconcile_completed_review_requests(current_user)
+
     # Pagination
     page = max(1, int(filters.get("page", 1)))
     limit = max(1, min(int(limit), 200)) # Default max 200 via param

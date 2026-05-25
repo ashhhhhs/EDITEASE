@@ -378,6 +378,64 @@ def test_search_can_filter_to_current_user_requests(monkeypatch):
     assert result["query"]["review_resolution_seen_by_requester"] == {"$ne": True}
 
 
+def test_search_reconciles_completed_requests_for_requester(monkeypatch):
+    class FakeUpdateResult:
+        modified_count = 1
+
+    class FakeCursor:
+        def sort(self, *_args):
+            return self
+
+        def skip(self, *_args):
+            return self
+
+        def limit(self, *_args):
+            return self
+
+        def __iter__(self):
+            return iter([])
+
+    class FakeCollection:
+        def __init__(self):
+            self.reconcile_query = None
+            self.reconcile_update = None
+
+        def update_many(self, query, update):
+            self.reconcile_query = query
+            self.reconcile_update = update
+            return FakeUpdateResult()
+
+        def count_documents(self, query):
+            return 0
+
+        def find(self, query):
+            return FakeCursor()
+
+    fake_col = FakeCollection()
+    monkeypatch.setattr(clip_service, "col", fake_col)
+
+    result = clip_service.search_clips(
+        {
+            "review_request_status": "resolved",
+            "requested_by_me": "true",
+            "resolution_unseen": "true",
+        },
+        current_user={"id": "editor-1", "role": "editor"},
+    )
+
+    assert result["query"]["review_request_status"] == "resolved"
+    assert fake_col.reconcile_query == {
+        "reviewed": True,
+        "review_request_status": {"$in": ["open", "assigned"]},
+        "$or": [
+            {"assigned_to": "editor-1"},
+            {"review_requested_by": "editor-1"},
+        ],
+    }
+    assert fake_col.reconcile_update["$set"]["review_request_status"] == "resolved"
+    assert fake_col.reconcile_update["$set"]["review_resolution_seen_by_requester"] is False
+
+
 def test_reviewer_cannot_update_unassigned_clip(monkeypatch):
     class FakeCollection:
         def find_one(self, query):
