@@ -133,6 +133,20 @@ def search_clips(filters, limit=100, current_user=None):
         if assigned_to_me:
             q["assigned_to"] = current_user.get("id")
 
+    requested_by_me = filters.get("requested_by_me")
+    if requested_by_me is not None and current_user:
+        if isinstance(requested_by_me, str):
+            requested_by_me = requested_by_me.lower() in ("true", "1", "yes")
+        if requested_by_me:
+            q["review_requested_by"] = current_user.get("id")
+
+    resolution_unseen = filters.get("resolution_unseen")
+    if resolution_unseen is not None:
+        if isinstance(resolution_unseen, str):
+            resolution_unseen = resolution_unseen.lower() in ("true", "1", "yes")
+        if resolution_unseen:
+            q["review_resolution_seen_by_requester"] = {"$ne": True}
+
     min_duration = filters.get("min_duration")
     max_duration = filters.get("max_duration")
     if min_duration is not None or max_duration is not None:
@@ -179,6 +193,8 @@ def request_admin_review(keys, reason, current_user=None):
         "review_resolved_at": None,
         "review_resolved_by": None,
         "review_resolution_note": None,
+        "review_resolution_seen_by_requester": False,
+        "review_resolution_seen_at": None,
     }
 
     query = {"_key": {"$in": keys}}
@@ -201,6 +217,8 @@ def resolve_review_requests(keys, status, note="", current_user=None):
         "review_resolved_at": now,
         "review_resolved_by": current_user.get("id"),
         "review_resolution_note": (note or "").strip()[:500],
+        "review_resolution_seen_by_requester": False,
+        "review_resolution_seen_at": None,
     }
     res = col.update_many(
         {"_key": {"$in": keys}, "review_request_status": {"$in": ["open", "assigned"]}},
@@ -280,6 +298,8 @@ def request_peer_review(keys, assignee, reason, current_user=None):
         "review_resolved_at": None,
         "review_resolved_by": None,
         "review_resolution_note": None,
+        "review_resolution_seen_by_requester": False,
+        "review_resolution_seen_at": None,
     }
 
     res = col.update_many({"_key": {"$in": keys}}, {"$set": update_fields})
@@ -289,6 +309,27 @@ def request_peer_review(keys, assignee, reason, current_user=None):
         "email": assignee.get("email"),
         "role": assignee.get("role"),
     }, "fields": update_fields}
+
+
+def acknowledge_resolved_requests(current_user=None):
+    if not current_user or current_user.get("role") not in ("editor", "reviewer"):
+        return {"error": "Only editors and reviewers can acknowledge resolved requests.", "status": 403}
+
+    now = datetime.datetime.utcnow().isoformat()
+    res = col.update_many(
+        {
+            "review_requested_by": current_user.get("id"),
+            "review_request_status": "resolved",
+            "review_resolution_seen_by_requester": {"$ne": True},
+        },
+        {
+            "$set": {
+                "review_resolution_seen_by_requester": True,
+                "review_resolution_seen_at": now,
+            }
+        },
+    )
+    return {"ok": True, "acknowledged_count": res.modified_count}
 
 
 def bulk_update_clips(keys, update_data, current_user=None):
@@ -331,6 +372,8 @@ def bulk_update_clips(keys, update_data, current_user=None):
             "review_resolved_at": datetime.datetime.utcnow().isoformat(),
             "review_resolved_by": current_user.get("id"),
             "review_resolution_note": "Marked reviewed by assigned reviewer.",
+            "review_resolution_seen_by_requester": False,
+            "review_resolution_seen_at": None,
         }
         resolution_res = col.update_many(
             {
@@ -400,6 +443,8 @@ def update_clip(video, scene_id, data, current_user=None):
         update_fields["review_resolved_at"] = datetime.datetime.utcnow().isoformat()
         update_fields["review_resolved_by"] = current_user.get("id")
         update_fields["review_resolution_note"] = "Marked reviewed by assigned reviewer."
+        update_fields["review_resolution_seen_by_requester"] = False
+        update_fields["review_resolution_seen_at"] = None
 
     if not has_face_any:
         if "dominant_emotion_overall" in update_fields:

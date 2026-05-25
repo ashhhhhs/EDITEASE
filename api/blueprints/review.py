@@ -15,7 +15,7 @@ def review_assignees():
 @review_bp.get('/search')
 @role_required(['admin', 'editor', 'reviewer'])
 def search():
-    filters = {k: request.args.get(k) for k in ['scene_label', 'emotion', 'video', 'reviewed', 'uncertain', 'review_request_status', 'assigned_to_me', 'min_duration', 'max_duration']}
+    filters = {k: request.args.get(k) for k in ['scene_label', 'emotion', 'video', 'reviewed', 'uncertain', 'review_request_status', 'assigned_to_me', 'requested_by_me', 'resolution_unseen', 'min_duration', 'max_duration']}
     filters['page'] = request.args.get('page', 1, type=int)
     filters = {k: v for k, v in filters.items() if v is not None}
     limit = request.args.get('limit', 100, type=int)
@@ -88,6 +88,15 @@ def resolve_review_requests_ep():
         data.get('note', ''),
         current_user=g.user,
     )
+    if 'error' in res:
+        return jsonify(res), res.get('status', 400)
+    return jsonify(res)
+
+
+@review_bp.post('/review/requests/acknowledge-resolved')
+@role_required(['editor', 'reviewer'])
+def acknowledge_resolved_requests_ep():
+    res = clip_service.acknowledge_resolved_requests(current_user=g.user)
     if 'error' in res:
         return jsonify(res), res.get('status', 400)
     return jsonify(res)

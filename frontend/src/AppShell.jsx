@@ -128,6 +128,7 @@ export default function AppShell({ currentUser, onLogout }) {
   const role = currentUser?.role || 'editor';
   const [openReviewRequests, setOpenReviewRequests] = useState(0);
   const [assignedReviewRequests, setAssignedReviewRequests] = useState(0);
+  const [resolvedReviewRequests, setResolvedReviewRequests] = useState(0);
   const navDescriptions = {
     Dashboard: 'Your creative hub. Track recent ingests and see what the system is organizing for you.',
     'Review Queue': 'Quickly review and sort ambiguous clips so they land in the right folders.',
@@ -210,7 +211,43 @@ export default function AppShell({ currentUser, onLogout }) {
     };
   }, [role, location.pathname]);
 
+  React.useEffect(() => {
+    if (!['editor', 'reviewer'].includes(role)) {
+      setResolvedReviewRequests(0);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchResolvedReviewRequests = async () => {
+      try {
+        const res = await api.get('/search?review_request_status=resolved&requested_by_me=true&resolution_unseen=true&limit=1');
+        if (!cancelled) setResolvedReviewRequests(res.data.total || 0);
+      } catch {
+        if (!cancelled) setResolvedReviewRequests(0);
+      }
+    };
+
+    fetchResolvedReviewRequests();
+    window.addEventListener('review-requests-changed', fetchResolvedReviewRequests);
+    const timer = setInterval(fetchResolvedReviewRequests, 30000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('review-requests-changed', fetchResolvedReviewRequests);
+      clearInterval(timer);
+    };
+  }, [role, location.pathname]);
+
   // ── Tour Guide State ──
+  const acknowledgeResolvedReviewRequests = async () => {
+    setResolvedReviewRequests(0);
+    try {
+      await api.post('/review/requests/acknowledge-resolved');
+      window.dispatchEvent(new Event('review-requests-changed'));
+    } catch {
+      // Keep the UI quiet; the next poll will restore the count if the request fails.
+    }
+  };
+
   const [runTour, setRunTour] = useState(false);
   const tourSteps = [
     {
@@ -454,12 +491,23 @@ export default function AppShell({ currentUser, onLogout }) {
             )}
             {role !== 'admin' && assignedReviewRequests > 0 && (
               <Link
-                to="/app/review?request=assigned&assigned_to_me=true"
+                to="/app/review?request=assigned&assigned_to_me=true&reviewed=false"
                 className="workspace-notification-pill"
                 title="Assigned review requests"
               >
                 <Bell size={14} />
                 <span>{assignedReviewRequests} assigned review{assignedReviewRequests === 1 ? '' : 's'}</span>
+              </Link>
+            )}
+            {role !== 'admin' && resolvedReviewRequests > 0 && (
+              <Link
+                to="/app/review?request=resolved&requested_by_me=true&reviewed="
+                className="workspace-notification-pill"
+                title="Resolved review requests"
+                onClick={acknowledgeResolvedReviewRequests}
+              >
+                <Bell size={14} />
+                <span>{resolvedReviewRequests} resolved request{resolvedReviewRequests === 1 ? '' : 's'}</span>
               </Link>
             )}
             <button 

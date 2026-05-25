@@ -24,10 +24,11 @@ export default function Inspector({ currentUser }) {
   
   const [fLabel, setFLabel] = useState('');
   const [fEmotion, setFEmotion] = useState('');
-  const [fReviewed, setFReviewed] = useState('false');
+  const [fReviewed, setFReviewed] = useState(() => searchParams.has('reviewed') ? searchParams.get('reviewed') || '' : 'false');
   const [fUncertain, setFUncertain] = useState('');
   const [fRequest, setFRequest] = useState(() => searchParams.get('request') || '');
   const [fAssignedToMe, setFAssignedToMe] = useState(() => searchParams.get('assigned_to_me') || '');
+  const [fRequestedByMe, setFRequestedByMe] = useState(() => searchParams.get('requested_by_me') || '');
   
   const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [bLabel, setBLabel] = useState('');
@@ -50,6 +51,13 @@ export default function Inspector({ currentUser }) {
       .catch(err => toast.error(err.friendlyMessage || 'Failed to load reviewers'));
   }, [currentUser?.id, currentUser?.role, toast]);
 
+  useEffect(() => {
+    setFRequest(searchParams.get('request') || '');
+    setFAssignedToMe(searchParams.get('assigned_to_me') || '');
+    setFRequestedByMe(searchParams.get('requested_by_me') || '');
+    setFReviewed(searchParams.has('reviewed') ? searchParams.get('reviewed') || '' : 'false');
+  }, [searchParams]);
+
   const fetchClips = async () => {
     setLoading(true);
     try {
@@ -60,6 +68,7 @@ export default function Inspector({ currentUser }) {
       if (fUncertain) url += `&uncertain=${fUncertain}`;
       if (fRequest) url += `&review_request_status=${fRequest}`;
       if (fAssignedToMe) url += `&assigned_to_me=${fAssignedToMe}`;
+      if (fRequestedByMe) url += `&requested_by_me=${fRequestedByMe}`;
       const res = await api.get(url);
       setClips(res.data.results || []);
       setTotal(res.data.total || 0);
@@ -71,6 +80,11 @@ export default function Inspector({ currentUser }) {
   };
 
   useEffect(() => { fetchClips(); }, [page]);
+
+  useEffect(() => {
+    if (page === 1) fetchClips();
+    else setPage(1);
+  }, [fRequest, fAssignedToMe, fRequestedByMe, fReviewed]);
 
   const handleSearchClick = () => { setPage(1); fetchClips(); };
 
@@ -240,6 +254,14 @@ export default function Inspector({ currentUser }) {
                 <div className="filter-chips">
                   {[['', 'All'], ['true', 'Mine']].map(([v, l]) => (
                     <button key={v} className={`chip${fAssignedToMe === v ? ' active' : ''}`} onClick={() => setFAssignedToMe(v)}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="mono-caps" style={{ marginBottom: 'var(--space-8)' }}>Requester</div>
+                <div className="filter-chips">
+                  {[['', 'All'], ['true', 'Mine']].map(([v, l]) => (
+                    <button key={v} className={`chip${fRequestedByMe === v ? ' active' : ''}`} onClick={() => setFRequestedByMe(v)}>{l}</button>
                   ))}
                 </div>
               </div>

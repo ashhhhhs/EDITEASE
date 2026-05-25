@@ -341,6 +341,43 @@ def test_search_can_filter_to_current_user_assignments(monkeypatch):
     assert result["query"]["assigned_to"] == "editor-1"
 
 
+def test_search_can_filter_to_current_user_requests(monkeypatch):
+    class FakeCursor:
+        def sort(self, *_args):
+            return self
+
+        def skip(self, *_args):
+            return self
+
+        def limit(self, *_args):
+            return self
+
+        def __iter__(self):
+            return iter([])
+
+    class FakeCollection:
+        def count_documents(self, query):
+            return 0
+
+        def find(self, query):
+            return FakeCursor()
+
+    monkeypatch.setattr(clip_service, "col", FakeCollection())
+
+    result = clip_service.search_clips(
+        {
+            "review_request_status": "resolved",
+            "requested_by_me": "true",
+            "resolution_unseen": "true",
+        },
+        current_user={"id": "editor-1", "role": "editor"},
+    )
+
+    assert result["query"]["review_request_status"] == "resolved"
+    assert result["query"]["review_requested_by"] == "editor-1"
+    assert result["query"]["review_resolution_seen_by_requester"] == {"$ne": True}
+
+
 def test_reviewer_cannot_update_unassigned_clip(monkeypatch):
     class FakeCollection:
         def find_one(self, query):
@@ -445,6 +482,34 @@ def test_admin_resolves_review_requests(monkeypatch):
     }
     assert fake_col.update["$set"]["review_request_status"] == "resolved"
     assert fake_col.update["$set"]["review_resolved_by"] == "admin-1"
+    assert fake_col.update["$set"]["review_resolution_seen_by_requester"] is False
+
+
+def test_editor_can_acknowledge_resolved_request_notifications(monkeypatch):
+    class FakeUpdateResult:
+        modified_count = 3
+
+    class FakeCollection:
+        def update_many(self, query, update):
+            self.query = query
+            self.update = update
+            return FakeUpdateResult()
+
+    fake_col = FakeCollection()
+    monkeypatch.setattr(clip_service, "col", fake_col)
+
+    result = clip_service.acknowledge_resolved_requests(
+        current_user={"id": "editor-1", "role": "editor"},
+    )
+
+    assert result["ok"] is True
+    assert result["acknowledged_count"] == 3
+    assert fake_col.query == {
+        "review_requested_by": "editor-1",
+        "review_request_status": "resolved",
+        "review_resolution_seen_by_requester": {"$ne": True},
+    }
+    assert fake_col.update["$set"]["review_resolution_seen_by_requester"] is True
 
 
 def test_admin_assigns_review_request_to_reviewer(monkeypatch):
@@ -573,6 +638,7 @@ def test_assigned_review_auto_resolves_when_marked_reviewed(monkeypatch):
     assert fake_col.update["reviewed"] is True
     assert fake_col.update["review_request_status"] == "resolved"
     assert fake_col.update["review_resolved_by"] == "reviewer-1"
+    assert fake_col.update["review_resolution_seen_by_requester"] is False
 
 
 def test_bulk_mark_reviewed_auto_resolves_assigned_requests(monkeypatch):
@@ -611,3 +677,4 @@ def test_bulk_mark_reviewed_auto_resolves_assigned_requests(monkeypatch):
     }
     assert fake_col.calls[1][1]["$set"]["review_request_status"] == "resolved"
     assert fake_col.calls[1][1]["$set"]["review_resolved_by"] == "reviewer-1"
+    assert fake_col.calls[1][1]["$set"]["review_resolution_seen_by_requester"] is False
