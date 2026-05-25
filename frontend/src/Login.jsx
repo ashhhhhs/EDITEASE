@@ -234,9 +234,9 @@ export default function Login({ onLogin, currentUser, onLogout }) {
           </FormButton>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: 'var(--space-32)', fontSize: 'var(--font-small)', color: 'var(--text-secondary)' }}>
-          Don't have an account?{' '}
-          <Link to="/register" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>Create account</Link>
+        <div className="auth-switch">
+          <span>Don't have an account?</span>
+          <Link to="/register" className="auth-switch-button">Create account</Link>
         </div>
     </AuthShell>
   );

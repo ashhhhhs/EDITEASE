@@ -221,9 +221,9 @@ export default function Register({ onLogin }) {
           </button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: 'var(--space-32)', fontSize: 'var(--font-small)', color: 'var(--text-secondary)' }}>
-          Already have an account?{' '}
-          <Link to="/login" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>Sign in here</Link>
+        <div className="auth-switch">
+          <span>Already have an account?</span>
+          <Link to="/login" className="auth-switch-button secondary">Sign in here</Link>
         </div>
     </AuthShell>
   );
