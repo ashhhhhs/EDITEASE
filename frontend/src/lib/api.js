@@ -30,6 +30,17 @@ api.interceptors.response.use(
       || 'An unexpected error occurred';
     // Attach the clean message to the error so callers can access it
     error.friendlyMessage = message;
+
+    const status = error.response?.status;
+    const requestUrl = error.config?.url || '';
+    const isAuthRequest = ['/login', '/register', '/auth/google', '/forgot-password', '/reset-password'].some(path => requestUrl.includes(path));
+    if (status === 401 && !isAuthRequest && localStorage.getItem('token')) {
+      localStorage.removeItem('token');
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+    }
+
     return Promise.reject(error);
   }
 );
