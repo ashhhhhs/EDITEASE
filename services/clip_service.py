@@ -270,6 +270,9 @@ def resolve_review_requests(keys, status, note="", current_user=None):
         "review_resolution_seen_by_requester": False,
         "review_resolution_seen_at": None,
     }
+    if status == "resolved":
+        update_fields["reviewed"] = True
+
     res = col.update_many(
         {"_key": {"$in": keys}, "review_request_status": {"$in": ["open", "assigned"]}},
         {"$set": update_fields},

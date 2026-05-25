@@ -541,6 +541,7 @@ def test_admin_resolves_review_requests(monkeypatch):
     assert fake_col.update["$set"]["review_request_status"] == "resolved"
     assert fake_col.update["$set"]["review_resolved_by"] == "admin-1"
     assert fake_col.update["$set"]["review_resolution_seen_by_requester"] is False
+    assert fake_col.update["$set"]["reviewed"] is True
 
 
 def test_editor_can_acknowledge_resolved_request_notifications(monkeypatch):

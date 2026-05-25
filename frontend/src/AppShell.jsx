@@ -501,9 +501,9 @@ export default function AppShell({ currentUser, onLogout }) {
             )}
             {role !== 'admin' && resolvedReviewRequests > 0 && (
               <Link
-                to="/app/review?request=resolved&requested_by_me=true&reviewed="
+                to="/app/organized-videos"
                 className="workspace-notification-pill"
-                title="Resolved review requests"
+                title="Resolved review requests ready for download"
                 onClick={acknowledgeResolvedReviewRequests}
               >
                 <Bell size={14} />
