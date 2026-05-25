@@ -367,20 +367,26 @@ def bulk_update_clips(keys, update_data, current_user=None):
 
     auto_resolved_count = 0
     if update_fields.get("reviewed") is True and current_user:
+        is_admin = current_user.get("role") == "admin"
         resolution_fields = {
             "review_request_status": "resolved",
             "review_resolved_at": datetime.datetime.utcnow().isoformat(),
             "review_resolved_by": current_user.get("id"),
-            "review_resolution_note": "Marked reviewed by assigned reviewer.",
+            "review_resolution_note": "Marked reviewed by admin." if is_admin else "Marked reviewed by assigned reviewer.",
             "review_resolution_seen_by_requester": False,
             "review_resolution_seen_at": None,
         }
+        resolution_query = {
+            "_key": {"$in": keys},
+        }
+        if is_admin:
+            resolution_query["review_request_status"] = {"$in": ["open", "assigned"]}
+        else:
+            resolution_query["assigned_to"] = current_user.get("id")
+            resolution_query["review_request_status"] = "assigned"
+
         resolution_res = col.update_many(
-            {
-                "_key": {"$in": keys},
-                "assigned_to": current_user.get("id"),
-                "review_request_status": "assigned",
-            },
+            resolution_query,
             {"$set": resolution_fields},
         )
         auto_resolved_count = resolution_res.modified_count
@@ -436,13 +442,25 @@ def update_clip(video, scene_id, data, current_user=None):
     if (
         update_fields.get("reviewed") is True
         and current_user
-        and doc.get("review_request_status") == "assigned"
-        and doc.get("assigned_to") == current_user.get("id")
+        and (
+            (
+                current_user.get("role") == "admin"
+                and doc.get("review_request_status") in ("open", "assigned")
+            )
+            or (
+                doc.get("review_request_status") == "assigned"
+                and doc.get("assigned_to") == current_user.get("id")
+            )
+        )
     ):
         update_fields["review_request_status"] = "resolved"
         update_fields["review_resolved_at"] = datetime.datetime.utcnow().isoformat()
         update_fields["review_resolved_by"] = current_user.get("id")
-        update_fields["review_resolution_note"] = "Marked reviewed by assigned reviewer."
+        update_fields["review_resolution_note"] = (
+            "Marked reviewed by admin."
+            if current_user.get("role") == "admin"
+            else "Marked reviewed by assigned reviewer."
+        )
         update_fields["review_resolution_seen_by_requester"] = False
         update_fields["review_resolution_seen_at"] = None
 

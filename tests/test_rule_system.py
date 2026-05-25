@@ -641,6 +641,45 @@ def test_assigned_review_auto_resolves_when_marked_reviewed(monkeypatch):
     assert fake_col.update["review_resolution_seen_by_requester"] is False
 
 
+def test_admin_review_auto_resolves_open_request_when_marked_reviewed(monkeypatch):
+    class FakeUpdateResult:
+        matched_count = 1
+
+    class FakeCollection:
+        def __init__(self):
+            self.doc = {
+                "_key": "demo::1",
+                "review_request_status": "open",
+                "review_requested_by": "editor-1",
+                "faces": {"face_present_any": False},
+            }
+            self.update = None
+
+        def find_one(self, query):
+            return {**self.doc, **(self.update or {})}
+
+        def update_one(self, query, update):
+            self.update = update["$set"]
+            return FakeUpdateResult()
+
+    fake_col = FakeCollection()
+    monkeypatch.setattr(clip_service, "col", fake_col)
+
+    result = clip_service.update_clip(
+        "demo",
+        1,
+        {"reviewed": True},
+        current_user={"id": "admin-1", "role": "admin"},
+    )
+
+    assert result["ok"] is True
+    assert fake_col.update["reviewed"] is True
+    assert fake_col.update["review_request_status"] == "resolved"
+    assert fake_col.update["review_resolved_by"] == "admin-1"
+    assert fake_col.update["review_resolution_note"] == "Marked reviewed by admin."
+    assert fake_col.update["review_resolution_seen_by_requester"] is False
+
+
 def test_bulk_mark_reviewed_auto_resolves_assigned_requests(monkeypatch):
     class FakeUpdateResult:
         def __init__(self, modified_count):
@@ -677,4 +716,40 @@ def test_bulk_mark_reviewed_auto_resolves_assigned_requests(monkeypatch):
     }
     assert fake_col.calls[1][1]["$set"]["review_request_status"] == "resolved"
     assert fake_col.calls[1][1]["$set"]["review_resolved_by"] == "reviewer-1"
+    assert fake_col.calls[1][1]["$set"]["review_resolution_seen_by_requester"] is False
+
+
+def test_admin_bulk_mark_reviewed_auto_resolves_open_requests(monkeypatch):
+    class FakeUpdateResult:
+        def __init__(self, modified_count):
+            self.modified_count = modified_count
+
+    class FakeCollection:
+        def __init__(self):
+            self.calls = []
+
+        def update_many(self, query, update):
+            self.calls.append((query, update))
+            return FakeUpdateResult(1)
+
+    fake_col = FakeCollection()
+    monkeypatch.setattr(clip_service, "col", fake_col)
+
+    result = clip_service.bulk_update_clips(
+        ["demo::1"],
+        {"reviewed": True},
+        current_user={"id": "admin-1", "role": "admin"},
+    )
+
+    assert result["ok"] is True
+    assert result["updated_count"] == 1
+    assert result["auto_resolved_count"] == 1
+    assert fake_col.calls[0][0] == {"_key": {"$in": ["demo::1"]}}
+    assert fake_col.calls[1][0] == {
+        "_key": {"$in": ["demo::1"]},
+        "review_request_status": {"$in": ["open", "assigned"]},
+    }
+    assert fake_col.calls[1][1]["$set"]["review_request_status"] == "resolved"
+    assert fake_col.calls[1][1]["$set"]["review_resolved_by"] == "admin-1"
+    assert fake_col.calls[1][1]["$set"]["review_resolution_note"] == "Marked reviewed by admin."
     assert fake_col.calls[1][1]["$set"]["review_resolution_seen_by_requester"] is False
