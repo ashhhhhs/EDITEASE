@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, CheckSquare, Search, Save, Settings2, Video, Square, CheckSquare as CheckSquareIcon, ListFilter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckSquare, Search, Save, Settings2, Video, Square, CheckSquare as CheckSquareIcon, ListFilter, Send, ShieldCheck, XCircle } from 'lucide-react';
 import { SCENE_LABELS, EMOTIONS } from './constants';
 import PageHeader from './components/PageHeader';
 import LoadingState from './components/LoadingState';
@@ -8,7 +8,7 @@ import { API_BASE } from './config';
 import api from './lib/api';
 import { useToast } from './hooks/useToast.jsx';
 
-export default function Inspector() {
+export default function Inspector({ currentUser }) {
   const toast = useToast();
   const [clips, setClips] = useState([]);
   const [page, setPage] = useState(1);
@@ -20,6 +20,7 @@ export default function Inspector() {
   const [fEmotion, setFEmotion] = useState('');
   const [fReviewed, setFReviewed] = useState('false');
   const [fUncertain, setFUncertain] = useState('');
+  const [fRequest, setFRequest] = useState('');
   
   const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [bLabel, setBLabel] = useState('');
@@ -27,6 +28,8 @@ export default function Inspector() {
   const [bReviewed, setBReviewed] = useState('');
   const [bUncertain, setBUncertain] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [requestReason, setRequestReason] = useState('');
+  const [requestLoading, setRequestLoading] = useState(false);
 
   const fetchClips = async () => {
     setLoading(true);
@@ -36,6 +39,7 @@ export default function Inspector() {
       if (fEmotion) url += `&emotion=${fEmotion}`;
       if (fReviewed) url += `&reviewed=${fReviewed}`;
       if (fUncertain) url += `&uncertain=${fUncertain}`;
+      if (fRequest) url += `&review_request_status=${fRequest}`;
       const res = await api.get(url);
       setClips(res.data.results || []);
       setTotal(res.data.total || 0);
@@ -82,6 +86,42 @@ export default function Inspector() {
     setBulkLoading(false);
   };
 
+  const handleRequestAdminReview = async () => {
+    if (selectedKeys.size === 0) { toast.warning('No clips selected'); return; }
+    if (!requestReason.trim()) { toast.warning('Add a reason for admin review'); return; }
+
+    setRequestLoading(true);
+    try {
+      const res = await api.post('/review/request-admin', {
+        scene_keys: Array.from(selectedKeys),
+        reason: requestReason.trim(),
+      });
+      toast.success(`Requested admin review for ${res.data.requested_count || selectedKeys.size} clips`);
+      setRequestReason('');
+      fetchClips();
+    } catch (err) {
+      toast.error(err.friendlyMessage || 'Failed to request admin review');
+    }
+    setRequestLoading(false);
+  };
+
+  const handleResolveRequests = async (status) => {
+    if (selectedKeys.size === 0) { toast.warning('No clips selected'); return; }
+
+    setRequestLoading(true);
+    try {
+      const res = await api.post('/review/requests/resolve', {
+        scene_keys: Array.from(selectedKeys),
+        status,
+      });
+      toast.success(`${status === 'resolved' ? 'Resolved' : 'Dismissed'} ${res.data.resolved_count || 0} requests`);
+      fetchClips();
+    } catch (err) {
+      toast.error(err.friendlyMessage || 'Failed to update review requests');
+    }
+    setRequestLoading(false);
+  };
+
   const totalPages = Math.ceil(total / limit) || 1;
   const thumbUrl = (clip) => clip?._id ? `${API_BASE}/thumbnail/${clip._id}` : null;
 
@@ -116,6 +156,14 @@ export default function Inspector() {
                 <div className="filter-chips">
                   {[['', 'All'], ['true', 'Uncertain'], ['false', 'Confident']].map(([v, l]) => (
                     <button key={v} className={`chip${fUncertain === v ? ' active' : ''}`} onClick={() => setFUncertain(v)}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="mono-caps" style={{ marginBottom: 'var(--space-8)' }}>Admin Request</div>
+                <div className="filter-chips">
+                  {[['', 'All'], ['open', 'Open'], ['resolved', 'Resolved'], ['dismissed', 'Dismissed'], ['__NONE__', 'None']].map(([v, l]) => (
+                    <button key={v} className={`chip${fRequest === v ? ' active' : ''}`} onClick={() => setFRequest(v)}>{l}</button>
                   ))}
                 </div>
               </div>
@@ -169,6 +217,37 @@ export default function Inspector() {
                 <Save size={14} /> {bulkLoading ? 'Applying...' : 'Execute Batch'}
               </button>
             </div>
+
+            <div style={{ marginTop: 'var(--space-20)', paddingTop: 'var(--space-20)', borderTop: '1px solid var(--border-subtle)' }}>
+              {currentUser?.role === 'admin' ? (
+                <>
+                  <div className="mono-caps" style={{ marginBottom: 'var(--space-8)' }}>Admin Review Requests</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-8)' }}>
+                    <button className="btn" onClick={() => handleResolveRequests('resolved')} disabled={requestLoading}>
+                      <ShieldCheck size={14} /> Resolve
+                    </button>
+                    <button className="btn" onClick={() => handleResolveRequests('dismissed')} disabled={requestLoading}>
+                      <XCircle size={14} /> Dismiss
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <label style={{ display: 'block', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>Ask Admin To Review</label>
+                  <textarea
+                    value={requestReason}
+                    onChange={e => setRequestReason(e.target.value)}
+                    maxLength={500}
+                    placeholder="Why should admin check these clips?"
+                    rows={4}
+                    style={{ resize: 'vertical', minHeight: 90 }}
+                  />
+                  <button className="btn" onClick={handleRequestAdminReview} disabled={requestLoading || !requestReason.trim()} style={{ marginTop: 'var(--space-8)', width: '100%' }}>
+                    <Send size={14} /> {requestLoading ? 'Requesting...' : 'Request Admin Review'}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -196,7 +275,7 @@ export default function Inspector() {
             {loading ? (
               <LoadingState type="grid" />
             ) : clips.length === 0 ? (
-              <EmptyState icon={Search} title="No Clips Found" message="Adjust your filters or reset to browse all clips." action={<button className="btn btn-primary" onClick={() => { setFLabel(''); setFEmotion(''); setFReviewed(''); setFUncertain(''); setPage(1); fetchClips(); }}>Reset Filters</button>} />
+              <EmptyState icon={Search} title="No Clips Found" message="Adjust your filters or reset to browse all clips." action={<button className="btn btn-primary" onClick={() => { setFLabel(''); setFEmotion(''); setFReviewed(''); setFUncertain(''); setFRequest(''); setPage(1); fetchClips(); }}>Reset Filters</button>} />
             ) : (
               <div className="clip-grid">
                 {clips.map(clip => {
@@ -219,7 +298,14 @@ export default function Inspector() {
                           <span className="badge" style={{ fontSize: '0.65rem' }}>{clip.scene_label || 'other'}</span>
                           <span className={`badge ${clip.reviewed ? 'success' : 'danger'}`} style={{ fontSize: '0.65rem' }}>{clip.reviewed ? 'Reviewed' : 'Pending'}</span>
                           {clip.uncertain && <span className="badge warning" style={{ fontSize: '0.65rem' }}>Uncertain</span>}
+                          {clip.review_request_status === 'open' && <span className="badge info" style={{ fontSize: '0.65rem' }}>Admin Requested</span>}
+                          {clip.review_request_status === 'resolved' && <span className="badge success" style={{ fontSize: '0.65rem' }}>Request Resolved</span>}
                         </div>
+                        {clip.review_request_status === 'open' && (
+                          <div style={{ marginTop: 'var(--space-8)', fontSize: 'var(--font-meta)', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                            {clip.review_request_reason || 'Admin review requested'}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

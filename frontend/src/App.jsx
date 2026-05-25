@@ -131,7 +131,7 @@ export default function App() {
 
               <Route path="/app" element={token && currentUser ? <UploadProvider><AppShell currentUser={currentUser} onLogout={handleLogout} /></UploadProvider> : <Navigate to="/login" replace />}>
                 <Route path="dashboard" element={<VerifiedGuard><Dashboard currentUser={currentUser} /></VerifiedGuard>} />
-                <Route path="review" element={<RoleGuard allowedRoles={['admin', 'editor', 'reviewer']}><VerifiedGuard><Inspector /></VerifiedGuard></RoleGuard>} />
+                <Route path="review" element={<RoleGuard allowedRoles={['admin', 'editor', 'reviewer']}><VerifiedGuard><Inspector currentUser={currentUser} /></VerifiedGuard></RoleGuard>} />
                 <Route path="admin/users" element={<RoleGuard allowedRoles={['admin']}><VerifiedGuard><UserManagement currentUser={currentUser} /></VerifiedGuard></RoleGuard>} />
                 <Route path="admin/jobs" element={<RoleGuard allowedRoles={['admin']}><VerifiedGuard><JobMonitor /></VerifiedGuard></RoleGuard>} />
                 <Route path="uploads" element={<RoleGuard allowedRoles={['admin', 'editor']}><VerifiedGuard><Upload /></VerifiedGuard></RoleGuard>} />

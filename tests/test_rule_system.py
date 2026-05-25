@@ -329,3 +329,84 @@ def test_reviewer_cannot_update_unassigned_clip(monkeypatch):
 
     assert result["error"] == "access denied"
     assert result["status"] == 403
+
+
+def test_editor_can_request_admin_review(monkeypatch):
+    class FakeUpdateResult:
+        modified_count = 2
+
+    class FakeCollection:
+        def update_many(self, query, update):
+            self.query = query
+            self.update = update
+            return FakeUpdateResult()
+
+    fake_col = FakeCollection()
+    monkeypatch.setattr(clip_service, "col", fake_col)
+
+    result = clip_service.request_admin_review(
+        ["demo::1", "demo::2"],
+        "Please confirm this label before export.",
+        current_user={
+            "id": "editor-1",
+            "role": "editor",
+            "name": "Editor One",
+            "email": "editor@example.com",
+        },
+    )
+
+    assert result["ok"] is True
+    assert result["requested_count"] == 2
+    assert fake_col.query == {"_key": {"$in": ["demo::1", "demo::2"]}}
+    assert fake_col.update["$set"]["review_request_status"] == "open"
+    assert fake_col.update["$set"]["review_requested_by"] == "editor-1"
+    assert fake_col.update["$set"]["review_request_reason"] == "Please confirm this label before export."
+
+
+def test_reviewer_admin_review_request_is_scoped(monkeypatch):
+    class FakeUpdateResult:
+        modified_count = 1
+
+    class FakeCollection:
+        def update_many(self, query, update):
+            self.query = query
+            self.update = update
+            return FakeUpdateResult()
+
+    fake_col = FakeCollection()
+    monkeypatch.setattr(clip_service, "col", fake_col)
+
+    result = clip_service.request_admin_review(
+        ["demo::1"],
+        "Needs second opinion.",
+        current_user={"id": "reviewer-1", "role": "reviewer"},
+    )
+
+    assert result["ok"] is True
+    assert fake_col.query["assigned_to"] == "reviewer-1"
+
+
+def test_admin_resolves_review_requests(monkeypatch):
+    class FakeUpdateResult:
+        modified_count = 1
+
+    class FakeCollection:
+        def update_many(self, query, update):
+            self.query = query
+            self.update = update
+            return FakeUpdateResult()
+
+    fake_col = FakeCollection()
+    monkeypatch.setattr(clip_service, "col", fake_col)
+
+    result = clip_service.resolve_review_requests(
+        ["demo::1"],
+        "resolved",
+        current_user={"id": "admin-1", "role": "admin"},
+    )
+
+    assert result["ok"] is True
+    assert result["resolved_count"] == 1
+    assert fake_col.query == {"_key": {"$in": ["demo::1"]}, "review_request_status": "open"}
+    assert fake_col.update["$set"]["review_request_status"] == "resolved"
+    assert fake_col.update["$set"]["review_resolved_by"] == "admin-1"

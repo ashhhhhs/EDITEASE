@@ -8,7 +8,7 @@ review_bp = Blueprint('review', __name__)
 @review_bp.get('/search')
 @role_required(['admin', 'editor', 'reviewer'])
 def search():
-    filters = {k: request.args.get(k) for k in ['scene_label', 'emotion', 'video', 'reviewed', 'uncertain', 'min_duration', 'max_duration']}
+    filters = {k: request.args.get(k) for k in ['scene_label', 'emotion', 'video', 'reviewed', 'uncertain', 'review_request_status', 'min_duration', 'max_duration']}
     filters['page'] = request.args.get('page', 1, type=int)
     filters = {k: v for k, v in filters.items() if v is not None}
     limit = request.args.get('limit', 100, type=int)
@@ -34,3 +34,32 @@ def bulk_update_ep():
     if not keys or not update_data:
         return jsonify({'error': 'scene_keys and update_data required'}), 400
     return jsonify(clip_service.bulk_update_clips(keys, update_data, current_user=g.user))
+
+
+@review_bp.post('/review/request-admin')
+@role_required(['editor', 'reviewer'])
+def request_admin_review_ep():
+    data = request.get_json(force=True) or {}
+    res = clip_service.request_admin_review(
+        data.get('scene_keys', []),
+        data.get('reason', ''),
+        current_user=g.user,
+    )
+    if 'error' in res:
+        return jsonify(res), res.get('status', 400)
+    return jsonify(res)
+
+
+@review_bp.post('/review/requests/resolve')
+@role_required(['admin'])
+def resolve_review_requests_ep():
+    data = request.get_json(force=True) or {}
+    res = clip_service.resolve_review_requests(
+        data.get('scene_keys', []),
+        data.get('status', ''),
+        data.get('note', ''),
+        current_user=g.user,
+    )
+    if 'error' in res:
+        return jsonify(res), res.get('status', 400)
+    return jsonify(res)

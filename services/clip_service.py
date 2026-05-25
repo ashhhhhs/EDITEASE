@@ -1,4 +1,5 @@
 import os
+import datetime
 from bson import ObjectId
 from pymongo import ASCENDING, MongoClient
 
@@ -68,6 +69,15 @@ def _can_review_doc(doc, current_user=None):
     return False
 
 
+def _add_or_clause(query, clauses):
+    if "$or" not in query:
+        query["$or"] = clauses
+        return
+    existing = query.pop("$or")
+    query.setdefault("$and", []).append({"$or": existing})
+    query["$and"].append({"$or": clauses})
+
+
 def search_clips(filters, limit=100, current_user=None):
     limit = max(1, min(int(limit), 200))
     q = {}
@@ -79,10 +89,10 @@ def search_clips(filters, limit=100, current_user=None):
     emotion = filters.get("emotion")
     if emotion:
         if emotion == "__NULL__":
-            q["$or"] = [
+            _add_or_clause(q, [
                 {"dominant_emotion_overall": None},
                 {"dominant_emotion_overall": {"$exists": False}}
-            ]
+            ])
         else:
             q["dominant_emotion_overall"] = emotion
 
@@ -106,6 +116,16 @@ def search_clips(filters, limit=100, current_user=None):
         elif isinstance(uncertain, bool):
             q["uncertain"] = uncertain
 
+    review_request_status = filters.get("review_request_status")
+    if review_request_status:
+        if review_request_status == "__NONE__":
+            _add_or_clause(q, [
+                {"review_request_status": {"$exists": False}},
+                {"review_request_status": None},
+            ])
+        else:
+            q["review_request_status"] = review_request_status
+
     min_duration = filters.get("min_duration")
     max_duration = filters.get("max_duration")
     if min_duration is not None or max_duration is not None:
@@ -126,6 +146,60 @@ def search_clips(filters, limit=100, current_user=None):
     cursor = col.find(q).sort("duration_sec", -1).skip(skip).limit(limit)
     results = [clean_doc(d) for d in cursor]
     return {"count": len(results), "total": total, "page": page, "limit": limit, "query": q, "results": results}
+
+
+def request_admin_review(keys, reason, current_user=None):
+    if not keys:
+        return {"error": "scene_keys required", "status": 400}
+    if not current_user or current_user.get("role") not in ("editor", "reviewer"):
+        return {"error": "Only editors and reviewers can request admin review.", "status": 403}
+
+    reason = (reason or "").strip()
+    if not reason:
+        return {"error": "reason required", "status": 400}
+    if len(reason) > 500:
+        return {"error": "reason must be 500 characters or fewer", "status": 400}
+
+    now = datetime.datetime.utcnow().isoformat()
+    update_fields = {
+        "review_request_status": "open",
+        "review_request_reason": reason,
+        "review_requested_at": now,
+        "review_requested_by": current_user.get("id"),
+        "review_requested_by_name": current_user.get("name"),
+        "review_requested_by_email": current_user.get("email"),
+        "review_requested_by_role": current_user.get("role"),
+        "review_resolved_at": None,
+        "review_resolved_by": None,
+        "review_resolution_note": None,
+    }
+
+    query = {"_key": {"$in": keys}}
+    query = _apply_review_scope(query, current_user)
+    res = col.update_many(query, {"$set": update_fields})
+    return {"ok": True, "requested_count": res.modified_count, "fields": update_fields}
+
+
+def resolve_review_requests(keys, status, note="", current_user=None):
+    if not keys:
+        return {"error": "scene_keys required", "status": 400}
+    if not current_user or current_user.get("role") != "admin":
+        return {"error": "Only admins can resolve review requests.", "status": 403}
+    if status not in ("resolved", "dismissed"):
+        return {"error": "status must be resolved or dismissed", "status": 400}
+
+    now = datetime.datetime.utcnow().isoformat()
+    update_fields = {
+        "review_request_status": status,
+        "review_resolved_at": now,
+        "review_resolved_by": current_user.get("id"),
+        "review_resolution_note": (note or "").strip()[:500],
+    }
+    res = col.update_many(
+        {"_key": {"$in": keys}, "review_request_status": "open"},
+        {"$set": update_fields},
+    )
+    return {"ok": True, "resolved_count": res.modified_count, "fields": update_fields}
 
 def bulk_update_clips(keys, update_data, current_user=None):
     if not keys:
