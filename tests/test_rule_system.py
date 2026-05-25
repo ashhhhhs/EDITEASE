@@ -497,6 +497,55 @@ def test_editor_can_request_admin_review(monkeypatch):
     assert fake_col.update["$set"]["review_request_reason"] == "Please confirm this label before export."
 
 
+def test_admin_review_request_appends_audit_history(monkeypatch):
+    class FakeUpdateResult:
+        modified_count = 1
+
+    class FakeCursor:
+        def __iter__(self):
+            return iter([
+                {
+                    "_key": "demo::1",
+                    "video": "demo",
+                    "scene_id": 1,
+                    "scene_label": "b-roll",
+                    "scene_confidence": 0.62,
+                    "review_request_status": None,
+                }
+            ])
+
+    class FakeCollection:
+        def __init__(self):
+            self.push_update = None
+
+        def find(self, query):
+            return FakeCursor()
+
+        def update_many(self, query, update):
+            return FakeUpdateResult()
+
+        def update_one(self, query, update):
+            self.push_update = update
+            return FakeUpdateResult()
+
+    fake_col = FakeCollection()
+    monkeypatch.setattr(clip_service, "col", fake_col)
+
+    result = clip_service.request_admin_review(
+        ["demo::1"],
+        "Needs admin approval.",
+        current_user={"id": "editor-1", "role": "editor", "name": "Editor One"},
+    )
+
+    assert result["ok"] is True
+    pushed = fake_col.push_update["$push"]
+    assert pushed["audit_trail"]["action"] == "admin_review_requested"
+    assert pushed["audit_trail"]["actor"]["id"] == "editor-1"
+    assert pushed["audit_trail"]["confidence_before"] == 0.62
+    assert pushed["review_history"]["action"] == "admin_review_requested"
+    assert pushed["review_history"]["status_after"] == "open"
+
+
 def test_reviewer_admin_review_request_is_scoped(monkeypatch):
     class FakeUpdateResult:
         modified_count = 1
@@ -705,6 +754,49 @@ def test_assigned_review_auto_resolves_when_marked_reviewed(monkeypatch):
     assert fake_col.update["review_request_status"] == "resolved"
     assert fake_col.update["review_resolved_by"] == "reviewer-1"
     assert fake_col.update["review_resolution_seen_by_requester"] is False
+
+
+def test_update_clip_appends_label_audit(monkeypatch):
+    class FakeUpdateResult:
+        matched_count = 1
+
+    class FakeCollection:
+        def __init__(self):
+            self.doc = {
+                "_key": "demo::1",
+                "video": "demo",
+                "scene_id": 1,
+                "scene_label": "b-roll",
+                "scene_confidence": 0.71,
+                "faces": {"face_present_any": False},
+            }
+            self.raw_update = None
+
+        def find_one(self, query):
+            return {**self.doc, **((self.raw_update or {}).get("$set") or {})}
+
+        def update_one(self, query, update):
+            self.raw_update = update
+            return FakeUpdateResult()
+
+    fake_col = FakeCollection()
+    monkeypatch.setattr(clip_service, "col", fake_col)
+
+    result = clip_service.update_clip(
+        "demo",
+        1,
+        {"scene_label": "testimonial", "notes": "Speaker gives a direct quote."},
+        current_user={"id": "editor-1", "role": "editor", "name": "Editor One"},
+    )
+
+    assert result["ok"] is True
+    audit = fake_col.raw_update["$push"]["audit_trail"]
+    assert audit["action"] == "clip_updated"
+    assert audit["actor"]["id"] == "editor-1"
+    assert audit["old_label"] == "b-roll"
+    assert audit["new_label"] == "testimonial"
+    assert audit["confidence_before"] == 0.71
+    assert {"field": "scene_label", "old": "b-roll", "new": "testimonial"} in audit["changes"]
 
 
 def test_admin_review_auto_resolves_open_request_when_marked_reviewed(monkeypatch):

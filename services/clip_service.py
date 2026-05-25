@@ -69,6 +69,107 @@ def _can_review_doc(doc, current_user=None):
     return False
 
 
+AUDITED_FIELDS = {
+    "scene_label",
+    "manual_scene_label",
+    "dominant_emotion_overall",
+    "manual_emotion",
+    "reviewed",
+    "uncertain",
+    "notes",
+    "assigned_to",
+    "review_request_status",
+}
+
+
+def _actor_snapshot(current_user=None):
+    current_user = current_user or {}
+    return {
+        "id": current_user.get("id"),
+        "name": current_user.get("name"),
+        "email": current_user.get("email"),
+        "role": current_user.get("role"),
+    }
+
+
+def _fetch_docs(query):
+    if not hasattr(col, "find"):
+        return []
+    try:
+        return list(col.find(query))
+    except Exception as e:
+        logger.error(f"Failed to load audit source docs: {e}")
+        return []
+
+
+def _build_change_list(doc, update_fields):
+    changes = []
+    for field, new_value in (update_fields or {}).items():
+        if field not in AUDITED_FIELDS:
+            continue
+        old_value = doc.get(field)
+        if old_value != new_value:
+            changes.append({"field": field, "old": old_value, "new": new_value})
+    return changes
+
+
+def _build_audit_entry(action, doc, update_fields=None, current_user=None, note="", extra=None):
+    update_fields = update_fields or {}
+    entry = {
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "action": action,
+        "actor": _actor_snapshot(current_user),
+        "clip_key": doc.get("_key"),
+        "video": doc.get("video"),
+        "scene_id": doc.get("scene_id"),
+        "note": (note or "").strip(),
+        "changes": _build_change_list(doc, update_fields),
+        "old_label": doc.get("scene_label"),
+        "new_label": update_fields.get("scene_label", doc.get("scene_label")),
+        "confidence_before": doc.get("scene_confidence"),
+        "review_status_before": doc.get("review_request_status"),
+        "review_status_after": update_fields.get("review_request_status", doc.get("review_request_status")),
+    }
+    if extra:
+        entry.update(extra)
+    return entry
+
+
+def _build_review_history_entry(action, doc, update_fields=None, current_user=None, note="", extra=None):
+    update_fields = update_fields or {}
+    entry = {
+        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "action": action,
+        "actor": _actor_snapshot(current_user),
+        "note": (note or "").strip(),
+        "status_before": doc.get("review_request_status"),
+        "status_after": update_fields.get("review_request_status", doc.get("review_request_status")),
+        "assigned_to_before": doc.get("assigned_to"),
+        "assigned_to_after": update_fields.get("assigned_to", doc.get("assigned_to")),
+    }
+    if extra:
+        entry.update(extra)
+    return entry
+
+
+def _push_audit_entries(docs, action, update_fields=None, current_user=None, note="", review_history=False, extra=None):
+    for doc in docs or []:
+        key = doc.get("_key")
+        if not key:
+            continue
+        push_fields = {
+            "audit_trail": _build_audit_entry(action, doc, update_fields, current_user, note, extra),
+        }
+        if review_history:
+            push_fields["review_history"] = _build_review_history_entry(
+                action, doc, update_fields, current_user, note, extra
+            )
+        try:
+            col.update_one({"_key": key}, {"$push": push_fields})
+        except Exception as e:
+            logger.error(f"Failed to append audit entry for {key}: {e}")
+
+
 def _reconcile_completed_review_requests(current_user=None):
     if not current_user or not hasattr(col, "update_many"):
         return 0
@@ -266,7 +367,16 @@ def request_admin_review(keys, reason, current_user=None):
 
     query = {"_key": {"$in": keys}}
     query = _apply_review_scope(query, current_user)
+    audit_docs = _fetch_docs(query)
     res = col.update_many(query, {"$set": update_fields})
+    _push_audit_entries(
+        audit_docs,
+        "admin_review_requested",
+        update_fields,
+        current_user,
+        reason,
+        review_history=True,
+    )
     return {"ok": True, "requested_count": res.modified_count, "fields": update_fields}
 
 
@@ -290,9 +400,16 @@ def resolve_review_requests(keys, status, note="", current_user=None):
     if status == "resolved":
         update_fields["reviewed"] = True
 
-    res = col.update_many(
-        {"_key": {"$in": keys}, "review_request_status": {"$in": ["open", "assigned"]}},
-        {"$set": update_fields},
+    query = {"_key": {"$in": keys}, "review_request_status": {"$in": ["open", "assigned"]}}
+    audit_docs = _fetch_docs(query)
+    res = col.update_many(query, {"$set": update_fields})
+    _push_audit_entries(
+        audit_docs,
+        f"review_request_{status}",
+        update_fields,
+        current_user,
+        note,
+        review_history=True,
     )
     return {"ok": True, "resolved_count": res.modified_count, "fields": update_fields}
 
@@ -318,9 +435,24 @@ def assign_review_requests(keys, assignee, note="", current_user=None):
         "review_assigned_to_role": assignee.get("role"),
         "review_assignment_note": (note or "").strip()[:500],
     }
-    res = col.update_many(
-        {"_key": {"$in": keys}, "review_request_status": {"$in": ["open", "assigned"]}},
-        {"$set": update_fields},
+    query = {"_key": {"$in": keys}, "review_request_status": {"$in": ["open", "assigned"]}}
+    audit_docs = _fetch_docs(query)
+    res = col.update_many(query, {"$set": update_fields})
+    _push_audit_entries(
+        audit_docs,
+        "review_request_assigned",
+        update_fields,
+        current_user,
+        note,
+        review_history=True,
+        extra={
+            "assignee": {
+                "id": str(assignee_id),
+                "name": assignee.get("name"),
+                "email": assignee.get("email"),
+                "role": assignee.get("role"),
+            }
+        },
     )
     return {"ok": True, "assigned_count": res.modified_count, "assignee": {
         "id": str(assignee_id),
@@ -372,7 +504,25 @@ def request_peer_review(keys, assignee, reason, current_user=None):
         "review_resolution_seen_at": None,
     }
 
-    res = col.update_many({"_key": {"$in": keys}}, {"$set": update_fields})
+    query = {"_key": {"$in": keys}}
+    audit_docs = _fetch_docs(query)
+    res = col.update_many(query, {"$set": update_fields})
+    _push_audit_entries(
+        audit_docs,
+        "peer_review_requested",
+        update_fields,
+        current_user,
+        reason,
+        review_history=True,
+        extra={
+            "assignee": {
+                "id": assignee_id,
+                "name": assignee.get("name"),
+                "email": assignee.get("email"),
+                "role": assignee.get("role"),
+            }
+        },
+    )
     return {"ok": True, "requested_count": res.modified_count, "assignee": {
         "id": assignee_id,
         "name": assignee.get("name"),
@@ -432,8 +582,16 @@ def bulk_update_clips(keys, update_data, current_user=None):
         
     query = {"_key": {"$in": keys}}
     query = _apply_review_scope(query, current_user)
+    audit_docs = _fetch_docs(query)
 
     res = col.update_many(query, {"$set": update_fields})
+    _push_audit_entries(
+        audit_docs,
+        "bulk_clip_updated",
+        update_fields,
+        current_user,
+        update_fields.get("notes", ""),
+    )
 
     auto_resolved_count = 0
     if update_fields.get("reviewed") is True and current_user:
@@ -455,9 +613,18 @@ def bulk_update_clips(keys, update_data, current_user=None):
             resolution_query["assigned_to"] = current_user.get("id")
             resolution_query["review_request_status"] = "assigned"
 
+        resolution_docs = _fetch_docs(resolution_query)
         resolution_res = col.update_many(
             resolution_query,
             {"$set": resolution_fields},
+        )
+        _push_audit_entries(
+            resolution_docs,
+            "review_auto_resolved",
+            resolution_fields,
+            current_user,
+            resolution_fields["review_resolution_note"],
+            review_history=True,
         )
         auto_resolved_count = resolution_res.modified_count
 
@@ -540,7 +707,24 @@ def update_clip(video, scene_id, data, current_user=None):
         if "manual_emotion" in update_fields:
             update_fields["manual_emotion"] = None
 
-    res = col.update_one({"_key": key}, {"$set": update_fields})
+    audit_entry = _build_audit_entry(
+        "clip_updated",
+        doc,
+        update_fields,
+        current_user,
+        update_fields.get("notes") or update_fields.get("review_resolution_note") or "",
+    )
+    push_fields = {"audit_trail": audit_entry}
+    if "review_request_status" in update_fields:
+        push_fields["review_history"] = _build_review_history_entry(
+            "review_auto_resolved" if update_fields["review_request_status"] == "resolved" else "review_status_changed",
+            doc,
+            update_fields,
+            current_user,
+            update_fields.get("review_resolution_note", ""),
+        )
+
+    res = col.update_one({"_key": key}, {"$set": update_fields, "$push": push_fields})
     if res.matched_count == 0:
         return {"error": "scene not found", "key": key}
 

@@ -13,6 +13,12 @@ const notifyReviewRequestsChanged = () => {
   window.dispatchEvent(new Event('review-requests-changed'));
 };
 
+const formatAuditAction = (action = '') => action
+  .split('_')
+  .filter(Boolean)
+  .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+  .join(' ');
+
 export default function Inspector({ currentUser }) {
   const toast = useToast();
   const [searchParams] = useSearchParams();
@@ -424,6 +430,8 @@ export default function Inspector({ currentUser }) {
                   const key = `${clip.video}::${clip.scene_id}`;
                   const isSelected = selectedKeys.has(key);
                   const thumb = thumbUrl(clip);
+                  const auditTrail = Array.isArray(clip.audit_trail) ? clip.audit_trail : [];
+                  const lastAudit = auditTrail[auditTrail.length - 1];
                   return (
                     <div key={key} className={`clip-card stagger-item ${isSelected ? 'selected' : ''}`} onClick={() => toggleSelect(key)} style={isSelected ? { boxShadow: '0 0 0 2px var(--accent), 0 0 20px rgba(88,166,255,0.25)' } : {}}>
                       <div style={{ position: 'absolute', top: 'var(--space-8)', left: 'var(--space-8)', zIndex: 10 }}>
@@ -452,6 +460,11 @@ export default function Inspector({ currentUser }) {
                                 Forwarded to {clip.review_assigned_to_name}
                               </div>
                             )}
+                          </div>
+                        )}
+                        {lastAudit && (
+                          <div style={{ marginTop: 'var(--space-8)', fontSize: 'var(--font-meta)', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                            {formatAuditAction(lastAudit.action)} by {lastAudit.actor?.name || lastAudit.actor?.email || lastAudit.actor?.role || 'system'}
                           </div>
                         )}
                       </div>
