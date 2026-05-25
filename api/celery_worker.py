@@ -80,9 +80,21 @@ def check_if_edited_by_metadata(video_path: str) -> bool:
         return False
 
 def check_if_edited_by_filename(filename: str) -> bool:
-    """Check filename for versioning or export keywords."""
+    """Check filename for strong editing/export signals.
+
+    Only matches explicit, underscore-or-hyphen-anchored markers so that
+    incidental substrings (e.g. "_v2" version suffix on a raw clip) do not
+    misroute footage into the edited bucket. Bare keywords like "final" or
+    "edit" were removed because they false-positive on common filenames.
+    """
     import re
-    pattern = r'(_final|_v\d+|_edit|_export|_master|_render|final|edit|export|version)'
+    pattern = (
+        r'(?:^|[_\-\s])'                                  # boundary
+        r'(final_cut|fcp|master_edit|finished_cut|'
+        r'final_render|edited_video|exported_video|'
+        r'_premiere|_resolve|_davinci|_capcut|_imovie)'
+        r'(?:[_\-\s\.]|$)'                                # boundary
+    )
     return bool(re.search(pattern, filename.lower()))
 
 
@@ -285,15 +297,35 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
     col = _get_col()
     existing = col.find_one({"file_hash": file_hash, "status": "organized"})
 
+    # If the existing record was organized under a label we no longer support,
+    # ignore the duplicate hit and treat this as a fresh upload so the asset
+    # gets re-organized under the current label set.
+    VALID_LABELS = {"testimonial", "b-roll", "audience_reaction",
+                    "establishing_shot", "other", "edited"}
+    if existing and existing.get("dominant_label") not in VALID_LABELS:
+        logger.info(
+            "Duplicate hit for hash %s... ignored — existing label '%s' is retired. "
+            "Re-organizing with fresh classification '%s'.",
+            file_hash[:12], existing.get("dominant_label"), dominant_label,
+        )
+        existing = None
+
     if existing:
-        # Same bytes already organized — create a lightweight duplicate record
-        logger.info(f"Duplicate detected for hash {file_hash[:12]}... — reusing existing asset")
+        # Same bytes already organized — skip the re-upload but trust the
+        # freshly computed `dominant_label` over whatever is cached on the
+        # existing record. The cache can carry stale labels from earlier
+        # classifier versions; the new run is the source of truth.
+        logger.info(
+            "Duplicate detected for hash %s... — reusing existing asset, "
+            "label '%s' (cached was '%s')",
+            file_hash[:12], dominant_label, existing.get("dominant_label"),
+        )
         dup_doc = build_doc(
             original_filename=original_filename,
             file_hash=file_hash,
             cloudinary_public_id=existing["cloudinary_public_id"],
             cloudinary_url=existing["cloudinary_url"],
-            dominant_label=existing["dominant_label"],
+            dominant_label=dominant_label,
             status="duplicate",
             uploaded_by=user_id,
             duplicate_of=str(existing["_id"]),
@@ -316,7 +348,7 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
         return {
             "status": "duplicate",
             "video": video_name,
-            "dominant_label": existing["dominant_label"],
+            "dominant_label": dominant_label,
             "duplicate_of": str(existing["_id"]),
             "export_path": existing.get("cloudinary_public_id"),
             "ai_metadata": ai_metadata,

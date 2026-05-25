@@ -1,10 +1,5 @@
 """Business logic for the organized_videos collection."""
 
-import io
-import zipfile
-import requests
-import datetime
-
 from bson import ObjectId
 
 from database.organized_videos_schema import _get_col
@@ -84,6 +79,81 @@ def get_organized_video(video_id: str) -> dict | None:
     except Exception:
         return None
     return _serialize(doc) if doc else None
+
+
+def delete_organized_videos(
+    ids: list[str],
+    *,
+    requester_id: str | None = None,
+    is_admin: bool = False,
+) -> dict:
+    """Delete organized-video records within the caller's visible scope.
+
+    Editors can delete only their own uploads. Admins can delete any organized
+    video record. Cloudinary assets are removed only when no remaining record
+    references the same public ID, which keeps duplicate records from breaking
+    shared assets.
+    """
+    if not isinstance(ids, list):
+        return {"error": "ids must be a list.", "status": 400}
+    if not ids:
+        return {"error": "Select at least one video to delete.", "status": 400}
+
+    object_ids = []
+    for video_id in ids:
+        if not ObjectId.is_valid(video_id):
+            return {"error": "One or more video IDs are invalid.", "status": 400}
+        object_ids.append(ObjectId(video_id))
+
+    col = _get_col()
+    query: dict = {"_id": {"$in": object_ids}}
+    if not is_admin:
+        if not requester_id:
+            return {"error": "Unauthorized.", "status": 401}
+        query["uploaded_by"] = requester_id
+
+    docs = list(col.find(query))
+    if not docs:
+        return {"error": "No matching videos found.", "status": 404}
+
+    delete_ids = [doc["_id"] for doc in docs]
+    public_ids = sorted({
+        doc.get("cloudinary_public_id")
+        for doc in docs
+        if doc.get("cloudinary_public_id")
+    })
+
+    result = col.delete_many({"_id": {"$in": delete_ids}})
+
+    deleted_assets = 0
+    skipped_assets = 0
+    failed_assets: list[str] = []
+    if public_ids:
+        from services import cloudinary_service
+
+        for public_id in public_ids:
+            if col.count_documents({"cloudinary_public_id": public_id}) > 0:
+                skipped_assets += 1
+                continue
+            try:
+                if cloudinary_service.delete_asset(public_id, resource_type="video"):
+                    deleted_assets += 1
+                else:
+                    failed_assets.append(public_id)
+            except Exception as exc:
+                logger.warning("Failed to delete Cloudinary asset %s: %s", public_id, exc)
+                failed_assets.append(public_id)
+
+    not_deleted = len(ids) - result.deleted_count
+    return {
+        "ok": True,
+        "deleted_count": result.deleted_count,
+        "requested_count": len(ids),
+        "not_deleted_count": not_deleted,
+        "asset_deleted_count": deleted_assets,
+        "asset_skipped_count": skipped_assets,
+        "asset_failed_count": len(failed_assets),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -205,4 +275,3 @@ def get_label_counts(uploader: str | None = None) -> dict:
         {"$group": {"_id": "$dominant_label", "count": {"$sum": 1}}},
     ]
     return {r["_id"]: r["count"] for r in col.aggregate(pipeline)}
-

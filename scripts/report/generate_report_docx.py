@@ -14,9 +14,10 @@ from docx.oxml import OxmlElement
 import re
 from PIL import Image
 
-BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = Path("/mnt/d/EDITEASE")
+BASE_DIR = PROJECT_ROOT / "_archive" / "reports"   # for resolving relative image refs in the MD
 REPORT_PATH = BASE_DIR / "Final_Project_Report.md"
-OUTPUT_PATH = BASE_DIR / "Final_Project_Report.docx"
+OUTPUT_PATH = PROJECT_ROOT / "Final_Project_Report.docx"
 
 
 def set_doc_margins(doc, top=2.54, bottom=2.54, left=3.0, right=2.54):

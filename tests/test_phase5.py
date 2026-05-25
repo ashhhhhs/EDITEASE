@@ -190,16 +190,12 @@ def test_invitation_flow(client, monkeypatch):
     # Admin creates invite
     import services.invitation_service
     sent_invites = []
-    
-    # We monkeypatch the actual Resend send function in invitation_service
-    import resend
-    class MockEmails:
-        @staticmethod
-        def send(kwargs):
-            sent_invites.append(kwargs)
-    monkeypatch.setattr(resend, "Emails", MockEmails)
-    
-    res = client.post('/invite', json={"email": "invited@example.com", "role": "reviewer"}, headers={"Authorization": f"Bearer {admin_token}"})
+
+    from services import email_service
+    monkeypatch.setattr(email_service, "send_invitation_email",
+                        lambda email, role, url: sent_invites.append(url) or True)
+
+    res = client.post('/invite', json={"email": "invited@example.com", "role": "editor"}, headers={"Authorization": f"Bearer {admin_token}"})
     assert res.status_code == 200
     
     # Get token manually to test validate

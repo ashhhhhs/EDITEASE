@@ -2,6 +2,7 @@
 /auto_organize, /open_folder, /organized-videos, /organized-videos/download-batch"""
 import os
 from flask import Blueprint, request, jsonify, send_file, redirect
+import cloudinary.api
 import cloudinary.utils
 import config
 from utils.logger import setup_logger
@@ -10,6 +11,31 @@ from api.decorators import login_required, role_required, require_verified_email
 
 logger = setup_logger('media_bp')
 media_bp = Blueprint('media', __name__)
+
+
+def _filter_existing_cloudinary_ids(public_ids: list[str]) -> tuple[list[str], list[str]]:
+    """Return (existing_ids, missing_ids) for a list of Cloudinary public IDs.
+
+    Cloudinary's `download_zip_url` fails the entire archive if any of the
+    requested IDs is missing. We pre-filter using `resources_by_ids` so a few
+    stale MongoDB records (deleted assets / failed uploads) don't break the
+    download for everyone else. Cloudinary caps `resources_by_ids` at 100 IDs
+    per call so we batch.
+    """
+    existing: list[str] = []
+    BATCH = 100
+    for i in range(0, len(public_ids), BATCH):
+        chunk = public_ids[i:i + BATCH]
+        try:
+            res = cloudinary.api.resources_by_ids(chunk, resource_type="video")
+            existing.extend(r["public_id"] for r in res.get("resources", []))
+        except Exception as exc:
+            logger.warning("resources_by_ids failed for chunk: %s", exc)
+            # If the lookup itself fails, fall back to including the chunk —
+            # better to let Cloudinary fail loudly than to silently drop IDs.
+            existing.extend(chunk)
+    missing = [pid for pid in public_ids if pid not in set(existing)]
+    return existing, missing
 
 @media_bp.get('/thumbnail/<clip_id>')
 def serve_thumbnail(clip_id):
@@ -146,6 +172,28 @@ def get_organized_video(video_id):
     return jsonify(doc)
 
 
+@media_bp.delete('/organized-videos')
+@role_required(['admin', 'editor'])
+@require_verified_email
+def delete_organized_videos():
+    """Delete selected organized videos.
+
+    Admins can delete any record; editors are scoped to their own uploads.
+    """
+    from flask import g
+    from services.organized_video_service import delete_organized_videos as svc_delete
+
+    data = request.get_json(silent=True) or {}
+    result = svc_delete(
+        data.get('ids', []),
+        requester_id=g.user.get('id'),
+        is_admin=g.user.get('role') == 'admin',
+    )
+    if 'error' in result:
+        return jsonify(result), result.get('status', 400)
+    return jsonify(result)
+
+
 @media_bp.get('/organized-videos/logs')
 @role_required(['admin', 'editor'])
 def get_organized_video_logs():
@@ -220,18 +268,31 @@ def start_batch_download():
     public_ids = [doc.get('cloudinary_public_id') for doc in docs if doc.get('cloudinary_public_id')]
     if not public_ids:
         return jsonify({'error': 'No cloud assets found for these videos'}), 404
-        
+
+    existing_ids, missing_ids = _filter_existing_cloudinary_ids(public_ids)
+    if missing_ids:
+        logger.warning(
+            "Skipping %d missing Cloudinary asset(s) in download-batch: %s",
+            len(missing_ids), missing_ids,
+        )
+    if not existing_ids:
+        return jsonify({'error': 'All requested cloud assets are missing'}), 404
+
     # Generate the signed Cloudinary ZIP URL (expires in 1 hour)
     zip_url = cloudinary.utils.download_zip_url(
-        public_ids=public_ids,
+        public_ids=existing_ids,
         resource_type="video",
         flatten_folders=True,
     )
-    
+
+    msg = f'Instant ZIP created for {len(existing_ids)} files'
+    if missing_ids:
+        msg += f' ({len(missing_ids)} unavailable were skipped)'
     return jsonify({
-        'status': 'SUCCESS', 
+        'status': 'SUCCESS',
         'url': zip_url,
-        'message': f'Instant ZIP created for {len(public_ids)} files'
+        'message': msg,
+        'skipped': len(missing_ids),
     })
 
 
@@ -263,16 +324,31 @@ def download_category():
     if not public_ids:
         return jsonify({'error': 'No cloud assets found for this category'}), 404
 
+    existing_ids, missing_ids = _filter_existing_cloudinary_ids(public_ids)
+    if missing_ids:
+        logger.warning(
+            "Skipping %d missing Cloudinary asset(s) in download-category '%s': %s",
+            len(missing_ids), label, missing_ids,
+        )
+    if not existing_ids:
+        return jsonify({'error': 'All cloud assets for this category are missing'}), 404
+
     zip_url = cloudinary.utils.download_zip_url(
-        public_ids=public_ids,
+        public_ids=existing_ids,
         resource_type="video",
         flatten_folders=True,
     )
     capped = len(docs) == CAP
+    msg = f'ZIP ready for {len(existing_ids)} files'
+    if capped:
+        msg += ' (first 50 only)'
+    if missing_ids:
+        msg += f' ({len(missing_ids)} unavailable were skipped)'
     return jsonify({
         'status': 'SUCCESS',
         'url': zip_url,
-        'count': len(public_ids),
+        'count': len(existing_ids),
         'capped': capped,
-        'message': f'ZIP ready for {len(public_ids)} files{" (first 50 only)" if capped else ""}'
+        'skipped': len(missing_ids),
+        'message': msg,
     })

@@ -6,27 +6,29 @@ from datetime import datetime
 from pymongo import MongoClient
 
 from utils.logger import setup_logger
+import sys
+sys.path.insert(0, "D:/EDITEASE")
 import config
 
 logger = setup_logger("export_dataset")
 
-# Your target label set (8 max)
+# Target label set (5 final classes after the cleanup).
 ALLOWED_LABELS = {
     "testimonial",
-    "presenter",
     "b-roll",
     "audience_reaction",
     "establishing_shot",
-    "screen_recording",
-    "text_slide",
     "other",
 }
 
-# Common alias normalization (protects you from label drift)
+# Common alias normalization (protects you from label drift).
+# Retired classes (presenter, screen_recording, text_slide) are remapped to
+# the closest surviving class so historical reviewed data is not discarded.
 LABEL_MAP = {
     "talking_head": "testimonial",
     "talkinghead": "testimonial",
     "interview": "testimonial",
+    "presenter": "testimonial",          # retired → testimonial
 
     "broll": "b-roll",
     "b_roll": "b-roll",
@@ -39,13 +41,13 @@ LABEL_MAP = {
     "establishing": "establishing_shot",
     "establishing_shot": "establishing_shot",
 
-    "screen": "screen_recording",
-    "screen_recording": "screen_recording",
-    "screenrecording": "screen_recording",
+    "screen": "other",                   # retired → other
+    "screen_recording": "other",         # retired → other
+    "screenrecording": "other",          # retired → other
 
-    "text": "text_slide",
-    "text_slide": "text_slide",
-    "slide": "text_slide",
+    "text": "other",                     # retired → other
+    "text_slide": "other",               # retired → other
+    "slide": "other",                    # retired → other
 
     "other": "other",
 }
@@ -149,7 +151,7 @@ def build_splits(video_ids, seed=42, train=0.70, val=0.15, test=0.15):
     }
 
 def export_scene_type_dataset(
-    out_dir="datasets/scene_type/v1",
+    out_dir="datasets/scene_type/v2_full",
     min_duration=2.0,
     max_duration=60.0,
     seed=42
@@ -279,7 +281,7 @@ def export_scene_type_dataset(
 
 if __name__ == "__main__":
     export_scene_type_dataset(
-        out_dir="datasets/scene_type/v1",
+        out_dir="datasets/scene_type/v2_full",
         min_duration=2.0,
         max_duration=60.0,
         seed=42

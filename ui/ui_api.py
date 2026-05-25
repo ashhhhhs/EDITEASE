@@ -7,7 +7,7 @@ import config
 
 API_BASE = f"http://{config.API_HOST}:{config.API_PORT}"
 
-SCENE_LABELS = ["testimonial", "presenter", "b-roll", "audience_reaction", "establishing_shot", "other"]
+SCENE_LABELS = ["testimonial", "b-roll", "audience_reaction", "establishing_shot", "other"]
 EMOTIONS = ["happy", "sad", "angry", "fear", "surprise", "disgust", "neutral"]
 
 

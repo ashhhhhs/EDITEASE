@@ -378,7 +378,7 @@ const CapCard3D = ({ c, i }) => {
 const CAPS_3D = [
   { kicker: 'Vision',   title: 'Scene-aware indexing',    desc: 'Every shot fingerprinted with composition, motion, and color tags. No manual timecoding.' },
   { kicker: 'Pipeline', title: '4-step ingest to export', desc: 'A single rail from raw upload to dataset, organized clips, or NLE handoff.' },
-  { kicker: 'Roles',    title: 'Reviewer, editor, admin', desc: 'Surface only what each role needs. Bulk-approve or moderate visually.' },
+  { kicker: 'Roles',    title: 'Editor and admin', desc: 'Surface only what each role needs. Bulk-approve or moderate visually.' },
   { kicker: 'Export',   title: 'Structured downloads',    desc: 'JSON / CSV manifests or auto-organized folders — batch-ready in one click.' },
 ];
 

@@ -3,7 +3,7 @@ import {
   Folder, Download, RefreshCw, Search,
   CheckCircle, Archive, X, ChevronLeft, PlayCircle,
   FileText, Clock, Hash, Brain, Eye, Zap,
-  Activity, AlertTriangle, ChevronDown, ChevronUp, FolderDown
+  Activity, AlertTriangle, ChevronDown, ChevronUp, FolderDown, Trash2
 } from 'lucide-react';
 import api from './lib/api';
 import gsap from 'gsap';
@@ -13,15 +13,13 @@ gsap.registerPlugin(ScrollTrigger);
 import { useToast } from './hooks/useToast.jsx';
 import PageHeader from './components/PageHeader';
 import LoadingState from './components/LoadingState';
+import ConfirmationModal from './components/ConfirmationModal';
 
 const BATCH_MAX = 10;
 
 const LABEL_MAP = {
   testimonial: 'Testimonials',
-  presenter: 'Presenters',
   audience_reaction: 'Audience Reactions',
-  text_slide: 'Text Slides',
-  screen_recording: 'Screen Recordings',
   'b-roll': 'B-Rolls',
   establishing_shot: 'Establishing Shots',
   edited: 'Edited Videos',
@@ -32,6 +30,19 @@ const getDisplayLabel = (key) => {
   if (!key) return 'Other';
   if (LABEL_MAP[key]) return LABEL_MAP[key];
   return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + 's';
+};
+
+const hasFaceEvidence = (ai) => {
+  if (!ai) return false;
+  if (ai.has_faces === false) return false;
+  if (ai.has_faces === true) return true;
+  return (ai.face_sample_hits ?? 0) > 0 || (ai.face_scene_count ?? 0) > 0;
+};
+
+const getSafeDominantEmotion = (ai) => {
+  if (!hasFaceEvidence(ai)) return null;
+  const emotion = ai?.dominant_emotion;
+  return emotion && emotion !== 'none' ? emotion : null;
 };
 
 /* ── Inline style helpers ── */
@@ -96,7 +107,7 @@ function MetadataStrip({ ai }) {
   const confidence = ai.average_confidence != null ? Math.round(ai.average_confidence * 100) : null;
   const emotionConfidence = ai.dominant_emotion_confidence != null ? Math.round(ai.dominant_emotion_confidence) : null;
   const scenes = ai.total_scenes_detected;
-  const emotion = ai.dominant_emotion;
+  const emotion = getSafeDominantEmotion(ai);
   const hasFaces = ai.has_faces;
   const faceSceneCount = ai.face_scene_count;
   const faceSceneRatio = ai.face_scene_ratio != null ? Math.round(ai.face_scene_ratio * 100) : null;
@@ -134,7 +145,7 @@ function MetadataStrip({ ai }) {
           <span style={{ ...metaValStyle, textTransform: 'capitalize' }}>{emotion}</span>
         </div>
       )}
-      {emotionConfidence != null && (
+      {emotion && emotionConfidence != null && (
         <div style={metaRowStyle}>
           <span style={metaKeyStyle}><Zap size={10} /> Emotion Conf.</span>
           <span style={metaValStyle}>{emotionConfidence}%</span>
@@ -388,7 +399,7 @@ function LogsPanel({ currentFolder, search }) {
       setLogs(res.data.logs || []);
       setTotal(res.data.total || 0);
       setPage(p);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load processing logs');
     } finally {
       setLoading(false);
@@ -443,7 +454,9 @@ function LogsPanel({ currentFolder, search }) {
             </tr>
           </thead>
           <tbody>
-            {logs.map(log => (
+            {logs.map(log => {
+              const safeEmotion = getSafeDominantEmotion(log.ai_metadata);
+              return (
               <React.Fragment key={log.id}>
                 <tr
                   style={{
@@ -523,13 +536,13 @@ function LogsPanel({ currentFolder, search }) {
                                   <span style={metaValStyle}>{log.ai_metadata.total_scenes_detected} cuts</span>
                                 </div>
                               )}
-                              {log.ai_metadata.dominant_emotion && (
+                              {safeEmotion && (
                                 <div style={metaRowStyle}>
                                   <span style={metaKeyStyle}>Emotion</span>
-                                  <span style={{ ...metaValStyle, textTransform: 'capitalize' }}>{log.ai_metadata.dominant_emotion}</span>
+                                  <span style={{ ...metaValStyle, textTransform: 'capitalize' }}>{safeEmotion}</span>
                                 </div>
                               )}
-                              {log.ai_metadata.dominant_emotion_confidence != null && (
+                              {safeEmotion && log.ai_metadata.dominant_emotion_confidence != null && (
                                 <div style={metaRowStyle}>
                                   <span style={metaKeyStyle}>Emotion Conf.</span>
                                   <span style={metaValStyle}>{Math.round(log.ai_metadata.dominant_emotion_confidence)}%</span>
@@ -611,7 +624,8 @@ function LogsPanel({ currentFolder, search }) {
                   </tr>
                 )}
               </React.Fragment>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>
@@ -659,6 +673,8 @@ export default function OrganizedVideos() {
   const [filterDup, setFilterDup]   = useState('');   // '' | 'true' | 'false'
   const [showMeta, setShowMeta]     = useState(true);
   const [showLogs, setShowLogs]     = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const limit = 24;
 
@@ -672,7 +688,7 @@ export default function OrganizedVideos() {
     try {
       const res = await api.get('/organized-videos/stats');
       setFolderStats(res.data || {});
-    } catch (err) {
+    } catch {
       toast.error('Failed to load folder structure');
     } finally {
       setStatsLoading(false);
@@ -783,6 +799,37 @@ export default function OrganizedVideos() {
     }
   };
 
+  const requestDeleteSelected = () => {
+    if (selected.size === 0) {
+      toast.error('Select at least one video to delete');
+      return;
+    }
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteSelected = async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+
+    setDeleting(true);
+    try {
+      const nextPage = ids.length >= videos.length && page > 1 ? page - 1 : page;
+      const res = await api.delete('/organized-videos', { data: { ids } });
+      const deletedCount = res.data.deleted_count ?? ids.length;
+      toast.success(`Deleted ${deletedCount} video${deletedCount !== 1 ? 's' : ''}`);
+      if (previewDoc && ids.includes(previewDoc.id)) {
+        setPreviewDoc(null);
+      }
+      clearAll();
+      setDeleteConfirmOpen(false);
+      await Promise.all([fetchStats(), fetchVideos(nextPage)]);
+    } catch (err) {
+      toast.error(err.friendlyMessage || 'Failed to delete selected videos');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleCategoryDownload = async (label) => {
     setDownloadingCategory(label);
     try {
@@ -805,6 +852,7 @@ export default function OrganizedVideos() {
 
   const totalPages = Math.ceil(total / limit);
   const selCount   = selected.size;
+  const previewEmotion = getSafeDominantEmotion(previewDoc?.ai_metadata);
 
   return (
     <div ref={mainRef}>
@@ -962,6 +1010,14 @@ export default function OrganizedVideos() {
               >
                 <Archive size={12} /> Download ZIP ({selCount})
               </button>
+              <button
+                className="btn btn-danger"
+                style={{ fontSize: 'var(--font-meta)', padding: '4px 14px' }}
+                onClick={requestDeleteSelected}
+                disabled={loading || deleting}
+              >
+                <Trash2 size={12} /> Delete Selected ({selCount})
+              </button>
             </>
           )}
         </div>
@@ -1101,10 +1157,10 @@ export default function OrganizedVideos() {
                   
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-small)' }}>Dominant Emotion</span>
-                    <span style={{ fontWeight: 500, fontSize: 'var(--font-small)', textTransform: 'capitalize', color: 'var(--text-primary)' }}>{previewDoc.ai_metadata.dominant_emotion || 'None'}</span>
+                    <span style={{ fontWeight: 500, fontSize: 'var(--font-small)', textTransform: 'capitalize', color: 'var(--text-primary)' }}>{previewEmotion || 'None'}</span>
                   </div>
 
-                  {previewDoc.ai_metadata.dominant_emotion_confidence != null && (
+                  {previewEmotion && previewDoc.ai_metadata.dominant_emotion_confidence != null && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-small)' }}>Emotion Confidence</span>
                       <span style={{ fontWeight: 500, fontSize: 'var(--font-small)' }}>
@@ -1163,6 +1219,17 @@ export default function OrganizedVideos() {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={deleteConfirmOpen}
+        title="Delete selected videos?"
+        body={`This will remove ${selCount} selected video${selCount !== 1 ? 's' : ''} from Organized Videos. This action cannot be undone.`}
+        confirmLabel={`Delete ${selCount} video${selCount !== 1 ? 's' : ''}`}
+        variant="danger"
+        loading={deleting}
+        onConfirm={handleDeleteSelected}
+        onCancel={() => !deleting && setDeleteConfirmOpen(false)}
+      />
     </div>
   );
 }

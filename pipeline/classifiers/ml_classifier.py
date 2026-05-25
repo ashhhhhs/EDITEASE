@@ -14,26 +14,26 @@ logger = setup_logger("ml_classifier")
 # ---------------------------------------------------------------------------
 # Per-class confidence thresholds
 #
-# Why: a single global threshold (0.60) is too blunt. Some scene types are
-# inherently hard to separate (presenter vs testimonial) and need a tighter
-# gate; others (text_slide, screen_recording) are visually distinct and can
-# afford a looser gate.
-#
-# Tune these values as you accumulate labelled data. Start conservative and
-# relax when you see that a class rarely needs rule-based correction.
+# Why: a single global threshold (0.60) is too blunt. Audience reactions are
+# easily confused with b-roll group shots, so they get a tighter gate;
+# testimonial / b-roll / establishing_shot are distinctive enough to use a
+# looser threshold. Tune as labelled data accumulates.
 # ---------------------------------------------------------------------------
 CLASS_THRESHOLDS = {
     "testimonial"      : 0.65,
-    "presenter"        : 0.70,   # easily confused with testimonial
     "audience_reaction": 0.72,
-    "text_slide"       : 0.52,   # highly distinctive visually
-    "screen_recording" : 0.52,
     "b-roll"           : 0.60,
     "establishing_shot": 0.60,
+    "other"            : 0.62,
 }
 # Fallback threshold for any label not listed above (e.g. if the model was
 # retrained with new classes that haven't been tuned yet).
 DEFAULT_THRESHOLD = 0.62
+
+# Classes the ML model may still emit because it was trained on the old label
+# set, but that we no longer support. When the ML predicts one of these, skip
+# it entirely and fall back to the rule-based classifier.
+RETIRED_LABELS = {"presenter", "text_slide", "screen_recording"}
 
 
 class MLClassifier(BaseClassifier):
@@ -55,8 +55,8 @@ class MLClassifier(BaseClassifier):
         self.idx_to_label: dict[str, str] = {}
 
         models_dir    = os.path.join(config.BASE_DIR, "pipeline", "models")
-        model_path    = os.path.join(models_dir, "scene_classifier.pth")
-        encoder_path  = os.path.join(models_dir, "label_encoder.json")
+        model_path    = os.path.join(models_dir, "scene_classifier_v2.pth")
+        encoder_path  = os.path.join(models_dir, "label_encoder_v2.json")
 
         try:
             if os.path.exists(encoder_path):
@@ -66,10 +66,16 @@ class MLClassifier(BaseClassifier):
             if os.path.exists(model_path) and self.idx_to_label:
                 self.model = models.resnet18(weights=None)
                 num_ftrs   = self.model.fc.in_features
-                self.model.fc = nn.Linear(num_ftrs, len(self.idx_to_label))
-                self.model.load_state_dict(
-                    torch.load(model_path, map_location=self.device, weights_only=True)
+                self.model.fc = nn.Sequential(
+                    nn.Linear(num_ftrs, 256),
+                    nn.LayerNorm(256),
+                    nn.ReLU(inplace=True),
+                    nn.Dropout(p=0.3),
+                    nn.Linear(256, len(self.idx_to_label)),
                 )
+                ckpt = torch.load(model_path, map_location=self.device, weights_only=False)
+                state_dict = ckpt.get("model_state_dict", ckpt)
+                self.model.load_state_dict(state_dict)
                 self.model.to(self.device)
                 self.model.eval()
 
@@ -153,6 +159,22 @@ class MLClassifier(BaseClassifier):
         # ── Run inference ───────────────────────────────────────────────
         try:
             scene_label, ml_conf, ml_debug = self.predict_thumbnail(thumbnail_path)
+
+            # ── Retired-label override ───────────────────────────────────
+            # The ML model still predicts the old class set; ignore any
+            # prediction that maps to a class we no longer support.
+            if scene_label in RETIRED_LABELS:
+                rb_label, rb_conf, rb_debug = self.fallback.classify(
+                    video_path, start_sec, end_sec, thumbnail_path
+                )
+                rb_debug["classifier_used"] = "rule_based_retired_label"
+                rb_debug["ml_label"]        = scene_label
+                rb_debug["ml_conf"]         = round(ml_conf, 4)
+                logger.debug(
+                    "ML predicted retired label '%s' (%.3f) — using rule-based (%s, %.3f).",
+                    scene_label, ml_conf, rb_label, rb_conf,
+                )
+                return rb_label, rb_conf, rb_debug
 
             # ── Per-class threshold check ────────────────────────────────
             threshold = CLASS_THRESHOLDS.get(scene_label, DEFAULT_THRESHOLD)

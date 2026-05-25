@@ -16,12 +16,9 @@ logger = setup_logger("train_scene_classifier")
 
 ALLOWED_LABELS = [
     "testimonial",
-    "presenter",
     "b-roll",
     "audience_reaction",
     "establishing_shot",
-    "screen_recording",
-    "text_slide",
     "other",
 ]
 LABEL_TO_IDX = {k: i for i, k in enumerate(ALLOWED_LABELS)}
@@ -178,8 +175,8 @@ def train_model(
         return
 
     # ── Weighted sampler — fixes class imbalance ──────────────────────────
-    # If you have 500 b-roll scenes and 50 text_slides, the model will ignore
-    # text_slides without this. Each sample's weight = 1 / class_count.
+    # If you have 500 b-roll scenes and 50 audience_reaction, the model will
+    # ignore the minority class without this. Each sample's weight = 1 / class_count.
     class_counts  = train_dataset.get_class_counts()
     class_weights = np.where(class_counts > 0, 1.0 / class_counts, 0.0)
     sample_weights = np.array([

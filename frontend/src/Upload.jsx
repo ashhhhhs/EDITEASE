@@ -16,6 +16,13 @@ const formatPercent = (value) => {
   return `${Math.round((numeric <= 1 ? numeric * 100 : numeric))}%`;
 };
 
+const hasFaceEvidence = (ai) => {
+  if (!ai) return false;
+  if (ai.has_faces === false) return false;
+  if (ai.has_faces === true) return true;
+  return (ai.face_sample_hits ?? 0) > 0 || (ai.face_scene_count ?? 0) > 0;
+};
+
 function AnalysisSummary({ file }) {
   const ai = file.aiMetadata;
   if (!ai && !file.dominantLabel) return null;
@@ -25,7 +32,7 @@ function AnalysisSummary({ file }) {
   const faceText = ai?.has_faces
     ? `${ai.face_scene_count ?? 0}/${ai.total_scenes_detected ?? '?'} scenes`
     : 'No faces detected';
-  const emotion = ai?.dominant_emotion && ai.dominant_emotion !== 'none'
+  const emotion = hasFaceEvidence(ai) && ai?.dominant_emotion && ai.dominant_emotion !== 'none'
     ? formatLabel(ai.dominant_emotion)
     : 'None';
 
@@ -46,14 +53,17 @@ function AnalysisSummary({ file }) {
           <div style={{ fontSize: 'var(--font-meta)', color: 'var(--text-muted)', marginBottom: 2 }}>Folder</div>
           <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formatLabel(file.dominantLabel || ai?.dominant_label)}</div>
         </div>
-        {metrics.map(({ icon: Icon, label, value }) => (
-          <div key={label} style={{ background: 'var(--surface-base)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '8px 10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 'var(--font-meta)', color: 'var(--text-muted)', marginBottom: 2 }}>
-              <Icon size={11} /> {label}
+        {metrics.map(({ icon, label, value }) => {
+          const MetricIcon = icon;
+          return (
+            <div key={label} style={{ background: 'var(--surface-base)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '8px 10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 'var(--font-meta)', color: 'var(--text-muted)', marginBottom: 2 }}>
+                <MetricIcon size={11} /> {label}
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-small)', fontWeight: 500 }}>{value}</div>
             </div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-small)', fontWeight: 500 }}>{value}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -22,7 +22,7 @@ export default function AuthShell({
   success,
   split = false,
   asideHeadline = 'Stop sorting footage manually.',
-  asideLede = 'A clip-first review workspace for editors, reviewers, and post-production teams.',
+  asideLede = 'A clip-first review workspace for editors, admins, and post-production teams.',
   asideBullets = DEFAULT_BULLETS,
   asideEyebrow,
 }) {

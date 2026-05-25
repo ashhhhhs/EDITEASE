@@ -11,9 +11,10 @@ Architecture overview
 
 Improvements over v1
 --------------------
-* color_temperature signal  — distinguishes screen recordings / text slides (cool)
-  from b-roll / establishing shots (warm / varied).
-* face_aspect_ratio signal  — large centred face = presenter/testimonial;
+* color_temperature signal  — captures warm vs. cool bias of the frame and
+  helps differentiate natural footage (b-roll / establishing) from synthetic
+  / desaturated scenes that fall into the "other" bucket.
+* face_aspect_ratio signal  — large centred face = testimonial;
   many small faces = audience_reaction.
 * Both signals slot into FEATURE_RANGES + SCENE_PROFILES with no rule rewriting.
 * Feature vector is returned inside `debug` so the caller can log it to MongoDB
@@ -72,19 +73,6 @@ SCENE_PROFILES = {
         "color_temperature"  : (0.55, 0.25),   # neutral-to-warm
     },
 
-    "presenter": {
-        # Single face, gesturing / walking, more dynamic
-        "face_presence"      : (1.00, 0.05),
-        "face_dominance"     : (0.35, 0.25),
-        "face_count_norm"    : (0.17, 0.10),
-        "face_aspect_ratio"  : (0.55, 0.25),
-        "motion_mean"        : (0.50, 0.22),
-        "motion_peak"        : (0.55, 0.25),
-        "motion_consistency" : (0.55, 0.25),
-        "color_variance"     : (0.22, 0.14),
-        "color_temperature"  : (0.52, 0.28),
-    },
-
     "audience_reaction": {
         # Many small faces (crowd, panel, audience shot)
         "face_presence"      : (1.00, 0.05),
@@ -96,34 +84,17 @@ SCENE_PROFILES = {
         "color_temperature"  : (0.50, 0.30),
     },
 
-    "text_slide": {
-        # No faces, static, text-heavy, flat cool colours (projector / screen)
-        "face_presence"      : (0.00, 0.05),
-        "motion_mean"        : (0.04, 0.06),
-        "motion_peak"        : (0.06, 0.08),
-        "text_density"       : (0.82, 0.18),
-        "color_variance"     : (0.07, 0.09),
-        "sharpness"          : (0.40, 0.30),
-        "edge_density"       : (0.45, 0.30),
-        "color_temperature"  : (0.25, 0.20),   # cool / desaturated
-    },
-
-    "screen_recording": {
-        # No faces, pixel-sharp UI, dense edges, low-moderate motion, cool palette
-        "face_presence"      : (0.00, 0.05),
-        "sharpness"          : (0.85, 0.15),
-        "edge_density"       : (0.75, 0.18),
-        "motion_mean"        : (0.18, 0.18),
-        "color_variance"     : (0.12, 0.14),
-        "text_density"       : (0.40, 0.30),
-        "color_temperature"  : (0.20, 0.18),   # distinctly cool (UI blues/grays)
-    },
+    # Note: "other" is intentionally NOT modelled as a Gaussian profile.
+    # Wide-sigma Gaussians behave unpredictably in a softmax — they can either
+    # dominate or vanish depending on which features each scene happens to
+    # match. Instead, `classify_scene` returns "other" when the winning real
+    # class falls below OTHER_FALLBACK_PROB.
 
     "b-roll": {
         # No faces, dynamic natural footage, rich warm colour
         "face_presence"      : (0.00, 0.05),
-        "motion_mean"        : (0.72, 0.22),
-        "motion_peak"        : (0.75, 0.22),
+        "motion_mean"        : (0.72, 0.15),
+        "motion_peak"        : (0.75, 0.15),
         "motion_burst"       : (0.45, 0.35),
         "color_variance"     : (0.72, 0.18),
         "text_density"       : (0.05, 0.12),
@@ -326,6 +297,12 @@ def extract_features(
 # Gaussian Likelihood Profiling classifier
 # ---------------------------------------------------------------------------
 
+# If the best real-class probability falls below this threshold, the
+# classifier returns "other" instead. Keep this conservative — too high and
+# real classes get swallowed, too low and ambiguous scenes get mislabelled.
+OTHER_FALLBACK_PROB = 0.40
+
+
 def _gaussian_log_likelihood(value, mu, sigma):
     """Unnormalised log N(value | mu, sigma). Constant term omitted."""
     return -0.5 * ((value - mu) / (sigma + 1e-9)) ** 2
@@ -356,10 +333,68 @@ def classify_scene(features):
     probs  = np.exp(raw)
     probs /= probs.sum()
 
+    # ── Common-sense hard gates ────────────────────────────────────────────
+    # These encode rules a human would apply instinctively: "audience_reaction
+    # must have several faces", "testimonial is one person not a crowd", etc.
+    # Implemented as multiplicative probability penalties (not zeros) so the
+    # softmax still produces a usable distribution if every class is gated.
+    #
+    # face_count_norm = raw_face_count / 6, clamped to 1.0
+    #   1 face  → 0.167
+    #   2 faces → 0.333
+    #   3 faces → 0.500
+    #   4 faces → 0.667
+    face_norm = features.get("face_count_norm", 0.0)
+    face_present = features.get("face_presence", 0.0) >= 0.5
+
+    # Gate 1 — audience_reaction REQUIRES a crowd. Fewer than ~3 faces and it
+    # cannot be an audience reaction shot.
+    if face_norm < 0.45:                          # < ~3 faces
+        if "audience_reaction" in labels:
+            probs[labels.index("audience_reaction")] *= 0.02
+
+    # Gate 2 — testimonial is ONE person to camera. If there's a crowd or no
+    # face at all, it cannot be a testimonial.
+    if face_norm > 0.45 or not face_present:      # crowd OR no face
+        if "testimonial" in labels:
+            probs[labels.index("testimonial")] *= 0.02
+
+    # Gate 3 — b-roll and establishing_shot are people-free. If a clearly
+    # dominant face is present, neither label applies.
+    if face_present and features.get("face_dominance", 0.0) > 0.10:
+        for retired_label in ("b-roll", "establishing_shot"):
+            if retired_label in labels:
+                probs[labels.index(retired_label)] *= 0.02
+
+    # Gate 4 — b-roll requires real motion. Static wides (drone holds,
+    # locked-off landscapes) belong to establishing_shot, not b-roll.
+    if features.get("motion_mean", 0.0) < 0.25 and features.get("motion_peak", 0.0) < 0.30:
+        if "b-roll" in labels:
+            probs[labels.index("b-roll")] *= 0.05
+
+    # Gate 5 — establishing_shot is static by definition. If motion is
+    # clearly high, demote it so a fast-moving scene can't accidentally win.
+    if features.get("motion_mean", 0.0) > 0.50 and features.get("motion_peak", 0.0) > 0.55:
+        if "establishing_shot" in labels:
+            probs[labels.index("establishing_shot")] *= 0.05
+
+    # Renormalize once after all gates so probabilities still sum to 1.
+    total = probs.sum()
+    if total > 0:
+        probs /= total
+
     best_idx   = int(np.argmax(probs))
     label      = labels[best_idx]
-    confidence = float(np.clip(probs[best_idx], 0.40, 0.95))
+    raw_prob   = float(probs[best_idx])
     all_probs  = {l: round(float(p), 4) for l, p in zip(labels, probs)}
+
+    # If no real class is a confident fit, route to "other" instead of
+    # forcing one of the trained labels. all_probs still reflects the
+    # underlying competition so debug logging stays informative.
+    if raw_prob < OTHER_FALLBACK_PROB:
+        label = "other"
+
+    confidence = float(np.clip(raw_prob, 0.40, 0.95))
 
     # Log classification results in a clean format
     probs_str = " | ".join(

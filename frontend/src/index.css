@@ -1502,7 +1502,6 @@ tr.row-failure td:first-child {
 /* ── Role-tinted avatar gradients ── */
 .avatar-gradient-admin    { background: linear-gradient(135deg, #58a6ff, #a371f7); }
 .avatar-gradient-editor   { background: linear-gradient(135deg, #238636, #2ea043); }
-.avatar-gradient-reviewer { background: linear-gradient(135deg, #d29922, #bb8009); }
 
 /* ── Presence dots for last-seen indicators ── */
 .presence-dot {
