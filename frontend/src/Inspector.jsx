@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, CheckSquare, Search, Save, Settings2, Video, Square, CheckSquare as CheckSquareIcon, ListFilter, Send, ShieldCheck, XCircle } from 'lucide-react';
 import { SCENE_LABELS, EMOTIONS } from './constants';
 import PageHeader from './components/PageHeader';
@@ -10,6 +11,7 @@ import { useToast } from './hooks/useToast.jsx';
 
 export default function Inspector({ currentUser }) {
   const toast = useToast();
+  const [searchParams] = useSearchParams();
   const [clips, setClips] = useState([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -20,7 +22,7 @@ export default function Inspector({ currentUser }) {
   const [fEmotion, setFEmotion] = useState('');
   const [fReviewed, setFReviewed] = useState('false');
   const [fUncertain, setFUncertain] = useState('');
-  const [fRequest, setFRequest] = useState('');
+  const [fRequest, setFRequest] = useState(() => searchParams.get('request') || '');
   
   const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [bLabel, setBLabel] = useState('');

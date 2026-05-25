@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, UploadCloud, Download, Library, Wand2, Shield, LogOut, CheckSquare, Users, Activity, AlertTriangle, Settings, Zap } from 'lucide-react';
+import { LayoutDashboard, UploadCloud, Download, Library, Wand2, Shield, LogOut, CheckSquare, Users, Activity, AlertTriangle, Settings, Zap, Bell } from 'lucide-react';
 import { Joyride, STATUS } from 'react-joyride';
 import api from './lib/api';
 
@@ -126,6 +126,7 @@ function GoogleLinkModal({ currentUser }) {
 export default function AppShell({ currentUser, onLogout }) {
   const location = useLocation();
   const role = currentUser?.role || 'editor';
+  const [openReviewRequests, setOpenReviewRequests] = useState(0);
   const navDescriptions = {
     Dashboard: 'Your creative hub. Track recent ingests and see what the system is organizing for you.',
     'Review Queue': 'Quickly review and sort ambiguous clips so they land in the right folders.',
@@ -155,6 +156,30 @@ export default function AppShell({ currentUser, onLogout }) {
   const activeNav        = visibleNav.find(n => location.pathname.startsWith(n.path));
   const activeTitle = activeNav?.name || 'Dashboard';
   const activeDescription = navDescriptions[activeTitle] || 'Move through review, uploads, and exports from one shared workspace.';
+
+  React.useEffect(() => {
+    if (role !== 'admin') {
+      setOpenReviewRequests(0);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchOpenReviewRequests = async () => {
+      try {
+        const res = await api.get('/search?review_request_status=open&limit=1');
+        if (!cancelled) setOpenReviewRequests(res.data.total || 0);
+      } catch {
+        if (!cancelled) setOpenReviewRequests(0);
+      }
+    };
+
+    fetchOpenReviewRequests();
+    const timer = setInterval(fetchOpenReviewRequests, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [role, location.pathname]);
 
   // ── Tour Guide State ──
   const [runTour, setRunTour] = useState(false);
@@ -388,6 +413,16 @@ export default function AppShell({ currentUser, onLogout }) {
             <span className="workspace-topbar-subtitle">{activeDescription}</span>
           </div>
           <div className="workspace-topbar-actions">
+            {role === 'admin' && openReviewRequests > 0 && (
+              <Link
+                to="/app/review?request=open"
+                className="workspace-notification-pill"
+                title="Open admin review requests"
+              >
+                <Bell size={14} />
+                <span>{openReviewRequests} review request{openReviewRequests === 1 ? '' : 's'}</span>
+              </Link>
+            )}
             <button 
               className="btn workspace-ghost-btn tour-start-btn"
               onClick={() => setRunTour(true)}
