@@ -333,6 +333,7 @@ export function FormButton({
   disabled = false,
   children,
   onClick,
+  style,
   ...props
 }) {
   const baseStyles = {
@@ -402,6 +403,7 @@ export function FormButton({
         ...sizeStyles,
         opacity: disabled || loading ? '0.5' : '1',
         cursor: disabled || loading ? 'not-allowed' : 'pointer',
+        ...style,
       }}
       {...props}
     >
