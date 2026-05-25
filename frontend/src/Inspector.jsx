@@ -9,6 +9,10 @@ import { API_BASE } from './config';
 import api from './lib/api';
 import { useToast } from './hooks/useToast.jsx';
 
+const notifyReviewRequestsChanged = () => {
+  window.dispatchEvent(new Event('review-requests-changed'));
+};
+
 export default function Inspector({ currentUser }) {
   const toast = useToast();
   const [searchParams] = useSearchParams();
@@ -95,6 +99,7 @@ export default function Inspector({ currentUser }) {
       await api.post('/review/bulk-update', { scene_keys: Array.from(selectedKeys), update_data: updateData });
       toast.success(`Updated ${selectedKeys.size} clips successfully`);
       setBLabel(''); setBEmotion(''); setBReviewed(''); setBUncertain('');
+      notifyReviewRequestsChanged();
       fetchClips();
     } catch (err) {
       toast.error(err.friendlyMessage || 'Bulk update failed');
@@ -114,6 +119,7 @@ export default function Inspector({ currentUser }) {
       });
       toast.success(`Requested admin review for ${res.data.requested_count || selectedKeys.size} clips`);
       setRequestReason('');
+      notifyReviewRequestsChanged();
       fetchClips();
     } catch (err) {
       toast.error(err.friendlyMessage || 'Failed to request admin review');
@@ -131,6 +137,7 @@ export default function Inspector({ currentUser }) {
         status,
       });
       toast.success(`${status === 'resolved' ? 'Resolved' : 'Dismissed'} ${res.data.resolved_count || 0} requests`);
+      notifyReviewRequestsChanged();
       fetchClips();
     } catch (err) {
       toast.error(err.friendlyMessage || 'Failed to update review requests');
@@ -152,6 +159,7 @@ export default function Inspector({ currentUser }) {
       const assigneeName = res.data.assignee?.name || res.data.assignee?.email || 'selected reviewer';
       toast.success(`Assigned ${res.data.assigned_count || 0} request${res.data.assigned_count === 1 ? '' : 's'} to ${assigneeName}`);
       setAssignmentNote('');
+      notifyReviewRequestsChanged();
       fetchClips();
     } catch (err) {
       toast.error(err.friendlyMessage || 'Failed to assign review requests');
@@ -174,6 +182,7 @@ export default function Inspector({ currentUser }) {
       const assigneeName = res.data.assignee?.name || res.data.assignee?.email || 'selected reviewer';
       toast.success(`Requested peer review from ${assigneeName}`);
       setPeerReason('');
+      notifyReviewRequestsChanged();
       fetchClips();
     } catch (err) {
       toast.error(err.friendlyMessage || 'Failed to request peer review');

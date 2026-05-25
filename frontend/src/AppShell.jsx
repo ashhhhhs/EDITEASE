@@ -175,9 +175,11 @@ export default function AppShell({ currentUser, onLogout }) {
     };
 
     fetchOpenReviewRequests();
+    window.addEventListener('review-requests-changed', fetchOpenReviewRequests);
     const timer = setInterval(fetchOpenReviewRequests, 30000);
     return () => {
       cancelled = true;
+      window.removeEventListener('review-requests-changed', fetchOpenReviewRequests);
       clearInterval(timer);
     };
   }, [role, location.pathname]);
@@ -199,9 +201,11 @@ export default function AppShell({ currentUser, onLogout }) {
     };
 
     fetchAssignedReviewRequests();
+    window.addEventListener('review-requests-changed', fetchAssignedReviewRequests);
     const timer = setInterval(fetchAssignedReviewRequests, 30000);
     return () => {
       cancelled = true;
+      window.removeEventListener('review-requests-changed', fetchAssignedReviewRequests);
       clearInterval(timer);
     };
   }, [role, location.pathname]);

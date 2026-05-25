@@ -323,7 +323,31 @@ def bulk_update_clips(keys, update_data, current_user=None):
     query = _apply_review_scope(query, current_user)
 
     res = col.update_many(query, {"$set": update_fields})
-    return {"ok": True, "updated_count": res.modified_count, "fields": update_fields}
+
+    auto_resolved_count = 0
+    if update_fields.get("reviewed") is True and current_user:
+        resolution_fields = {
+            "review_request_status": "resolved",
+            "review_resolved_at": datetime.datetime.utcnow().isoformat(),
+            "review_resolved_by": current_user.get("id"),
+            "review_resolution_note": "Marked reviewed by assigned reviewer.",
+        }
+        resolution_res = col.update_many(
+            {
+                "_key": {"$in": keys},
+                "assigned_to": current_user.get("id"),
+                "review_request_status": "assigned",
+            },
+            {"$set": resolution_fields},
+        )
+        auto_resolved_count = resolution_res.modified_count
+
+    return {
+        "ok": True,
+        "updated_count": res.modified_count,
+        "auto_resolved_count": auto_resolved_count,
+        "fields": update_fields,
+    }
 
 def update_clip(video, scene_id, data, current_user=None):
     if not video or scene_id is None:
