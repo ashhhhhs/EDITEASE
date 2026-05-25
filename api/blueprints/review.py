@@ -5,6 +5,13 @@ from api.decorators import role_required
 
 review_bp = Blueprint('review', __name__)
 
+@review_bp.get('/review/assignees')
+@role_required(['admin', 'editor'])
+def review_assignees():
+    from services.auth_service import get_review_assignees
+    return jsonify({"users": get_review_assignees(exclude_user_id=g.user.get('id'))})
+
+
 @review_bp.get('/search')
 @role_required(['admin', 'editor', 'reviewer'])
 def search():
@@ -42,6 +49,27 @@ def request_admin_review_ep():
     data = request.get_json(force=True) or {}
     res = clip_service.request_admin_review(
         data.get('scene_keys', []),
+        data.get('reason', ''),
+        current_user=g.user,
+    )
+    if 'error' in res:
+        return jsonify(res), res.get('status', 400)
+    return jsonify(res)
+
+
+@review_bp.post('/review/request-peer')
+@role_required(['editor'])
+def request_peer_review_ep():
+    from services.auth_service import get_user_by_id
+
+    data = request.get_json(force=True) or {}
+    assignee = get_user_by_id(data.get('assignee_id'))
+    if not assignee:
+        return jsonify({'error': 'Assignee not found'}), 404
+
+    res = clip_service.request_peer_review(
+        data.get('scene_keys', []),
+        assignee,
         data.get('reason', ''),
         current_user=g.user,
     )

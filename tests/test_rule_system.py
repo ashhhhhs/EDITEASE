@@ -439,7 +439,10 @@ def test_admin_resolves_review_requests(monkeypatch):
 
     assert result["ok"] is True
     assert result["resolved_count"] == 1
-    assert fake_col.query == {"_key": {"$in": ["demo::1"]}, "review_request_status": "open"}
+    assert fake_col.query == {
+        "_key": {"$in": ["demo::1"]},
+        "review_request_status": {"$in": ["open", "assigned"]},
+    }
     assert fake_col.update["$set"]["review_request_status"] == "resolved"
     assert fake_col.update["$set"]["review_resolved_by"] == "admin-1"
 
@@ -480,3 +483,93 @@ def test_admin_assigns_review_request_to_reviewer(monkeypatch):
     assert fake_col.update["$set"]["review_request_status"] == "assigned"
     assert fake_col.update["$set"]["review_assigned_to_role"] == "reviewer"
     assert fake_col.update["$set"]["review_assignment_note"] == "Please check editing quality."
+
+
+def test_editor_requests_peer_review(monkeypatch):
+    class FakeUpdateResult:
+        modified_count = 1
+
+    class FakeCollection:
+        def update_many(self, query, update):
+            self.query = query
+            self.update = update
+            return FakeUpdateResult()
+
+    fake_col = FakeCollection()
+    monkeypatch.setattr(clip_service, "col", fake_col)
+
+    result = clip_service.request_peer_review(
+        ["demo::1"],
+        {
+            "id": "editor-2",
+            "name": "Editor Two",
+            "email": "editor2@example.com",
+            "role": "editor",
+            "is_active": True,
+        },
+        "Can you verify this scene type?",
+        current_user={
+            "id": "editor-1",
+            "role": "editor",
+            "name": "Editor One",
+            "email": "editor1@example.com",
+        },
+    )
+
+    assert result["ok"] is True
+    assert result["requested_count"] == 1
+    assert fake_col.query == {"_key": {"$in": ["demo::1"]}}
+    assert fake_col.update["$set"]["assigned_to"] == "editor-2"
+    assert fake_col.update["$set"]["review_request_status"] == "assigned"
+    assert fake_col.update["$set"]["review_requested_by"] == "editor-1"
+    assert fake_col.update["$set"]["review_assigned_to"] == "editor-2"
+    assert fake_col.update["$set"]["review_request_reason"] == "Can you verify this scene type?"
+
+
+def test_editor_cannot_request_peer_review_from_self(monkeypatch):
+    result = clip_service.request_peer_review(
+        ["demo::1"],
+        {"id": "editor-1", "role": "editor", "is_active": True},
+        "Please review this.",
+        current_user={"id": "editor-1", "role": "editor"},
+    )
+
+    assert result["error"] == "Cannot request peer review from yourself."
+    assert result["status"] == 400
+
+
+def test_assigned_review_auto_resolves_when_marked_reviewed(monkeypatch):
+    class FakeUpdateResult:
+        matched_count = 1
+
+    class FakeCollection:
+        def __init__(self):
+            self.doc = {
+                "_key": "demo::1",
+                "assigned_to": "reviewer-1",
+                "review_request_status": "assigned",
+                "faces": {"face_present_any": False},
+            }
+            self.update = None
+
+        def find_one(self, query):
+            return {**self.doc, **(self.update or {})}
+
+        def update_one(self, query, update):
+            self.update = update["$set"]
+            return FakeUpdateResult()
+
+    fake_col = FakeCollection()
+    monkeypatch.setattr(clip_service, "col", fake_col)
+
+    result = clip_service.update_clip(
+        "demo",
+        1,
+        {"reviewed": True},
+        current_user={"id": "reviewer-1", "role": "reviewer"},
+    )
+
+    assert result["ok"] is True
+    assert fake_col.update["reviewed"] is True
+    assert fake_col.update["review_request_status"] == "resolved"
+    assert fake_col.update["review_resolved_by"] == "reviewer-1"

@@ -270,6 +270,26 @@ def get_user_by_id(user_id):
     return user
 
 
+def get_review_assignees(exclude_user_id=None):
+    """Return active editors/reviewers that can receive review work."""
+    users_col = _get_users_col()
+    query = {"role": {"$in": ["editor", "reviewer"]}, "is_active": True}
+    if exclude_user_id:
+        from bson import ObjectId
+        try:
+            query["_id"] = {"$ne": ObjectId(exclude_user_id)}
+        except Exception:
+            pass
+
+    users = []
+    cursor = users_col.find(query, {"password_hash": 0, "token": 0}).sort("name", 1)
+    for user in cursor:
+        user["_id"] = str(user["_id"])
+        user["id"] = user["_id"]
+        users.append(user)
+    return users
+
+
 def _get_admin_count():
     users_col = _get_users_col()
     return users_col.count_documents({"role": "admin", "is_active": True})

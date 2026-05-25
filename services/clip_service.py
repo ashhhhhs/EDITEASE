@@ -203,7 +203,7 @@ def resolve_review_requests(keys, status, note="", current_user=None):
         "review_resolution_note": (note or "").strip()[:500],
     }
     res = col.update_many(
-        {"_key": {"$in": keys}, "review_request_status": "open"},
+        {"_key": {"$in": keys}, "review_request_status": {"$in": ["open", "assigned"]}},
         {"$set": update_fields},
     )
     return {"ok": True, "resolved_count": res.modified_count, "fields": update_fields}
@@ -240,6 +240,56 @@ def assign_review_requests(keys, assignee, note="", current_user=None):
         "email": assignee.get("email"),
         "role": assignee.get("role"),
     }, "fields": update_fields}
+
+
+def request_peer_review(keys, assignee, reason, current_user=None):
+    if not keys:
+        return {"error": "scene_keys required", "status": 400}
+    if not current_user or current_user.get("role") != "editor":
+        return {"error": "Only editors can request peer review.", "status": 403}
+    if not assignee or assignee.get("role") not in ("editor", "reviewer") or not assignee.get("is_active", True):
+        return {"error": "Assignee must be an active editor or reviewer.", "status": 400}
+
+    assignee_id = str(assignee.get("id") or assignee.get("_id"))
+    if assignee_id == str(current_user.get("id")):
+        return {"error": "Cannot request peer review from yourself.", "status": 400}
+
+    reason = (reason or "").strip()
+    if not reason:
+        return {"error": "reason required", "status": 400}
+    if len(reason) > 500:
+        return {"error": "reason must be 500 characters or fewer", "status": 400}
+
+    now = datetime.datetime.utcnow().isoformat()
+    update_fields = {
+        "assigned_to": assignee_id,
+        "review_request_status": "assigned",
+        "review_request_reason": reason,
+        "review_requested_at": now,
+        "review_requested_by": current_user.get("id"),
+        "review_requested_by_name": current_user.get("name"),
+        "review_requested_by_email": current_user.get("email"),
+        "review_requested_by_role": current_user.get("role"),
+        "review_assigned_at": now,
+        "review_assigned_by": current_user.get("id"),
+        "review_assigned_to": assignee_id,
+        "review_assigned_to_name": assignee.get("name"),
+        "review_assigned_to_email": assignee.get("email"),
+        "review_assigned_to_role": assignee.get("role"),
+        "review_assignment_note": reason,
+        "review_resolved_at": None,
+        "review_resolved_by": None,
+        "review_resolution_note": None,
+    }
+
+    res = col.update_many({"_key": {"$in": keys}}, {"$set": update_fields})
+    return {"ok": True, "requested_count": res.modified_count, "assignee": {
+        "id": assignee_id,
+        "name": assignee.get("name"),
+        "email": assignee.get("email"),
+        "role": assignee.get("role"),
+    }, "fields": update_fields}
+
 
 def bulk_update_clips(keys, update_data, current_user=None):
     if not keys:
@@ -315,6 +365,17 @@ def update_clip(video, scene_id, data, current_user=None):
 
     if "scene_label" in update_fields and "manual_scene_label" not in update_fields:
         update_fields["manual_scene_label"] = update_fields["scene_label"]
+
+    if (
+        update_fields.get("reviewed") is True
+        and current_user
+        and doc.get("review_request_status") == "assigned"
+        and doc.get("assigned_to") == current_user.get("id")
+    ):
+        update_fields["review_request_status"] = "resolved"
+        update_fields["review_resolved_at"] = datetime.datetime.utcnow().isoformat()
+        update_fields["review_resolved_by"] = current_user.get("id")
+        update_fields["review_resolution_note"] = "Marked reviewed by assigned reviewer."
 
     if not has_face_any:
         if "dominant_emotion_overall" in update_fields:

@@ -35,22 +35,16 @@ export default function Inspector({ currentUser }) {
   const [requestLoading, setRequestLoading] = useState(false);
   const [reviewAssignees, setReviewAssignees] = useState([]);
   const [selectedAssignee, setSelectedAssignee] = useState('');
+  const [selectedPeerAssignee, setSelectedPeerAssignee] = useState('');
   const [assignmentNote, setAssignmentNote] = useState('');
+  const [peerReason, setPeerReason] = useState('');
 
   useEffect(() => {
-    if (currentUser?.role !== 'admin') return;
-    Promise.all([
-      api.get('/admin/users?limit=200&role=editor&status=active'),
-      api.get('/admin/users?limit=200&role=reviewer&status=active'),
-    ])
-      .then(([editorsRes, reviewersRes]) => {
-        setReviewAssignees([
-          ...(editorsRes.data.users || []),
-          ...(reviewersRes.data.users || []),
-        ]);
-      })
+    if (!['admin', 'editor'].includes(currentUser?.role)) return;
+    api.get('/review/assignees')
+      .then(res => setReviewAssignees(res.data.users || []))
       .catch(err => toast.error(err.friendlyMessage || 'Failed to load reviewers'));
-  }, [currentUser?.role, toast]);
+  }, [currentUser?.id, currentUser?.role, toast]);
 
   const fetchClips = async () => {
     setLoading(true);
@@ -161,6 +155,28 @@ export default function Inspector({ currentUser }) {
       fetchClips();
     } catch (err) {
       toast.error(err.friendlyMessage || 'Failed to assign review requests');
+    }
+    setRequestLoading(false);
+  };
+
+  const handleRequestPeerReview = async () => {
+    if (selectedKeys.size === 0) { toast.warning('No clips selected'); return; }
+    if (!selectedPeerAssignee) { toast.warning('Choose an editor or reviewer'); return; }
+    if (!peerReason.trim()) { toast.warning('Add a reason for peer review'); return; }
+
+    setRequestLoading(true);
+    try {
+      const res = await api.post('/review/request-peer', {
+        scene_keys: Array.from(selectedKeys),
+        assignee_id: selectedPeerAssignee,
+        reason: peerReason.trim(),
+      });
+      const assigneeName = res.data.assignee?.name || res.data.assignee?.email || 'selected reviewer';
+      toast.success(`Requested peer review from ${assigneeName}`);
+      setPeerReason('');
+      fetchClips();
+    } catch (err) {
+      toast.error(err.friendlyMessage || 'Failed to request peer review');
     }
     setRequestLoading(false);
   };
@@ -316,6 +332,30 @@ export default function Inspector({ currentUser }) {
                   <button className="btn" onClick={handleRequestAdminReview} disabled={requestLoading || !requestReason.trim()} style={{ marginTop: 'var(--space-8)', width: '100%' }}>
                     <Send size={14} /> {requestLoading ? 'Requesting...' : 'Request Admin Review'}
                   </button>
+                  {currentUser?.role === 'editor' && (
+                    <div style={{ marginTop: 'var(--space-20)', paddingTop: 'var(--space-20)', borderTop: '1px solid var(--border-subtle)' }}>
+                      <label style={{ display: 'block', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>Ask Editor/Reviewer</label>
+                      <select value={selectedPeerAssignee} onChange={e => setSelectedPeerAssignee(e.target.value)} style={{ marginBottom: 'var(--space-8)' }}>
+                        <option value="">Choose editor/reviewer...</option>
+                        {reviewAssignees.map(user => (
+                          <option key={user._id || user.id} value={user._id || user.id}>
+                            {user.name || user.username || user.email} ({user.role})
+                          </option>
+                        ))}
+                      </select>
+                      <textarea
+                        value={peerReason}
+                        onChange={e => setPeerReason(e.target.value)}
+                        maxLength={500}
+                        placeholder="Why should this teammate review these clips?"
+                        rows={4}
+                        style={{ resize: 'vertical', minHeight: 90 }}
+                      />
+                      <button className="btn btn-primary" onClick={handleRequestPeerReview} disabled={requestLoading || !selectedPeerAssignee || !peerReason.trim()} style={{ marginTop: 'var(--space-8)', width: '100%' }}>
+                        <UserPlus size={14} /> {requestLoading ? 'Requesting...' : 'Request Peer Review'}
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </div>
