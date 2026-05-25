@@ -16,3 +16,4 @@ torchvision
 tqdm
 scikit-learn
 python-dateutil
+mongomock

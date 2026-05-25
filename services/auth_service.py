@@ -11,6 +11,7 @@ from utils.logger import setup_logger
 logger = setup_logger("auth_service")
 
 _client = None
+ACTIVE_ROLES = {"admin", "editor", "reviewer"}
 
 def _normalize_email(email):
     return (email or "").strip().lower()
@@ -259,6 +260,8 @@ def _get_admin_count():
 
 def update_user_role(target_id, new_role, requester_id):
     from bson import ObjectId
+    if new_role not in ACTIVE_ROLES:
+        return {"error": "Invalid role.", "status": 400}
     if target_id == requester_id:
         return {"error": "Cannot change your own role.", "status": 403}
     try:

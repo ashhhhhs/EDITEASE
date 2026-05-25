@@ -53,7 +53,7 @@ def _patch_pipeline_dependencies(monkeypatch, upsert_fn=None):
                 "thumbnail_path": thumbnail_path,
             })
             return (
-                "presenter",
+                "testimonial",
                 0.72,
                 {
                     "classifier_used": "ml_pytorch",
@@ -66,7 +66,7 @@ def _patch_pipeline_dependencies(monkeypatch, upsert_fn=None):
 
         def classify(self, video_path, start_sec, end_sec, thumbnail_path):
             self.calls.append((video_path, start_sec, end_sec, thumbnail_path))
-            return "presenter", 0.91, {"classifier_used": "rule_based_test"}
+            return "testimonial", 0.91, {"classifier_used": "rule_based_test"}
 
     fake_classifier = FakeSceneClassifier()
     monkeypatch.setattr(run_pipeline, "scene_classifier", fake_classifier)
@@ -146,7 +146,7 @@ def test_process_video_traces_raw_video_through_storage(tmp_path, monkeypatch, c
     for expected_id, doc in enumerate(scene_docs, start=1):
         assert doc["scene_id"] == expected_id
         assert doc["video"] == "raw_pipeline"
-        assert doc["scene_label"] == "presenter"
+        assert doc["scene_label"] == "testimonial"
         assert doc["cloudinary_url"] == "https://example.test/video.mp4"
         assert Path(doc["thumbnail"]).exists()
         assert doc["thumbnail_url"].startswith("https://example.test/")
@@ -156,7 +156,7 @@ def test_process_video_traces_raw_video_through_storage(tmp_path, monkeypatch, c
         assert len(doc["emotion_timeline"]) == 2
         assert doc["feature_vector_for_training"] == {"motion_mean": 0.25}
         assert doc["scene_debug"]["agent_action"] == "auto_organized_agreed"
-        assert doc["scene_debug"]["rb_label"] == "presenter"
+        assert doc["scene_debug"]["rb_label"] == "testimonial"
 
     checkpoints = _checkpoint_payloads(caplog)
     stages = {payload["stage"] for payload in checkpoints}

@@ -192,11 +192,11 @@ def assign_video():
     if not video:
         return jsonify({'error': 'video is required'}), 400
     
-    # Verify user_id is valid editor/reviewer
+    # Verify user_id is valid for review work.
     if user_id:
         from services.auth_service import get_user_by_id
         user = get_user_by_id(user_id)
-        if not user or user.get('role') not in ('editor', 'reviewer', 'admin'):
+        if not user or user.get('role') not in ('editor', 'reviewer'):
             return jsonify({'error': 'Invalid user ID'}), 400
             
     from services.clip_service import col
@@ -205,4 +205,3 @@ def assign_video():
         {"$set": {"assigned_to": user_id}}
     )
     return jsonify({'ok': True, 'modified_count': res.modified_count})
-

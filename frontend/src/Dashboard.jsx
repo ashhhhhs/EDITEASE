@@ -482,7 +482,43 @@ function EditorDashboard({ currentUser }) {
   );
 }
 
+function ReviewerDashboard({ currentUser }) {
+  const firstName = currentUser?.name?.split(' ')[0] || 'there';
+
+  return (
+    <div>
+      <PageHeader
+        title={`Review workspace, ${firstName}`}
+        description="Your role is focused on checking assigned AI decisions and keeping review notes accurate."
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(220px, 1fr))', gap: 'var(--space-20)', marginBottom: 'var(--space-24)' }}>
+        <BentoCard accent="var(--warning)" to="/app/review">
+          <StatLabel><CheckSquare size={13} style={{verticalAlign:'middle',marginRight:4}} /> Assigned Review Queue</StatLabel>
+          <div style={{ fontSize: 'var(--font-title-card)', color: 'var(--text-primary)', margin: 'var(--space-12) 0' }}>
+            Open pending clips
+          </div>
+          <div style={{ fontSize: 'var(--font-small)', color: 'var(--text-secondary)' }}>
+            Reviewers can inspect and correct clips assigned to them.
+          </div>
+        </BentoCard>
+
+        <BentoCard accent="var(--accent)">
+          <StatLabel><AlertCircle size={13} style={{verticalAlign:'middle',marginRight:4}} /> Review Scope</StatLabel>
+          <div style={{ fontSize: 'var(--font-title-card)', color: 'var(--text-primary)', margin: 'var(--space-12) 0' }}>
+            Limited access
+          </div>
+          <div style={{ fontSize: 'var(--font-small)', color: 'var(--text-secondary)' }}>
+            Upload, download, user management, and job operations remain with editors and admins.
+          </div>
+        </BentoCard>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard({ currentUser }) {
   if (currentUser?.role === 'admin') return <AdminOverview />;
+  if (currentUser?.role === 'reviewer') return <ReviewerDashboard currentUser={currentUser} />;
   return <EditorDashboard currentUser={currentUser} />;
 }

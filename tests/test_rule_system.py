@@ -8,6 +8,7 @@ pytest.importorskip("pymongo")
 pytest.importorskip("celery")
 
 celery_worker = pytest.importorskip("api.celery_worker")
+from pipeline.processing import run_pipeline
 from pipeline.processing.run_pipeline import _fuse_predictions
 from pipeline.processing.scene_type_detect import (
     SCENE_PROFILES,
@@ -39,17 +40,17 @@ def test_rule_feature_extraction_normalizes_extreme_values():
     assert features["color_temperature"] == 1.0
 
 
-def test_rule_classifier_identifies_text_slide_profile():
+def test_rule_classifier_identifies_broll_profile():
     features = {
         feature_name: mu
-        for feature_name, (mu, _sigma) in SCENE_PROFILES["text_slide"].items()
+        for feature_name, (mu, _sigma) in SCENE_PROFILES["b-roll"].items()
     }
 
     label, confidence, probabilities = classify_scene(features)
 
-    assert label == "text_slide"
+    assert label == "b-roll"
     assert 0.40 <= confidence <= 0.95
-    assert probabilities["text_slide"] == max(probabilities.values())
+    assert probabilities["b-roll"] == max(probabilities.values())
     assert sum(probabilities.values()) == pytest.approx(1.0, abs=0.02)
 
 
@@ -65,30 +66,79 @@ def test_temporal_smoothing_penalizes_contradictory_single_frame_labels():
 
 def test_prediction_fusion_handles_agreement_and_conflict():
     agreed_label, agreed_conf, agreed_uncertain, agreed_action = _fuse_predictions(
-        "presenter",
+        "testimonial",
         0.72,
-        "presenter",
+        "testimonial",
         0.88,
     )
-    assert agreed_label == "presenter"
+    assert agreed_label == "testimonial"
     assert agreed_conf > 0.72
     assert agreed_uncertain is False
     assert agreed_action == "auto_organized_agreed"
 
     conflict_label, conflict_conf, conflict_uncertain, conflict_action = _fuse_predictions(
-        "presenter",
+        "testimonial",
         0.60,
-        "text_slide",
+        "b-roll",
         0.90,
     )
-    assert conflict_label == "presenter"
+    assert conflict_label == "testimonial"
     assert conflict_conf < 0.58
     assert conflict_uncertain is True
     assert conflict_action == "escalated_disagreement"
 
 
+def test_emotion_sampling_suppresses_single_face_hit(monkeypatch, tmp_path):
+    """One face-like false positive should not produce a scene-level emotion."""
+    face_sequence = iter([True, False, False, False])
+
+    monkeypatch.setattr(run_pipeline, "extract_frame", lambda *_args: True)
+    monkeypatch.setattr(run_pipeline, "has_face", lambda *_args: next(face_sequence))
+    monkeypatch.setattr(run_pipeline, "detect_emotion", lambda *_args, **_kwargs: ("happy", {"happy": 99.0}, 99.0))
+
+    timeline, dominant, face_any, face_ratio = run_pipeline.sample_emotions_over_scene(
+        "demo.mp4",
+        0,
+        5,
+        str(tmp_path),
+        1,
+    )
+
+    assert face_any is True
+    assert face_ratio == pytest.approx(0.25)
+    assert timeline[0]["emotion"] == "happy"
+    assert dominant is None
+
+
+def test_emotion_sampling_requires_deepface_face_confirmation(monkeypatch, tmp_path):
+    """Emotion should still work when repeated face samples pass strict detection."""
+    face_sequence = iter([True, True, False, False])
+    calls = []
+
+    def fake_detect(*_args, **kwargs):
+        calls.append(kwargs)
+        return "neutral", {"neutral": 88.0}, 88.0
+
+    monkeypatch.setattr(run_pipeline, "extract_frame", lambda *_args: True)
+    monkeypatch.setattr(run_pipeline, "has_face", lambda *_args: next(face_sequence))
+    monkeypatch.setattr(run_pipeline, "detect_emotion", fake_detect)
+
+    _timeline, dominant, face_any, face_ratio = run_pipeline.sample_emotions_over_scene(
+        "demo.mp4",
+        0,
+        5,
+        str(tmp_path),
+        1,
+    )
+
+    assert face_any is True
+    assert face_ratio == pytest.approx(0.5)
+    assert dominant == "neutral"
+    assert calls == [{"enforce_detection": True}, {"enforce_detection": True}]
+
+
 def test_metadata_tagging_detects_edited_filename_and_ffprobe_tags(monkeypatch):
-    assert celery_worker.check_if_edited_by_filename("client_final_v2_export.mp4")
+    assert celery_worker.check_if_edited_by_filename("client_final_render.mp4")
     assert not celery_worker.check_if_edited_by_filename("C0018_raw_take.mp4")
 
     def fake_check_output(cmd):
@@ -140,7 +190,7 @@ def test_categorization_metadata_prefers_variety_override_for_conflicting_rules(
             "faces": {"face_present_any": True},
         },
         {
-            "scene_label": "presenter",
+            "scene_label": "establishing_shot",
             "scene_confidence": 0.64,
             "reviewed": False,
             "emotion_timeline": [],
@@ -156,7 +206,7 @@ def test_categorization_metadata_prefers_variety_override_for_conflicting_rules(
     assert metadata["label_distribution"] == {
         "b-roll": 2,
         "testimonial": 1,
-        "presenter": 1,
+        "establishing_shot": 1,
     }
     assert metadata["dominant_emotion"] == "happy"
     assert metadata["dominant_emotion_confidence"] == pytest.approx(75.0)
@@ -226,3 +276,56 @@ def test_content_filtering_rules_build_safe_clip_queries(monkeypatch):
         {"dominant_emotion_overall": None},
         {"dominant_emotion_overall": {"$exists": False}},
     ]
+
+
+def test_reviewer_search_is_scoped_to_assigned_clips(monkeypatch):
+    class FakeCursor:
+        def sort(self, *_args):
+            return self
+
+        def skip(self, *_args):
+            return self
+
+        def limit(self, *_args):
+            return self
+
+        def __iter__(self):
+            return iter([])
+
+    class FakeCollection:
+        def count_documents(self, query):
+            return 0
+
+        def find(self, query):
+            return FakeCursor()
+
+    monkeypatch.setattr(clip_service, "col", FakeCollection())
+
+    result = clip_service.search_clips(
+        {"reviewed": "false"},
+        current_user={"id": "reviewer-1", "role": "reviewer"},
+    )
+
+    assert result["query"]["assigned_to"] == "reviewer-1"
+
+
+def test_reviewer_cannot_update_unassigned_clip(monkeypatch):
+    class FakeCollection:
+        def find_one(self, query):
+            return {
+                "_key": query["_key"],
+                "assigned_to": "someone-else",
+                "faces": {"face_present_any": False},
+            }
+
+    monkeypatch.setattr(clip_service, "col", FakeCollection())
+
+    result = clip_service.update_clip(
+        "demo",
+        1,
+        {"reviewed": True},
+        current_user={"id": "reviewer-1", "role": "reviewer"},
+    )
+
+    assert result["error"] == "access denied"
+    assert result["status"] == 403

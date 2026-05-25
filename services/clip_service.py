@@ -46,7 +46,29 @@ def face_present(doc):
             return True
     return False
 
-def search_clips(filters, limit=100):
+def _apply_review_scope(query, current_user=None):
+    """Restrict review access for roles that should not see the whole queue."""
+    if not current_user:
+        return query
+
+    role = current_user.get("role")
+    if role == "reviewer":
+        query["assigned_to"] = current_user.get("id")
+    return query
+
+
+def _can_review_doc(doc, current_user=None):
+    if not current_user:
+        return True
+    role = current_user.get("role")
+    if role in ("admin", "editor"):
+        return True
+    if role == "reviewer":
+        return doc.get("assigned_to") == current_user.get("id")
+    return False
+
+
+def search_clips(filters, limit=100, current_user=None):
     limit = max(1, min(int(limit), 200))
     q = {}
 
@@ -98,12 +120,14 @@ def search_clips(filters, limit=100):
     limit = max(1, min(int(limit), 200)) # Default max 200 via param
     skip = (page - 1) * limit
 
+    q = _apply_review_scope(q, current_user)
+
     total = col.count_documents(q)
     cursor = col.find(q).sort("duration_sec", -1).skip(skip).limit(limit)
     results = [clean_doc(d) for d in cursor]
     return {"count": len(results), "total": total, "page": page, "limit": limit, "query": q, "results": results}
 
-def bulk_update_clips(keys, update_data):
+def bulk_update_clips(keys, update_data, current_user=None):
     if not keys:
         return {"error": "no keys provided"}
         
@@ -131,10 +155,13 @@ def bulk_update_clips(keys, update_data):
     if not update_fields:
         return {"error": "No valid fields provided to update."}
         
-    res = col.update_many({"_key": {"$in": keys}}, {"$set": update_fields})
+    query = {"_key": {"$in": keys}}
+    query = _apply_review_scope(query, current_user)
+
+    res = col.update_many(query, {"$set": update_fields})
     return {"ok": True, "updated_count": res.modified_count, "fields": update_fields}
 
-def update_clip(video, scene_id, data):
+def update_clip(video, scene_id, data, current_user=None):
     if not video or scene_id is None:
         return {"error": "video and scene_id required"}
         
@@ -147,6 +174,8 @@ def update_clip(video, scene_id, data):
     doc = col.find_one({"_key": key})
     if not doc:
         return {"error": "scene not found", "key": key}
+    if not _can_review_doc(doc, current_user):
+        return {"error": "access denied", "status": 403}
 
     has_face_any = face_present(doc)
 

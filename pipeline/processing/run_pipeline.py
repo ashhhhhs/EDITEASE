@@ -7,7 +7,6 @@ import numpy as np
 
 import config
 from database.ingest_to_mongo import upsert_scene_docs
-from pipeline.classifiers.ml_classifier import MLClassifier
 from pipeline.classifiers.rule_based_classifier import RuleBasedClassifier
 from pipeline.processing.detect_scenes import find_scenes
 from pipeline.processing.emotion_detect import detect_emotion
@@ -17,7 +16,12 @@ from utils.logger import setup_logger
 logger = setup_logger("run_pipeline")
 
 if config.CLASSIFIER_TYPE == "ml":
-    scene_classifier = MLClassifier()
+    try:
+        from pipeline.classifiers.ml_classifier import MLClassifier
+        scene_classifier = MLClassifier()
+    except ImportError:
+        logger.warning("torch/torchvision unavailable — falling back to rule-based classifier")
+        scene_classifier = RuleBasedClassifier()
 else:
     scene_classifier = RuleBasedClassifier()
 
@@ -44,8 +48,18 @@ def has_face(img_path):
     cascade = cv2.CascadeClassifier(
         os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")  # type: ignore
     )
-    faces = cascade.detectMultiScale(gray, 1.1, 5, minSize=(40, 40))
-    return len(faces) > 0
+    h, w = gray.shape
+    # Face must be at least 6% of the smaller frame dimension — kills tiny
+    # texture hits (leaves, rocks, building details) that Haar misreads as faces.
+    min_side = max(60, int(min(h, w) * 0.06))
+    faces = cascade.detectMultiScale(
+        gray, scaleFactor=1.1, minNeighbors=10, minSize=(min_side, min_side)
+    )
+    if len(faces) == 0:
+        return False
+    # Require face to occupy ≥1.5% of frame area before we trust it.
+    frame_area = float(h * w)
+    return any((fw * fh) / frame_area >= 0.015 for (_, _, fw, fh) in faces)
 
 
 def make_json_safe(obj):
@@ -110,6 +124,10 @@ def extract_frame(video_path, timestamp, out_path):
 # Adaptive emotion sampling
 # ---------------------------------------------------------------------------
 
+MIN_EMOTION_FACE_HITS = 2
+MIN_EMOTION_FACE_RATIO = 0.40
+
+
 def _get_sample_count(duration_seconds: float) -> int:
     """Scale sample count to scene length — avoids under-sampling long scenes."""
     if duration_seconds < 3:
@@ -127,7 +145,7 @@ def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene
     - Sample count adapts to scene duration.
     - Frames at the start/end are weighted more heavily for dominant emotion
       (editorially more significant than mid-scene).
-    - Enforces: if no face => emotion None.
+    - Enforces: if face evidence is weak => dominant emotion None.
     """
     scene_duration = end_sec - start_sec
     n_samples = _get_sample_count(scene_duration)
@@ -167,7 +185,7 @@ def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene
             })
             continue
 
-        dominant, probs, conf = detect_emotion(thumb_path, enforce_detection=False)
+        dominant, probs, conf = detect_emotion(thumb_path, enforce_detection=True)
         emotion_timeline.append({
             "time_ratio"   : round(ratio, 3),
             "face_detected": True,
@@ -179,9 +197,17 @@ def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene
             w = _weight(i, n_samples)
             emotion_votes[dominant] = emotion_votes.get(dominant, 0.0) + w
 
-    dominant_overall    = max(emotion_votes, key=emotion_votes.get) if emotion_votes else None  # type: ignore
     face_present_any    = face_hits > 0
     face_present_ratio  = (face_hits / total_samples) if total_samples > 0 else 0.0
+    has_emotion_evidence = (
+        face_hits >= MIN_EMOTION_FACE_HITS
+        and face_present_ratio >= MIN_EMOTION_FACE_RATIO
+    )
+    dominant_overall = (
+        max(emotion_votes, key=emotion_votes.get)
+        if has_emotion_evidence and emotion_votes
+        else None
+    )  # type: ignore
 
     return emotion_timeline, dominant_overall, face_present_any, face_present_ratio
 

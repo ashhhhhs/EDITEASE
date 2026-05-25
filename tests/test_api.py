@@ -6,11 +6,24 @@ from api.api_server import app
 from database import ingest_to_mongo
 from services import cloudinary_service
 
+_TEST_USER = {
+    "id": "000000000000000000000001",
+    "email": "admin@test.com",
+    "name": "Test Admin",
+    "role": "admin",
+    "email_verified": True,
+    "is_active": True,
+    "created_at": None,
+    "last_login_at": None,
+}
+
 @pytest.fixture
-def client():
+def client(monkeypatch):
+    from services import auth_service
+    monkeypatch.setattr(auth_service, "get_user_by_token", lambda t: _TEST_USER)
     app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
+    with app.test_client() as c:
+        yield c
 
 def test_health_endpoint(client):
     """Test that the health endpoint returns 200 OK and expected structure."""
@@ -64,6 +77,76 @@ def test_auto_organize_no_file(client):
     assert 'error' in data
 
 
+def test_delete_selected_organized_videos(client, monkeypatch):
+    """Organized-video deletion removes selected records and unreferenced cloud assets."""
+    import mongomock
+    from bson import ObjectId
+    from services import organized_video_service, cloudinary_service
+
+    fake_col = mongomock.MongoClient()["editease"]["organized_videos"]
+    delete_id = ObjectId()
+    keep_id = ObjectId()
+    fake_col.insert_many([
+        {
+            "_id": delete_id,
+            "display_name": "Delete Me",
+            "original_filename": "delete.mp4",
+            "dominant_label": "presenter",
+            "status": "organized",
+            "uploaded_by": _TEST_USER["id"],
+            "cloudinary_public_id": "editease/organized-videos/presenter/delete",
+            "cloudinary_url": "https://example.test/delete.mp4",
+            "created_at": "2026-05-22T00:00:00",
+        },
+        {
+            "_id": keep_id,
+            "display_name": "Keep Me",
+            "original_filename": "keep.mp4",
+            "dominant_label": "presenter",
+            "status": "organized",
+            "uploaded_by": _TEST_USER["id"],
+            "cloudinary_public_id": "editease/organized-videos/presenter/keep",
+            "cloudinary_url": "https://example.test/keep.mp4",
+            "created_at": "2026-05-22T00:00:00",
+        },
+    ])
+    monkeypatch.setattr(organized_video_service, "_get_col", lambda: fake_col)
+
+    deleted_assets = []
+    monkeypatch.setattr(
+        cloudinary_service,
+        "delete_asset",
+        lambda public_id, resource_type="image": deleted_assets.append((public_id, resource_type)) or True,
+    )
+
+    rv = client.delete('/organized-videos', json={"ids": [str(delete_id)]})
+
+    assert rv.status_code == 200
+    data = rv.get_json()
+    assert data["deleted_count"] == 1
+    assert fake_col.find_one({"_id": delete_id}) is None
+    assert fake_col.find_one({"_id": keep_id}) is not None
+    assert deleted_assets == [("editease/organized-videos/presenter/delete", "video")]
+
+
+def test_reviewer_role_is_assignable(client, monkeypatch):
+    """Reviewer is an active role in the admin role endpoint."""
+    from services import auth_service
+
+    monkeypatch.setattr(
+        auth_service,
+        "update_user_role",
+        lambda target_id, new_role, requester_id: {"ok": True, "new_role": new_role},
+    )
+
+    rv = client.patch(
+        '/admin/users/507f1f77bcf86cd799439011/role',
+        json={"role": "reviewer"},
+    )
+    assert rv.status_code == 200
+    assert rv.get_json()["new_role"] == "reviewer"
+
+
 def test_cloudinary_service_upload_mock(monkeypatch):
     """Cloudinary upload helper should return the secure CDN URL from the SDK."""
     monkeypatch.setattr(cloudinary_service, "is_configured", lambda: True)
@@ -74,7 +157,7 @@ def test_cloudinary_service_upload_mock(monkeypatch):
         calls.append((local_path, opts))
         return {"secure_url": "https://res.cloudinary.com/demo/video/upload/sample.mp4"}
 
-    monkeypatch.setattr(cloudinary_service.cloudinary.uploader, "upload", fake_upload)
+    monkeypatch.setattr(cloudinary_service.cloudinary.uploader, "upload_large", fake_upload)
 
     result = cloudinary_service.upload_video(
         "D:/EDITEASE/data/sample.mp4",

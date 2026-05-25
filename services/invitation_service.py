@@ -10,6 +10,7 @@ from utils.logger import setup_logger
 logger = setup_logger("invitation_service")
 
 _client = None
+ACTIVE_ROLES = {"admin", "editor", "reviewer"}
 
 def _get_invites_col():
     global _client
@@ -27,7 +28,7 @@ def _get_invites_col():
 
 def create_and_send_invitation(email, role, invited_by_id):
     """Generate a high-entropy invite token, store it, and send an email."""
-    if role not in ["admin", "reviewer", "editor"]:
+    if role not in ACTIVE_ROLES:
         return {"error": "Invalid role.", "status": 400}
         
     invites_col = _get_invites_col()

@@ -28,9 +28,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "mongomock",
     "black",
     "flake8"
 ]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+testpaths = ["tests"]

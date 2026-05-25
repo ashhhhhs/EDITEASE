@@ -137,8 +137,8 @@ export default function AppShell({ currentUser, onLogout }) {
 
   // Workspace nav — shown to all roles (primary tasks)
   const workspaceNav = [
-    { name: 'Dashboard',    path: '/app/dashboard', icon: LayoutDashboard, roles: ['admin', 'reviewer', 'editor'] },
-    { name: 'Review Queue', path: '/app/review',     icon: CheckSquare,     roles: ['admin', 'reviewer', 'editor'] },
+    { name: 'Dashboard',    path: '/app/dashboard', icon: LayoutDashboard, roles: ['admin', 'editor', 'reviewer'] },
+    { name: 'Review Queue', path: '/app/review',     icon: CheckSquare,     roles: ['admin', 'editor', 'reviewer'] },
     { name: 'Uploads',      path: '/app/uploads',    icon: UploadCloud,     roles: ['admin', 'editor'] },
     { name: 'Organized Videos', path: '/app/organized-videos', icon: Library, roles: ['admin', 'editor'] },
   ];

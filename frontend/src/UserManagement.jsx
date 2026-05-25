@@ -10,6 +10,8 @@ import { relativeTime } from './hooks/useRelativeTime';
 import api from './lib/api';
 import { useToast } from './hooks/useToast.jsx';
 
+const ACTIVE_ROLES = ['admin', 'editor', 'reviewer'];
+
 function InviteModal({ isOpen, onClose, onInvite }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('editor');
@@ -52,8 +54,8 @@ function InviteModal({ isOpen, onClose, onInvite }) {
               <option value="admin">Admin</option>
             </select>
             <div style={{ marginTop: 'var(--space-8)', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-              {role === 'editor' && "Can upload videos and trigger auto-organization. Cannot manage users or view system jobs."}
-              {role === 'reviewer' && "Can review ambiguous clips in the Review Queue. Read-only access to organized footage."}
+              {role === 'editor' && "Can upload, review, organize, download, and delete their own videos."}
+              {role === 'reviewer' && "Can review clips assigned to them, without upload, download, or admin permissions."}
               {role === 'admin' && "Full platform access. Can manage users, monitor jobs, and access system settings."}
             </div>
           </div>
@@ -211,7 +213,7 @@ export default function UserManagement({ currentUser }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
               <span className="mono-caps" style={{ marginRight: 4 }}>Role</span>
               <div className="filter-chips">
-                {['all', 'admin', 'reviewer', 'editor'].map(r => (
+                {['all', ...ACTIVE_ROLES].map(r => (
                   <button key={r} className={`chip${roleFilter === r ? ' active' : ''}`} onClick={() => { setRoleFilter(r); setPage(1); }}>
                     {r === 'all' ? 'Any' : r.charAt(0).toUpperCase() + r.slice(1)}
                   </button>
@@ -251,7 +253,7 @@ export default function UserManagement({ currentUser }) {
               <tbody>
                 {users.map(u => {
                   const initials = (u.username || u.name || '?').slice(0, 2).toUpperCase();
-                  const avatarClass = u.role === 'admin' ? 'avatar-gradient-admin' : u.role === 'reviewer' ? 'avatar-gradient-reviewer' : 'avatar-gradient-editor';
+                  const avatarClass = u.role === 'admin' ? 'avatar-gradient-admin' : 'avatar-gradient-editor';
                   const lastSeen = u.last_login_at ? new Date(u.last_login_at) : null;
                   const minsAgo = lastSeen ? (Date.now() - lastSeen.getTime()) / 60000 : Infinity;
                   const presenceClass = minsAgo < 5 ? 'presence-dot--active' : minsAgo < 60 ? 'presence-dot--recent' : 'presence-dot--idle';
@@ -284,9 +286,12 @@ export default function UserManagement({ currentUser }) {
                       {u.id !== currentUser.id && u._id !== currentUser.id ? (
                         <div style={{ display: 'flex', gap: 'var(--space-8)', alignItems: 'center' }}>
                           <select value={u.role} onChange={e => initiateRoleChange(u._id, e.target.value)} style={{ padding: 'var(--space-4) var(--space-8)', width: 'auto' }}>
+                            {!ACTIVE_ROLES.includes(u.role) && (
+                              <option value={u.role}>Legacy: {u.role}</option>
+                            )}
                             <option value="admin">Admin</option>
-                            <option value="reviewer">Reviewer</option>
                             <option value="editor">Editor</option>
+                            <option value="reviewer">Reviewer</option>
                           </select>
                           <button
                             onClick={() => initiateStatusChange(u._id, !u.is_active)}
