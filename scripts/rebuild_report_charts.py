@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-EVAL_PATH = BASE_DIR / "eval_report_v2.json"
+EVAL_PATH = BASE_DIR / "artifacts" / "eval_report_v2_test.json"
 HISTORY_PATH = BASE_DIR / "datasets" / "scene_type" / "v2_full" / "training_history.json"
 ANNOTATIONS_PATH = BASE_DIR / "datasets" / "scene_type" / "v2_full" / "annotations.jsonl"
 FIGURE_DIR = BASE_DIR / "report_assets" / "figures"
@@ -188,7 +188,7 @@ def plot_loss(history: list[dict]):
 def plot_per_class(per_class: dict, classes: list[str]):
     img, draw = new_canvas(
         "Per-Class Test Metrics (v2)",
-        "Precision, recall, and F1-score from eval_report_v2.json",
+        "Precision, recall, and F1-score from artifacts/eval_report_v2_test.json",
     )
     left, top, right, bottom = 150, 160, W - 90, 700
     draw_axes(draw, (left, top, right, bottom), [], 0, 1.0)
@@ -226,7 +226,7 @@ def plot_per_class(per_class: dict, classes: list[str]):
 def plot_distribution(per_class: dict, classes: list[str]):
     img, draw = new_canvas(
         "Held-Out Test Set Class Distribution (v2)",
-        "Support counts used in eval_report_v2.json",
+        "Support counts used in artifacts/eval_report_v2_test.json",
     )
     left, top, right, bottom = 150, 160, W - 90, 700
     supports = [int(per_class[cls]["support"]) for cls in classes]

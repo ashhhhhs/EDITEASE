@@ -8,6 +8,7 @@ import numpy as np
 import config
 from database.ingest_to_mongo import upsert_scene_docs
 from pipeline.classifiers.rule_based_classifier import RuleBasedClassifier
+from pipeline.processing.scene_type_detect import detect_faces_info
 from pipeline.processing.detect_scenes import find_scenes
 from pipeline.processing.emotion_detect import detect_emotion
 from services import cloudinary_service
@@ -34,6 +35,7 @@ CONF_AUTO_HIGH   = float(os.getenv("CONF_AUTO_HIGH",   "0.85"))  # ML auto-accep
 CONF_FUSE_LOW    = float(os.getenv("CONF_FUSE_LOW",    "0.58"))  # fusion below this → uncertain
 ML_WEIGHT        = float(os.getenv("ML_WEIGHT",        "0.65"))  # ML share in weighted fusion
 RULE_WEIGHT      = 1.0 - ML_WEIGHT
+AUDIENCE_REACTION_MIN_FACES = int(os.getenv("AUDIENCE_REACTION_MIN_FACES", "3"))
 
 
 # ---------------------------------------------------------------------------
@@ -244,6 +246,80 @@ def _fuse_predictions(
     return winner, fused_conf, uncertain, action
 
 
+def _face_count_from_debug(scene_debug: dict) -> int | None:
+    raw_signals = scene_debug.get("raw_signals") if isinstance(scene_debug, dict) else None
+    if not isinstance(raw_signals, dict):
+        return None
+    try:
+        return int(raw_signals.get("face_count"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _detect_face_count_for_gate(thumbnail_path: str | None) -> int | None:
+    if not thumbnail_path or not os.path.exists(thumbnail_path):
+        return None
+
+    img = cv2.imread(thumbnail_path)
+    if img is None:
+        return None
+
+    face_count, _largest_face_ratio, _face_aspect_ratio = detect_faces_info(img)
+    return int(face_count)
+
+
+def _apply_audience_reaction_face_gate(
+    scene_label: str,
+    scene_conf: float,
+    scene_debug: dict,
+    *,
+    face_any: bool,
+    face_ratio: float,
+    thumbnail_path: str | None,
+) -> tuple[str, float, dict, bool]:
+    """
+    Audience reaction must show a visible crowd. This final gate prevents a
+    high-confidence ML prediction from bypassing the rule-based face-count rule.
+    """
+    if scene_label != "audience_reaction":
+        return scene_label, scene_conf, scene_debug, False
+
+    gated_debug = dict(scene_debug)
+    face_count = _face_count_from_debug(gated_debug)
+    face_count_source = "classifier_debug"
+
+    if face_count is None:
+        face_count = _detect_face_count_for_gate(thumbnail_path)
+        face_count_source = "thumbnail_detector"
+
+    should_block = (
+        not face_any
+        or face_count is None
+        or face_count < AUDIENCE_REACTION_MIN_FACES
+    )
+
+    gated_debug["face_gate"] = {
+        "label_checked": "audience_reaction",
+        "passed": not should_block,
+        "deepface_face_present": bool(face_any),
+        "deepface_face_ratio": round(float(face_ratio or 0.0), 3),
+        "detected_face_count": face_count,
+        "min_face_count": AUDIENCE_REACTION_MIN_FACES,
+        "face_count_source": face_count_source,
+    }
+
+    if not should_block:
+        return scene_label, scene_conf, gated_debug, False
+
+    gated_debug["face_gate"]["blocked_label"] = scene_label
+    gated_debug["face_gate"]["reason"] = "audience_reaction_requires_3_or_more_faces"
+    gated_debug["blocked_label"] = scene_label
+    gated_debug["blocked_conf"] = round(float(scene_conf), 4)
+
+    fallback_conf = max(0.0, min(float(scene_conf), CONF_FUSE_LOW - 0.01))
+    return "other", round(fallback_conf, 4), gated_debug, True
+
+
 # ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
@@ -416,12 +492,24 @@ def process_video(
             classifier_used=scene_debug.get("classifier_used", "unknown"),
         )
 
+        scene_label, scene_conf, scene_debug, face_gate_blocked = _apply_audience_reaction_face_gate(
+            scene_label,
+            scene_conf,
+            scene_debug,
+            face_any=face_any,
+            face_ratio=face_ratio,
+            thumbnail_path=thumb_path,
+        )
+
         # ── Agentic Decision Layer ─────────────────────────────────────
         reviewed  = False
         uncertain = True
         c_used    = scene_debug.get("classifier_used", "")
 
-        if scene_conf >= CONF_AUTO_HIGH:
+        if face_gate_blocked:
+            scene_debug["agent_action"] = "escalated_face_gate"
+
+        elif scene_conf >= CONF_AUTO_HIGH:
             # High-confidence (ML or Rule-Based) — auto-accept.
             reviewed  = True
             uncertain = False

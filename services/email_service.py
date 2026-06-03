@@ -78,6 +78,12 @@ def send_password_reset_email(email: str, name: str, raw_token: str) -> bool:
     return send_email(email, "Reset your EditEase password", html)
 
 
+def send_password_otp_email(email: str, otp: str) -> bool:
+    """Send a 6-digit OTP for setting a local password on a Google-linked account."""
+    html = _render("password_otp.html", otp=otp)
+    return send_email(email, "Your EditEase verification code", html)
+
+
 def send_invitation_email(email: str, role: str, invite_url: str) -> bool:
     """Send a team invitation link."""
     html = _render("invitation.html", email=email, role=role, invite_url=invite_url)

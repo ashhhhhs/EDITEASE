@@ -1,6 +1,5 @@
 import React, { useLayoutEffect, useRef, useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Scissors, Grid3X3, Download, Shield } from 'lucide-react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import SplitType from 'split-type';
@@ -11,33 +10,6 @@ import './landing-v2.css';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const CAPABILITIES = [
-  {
-    title: 'Scene detection',
-    desc: 'Automatically splits continuous footage into distinct, reviewable scenes based on visual cuts. No manual timecoding.',
-    accent: 'var(--accent)',
-    Icon: Scissors,
-  },
-  {
-    title: 'Batch review',
-    desc: 'Approve, flag, or mark uncertain across thousands of clips in one grid. Keyboard-friendly. Role-aware.',
-    accent: 'var(--success)',
-    Icon: Grid3X3,
-  },
-  {
-    title: 'Structured organization',
-    desc: 'Generate JSON or CSV manifests, or simply let the system automatically organize your assets into labeled folders, ready for batch download.',
-    accent: 'var(--warning)',
-    Icon: Download,
-  },
-  {
-    title: 'Role-based access',
-    desc: 'Separate upload, review, and admin permissions. Reviewers see what they need. Nothing more.',
-    accent: '#a371f7',
-    Icon: Shield,
-  },
-];
-
 const STEPS = [
   { num: '01', label: 'Upload', body: 'Drop any video format. No conversion needed.' },
   { num: '02', label: 'Analyze', body: 'Scene boundaries and tags detected automatically.' },
@@ -45,128 +17,23 @@ const STEPS = [
   { num: '04', label: 'Download', body: 'Batch download organized videos or structured datasets.' },
 ];
 
-const TESTIMONIALS = [
+const PRODUCT_EVIDENCE = [
   {
-    quote: 'Cut our clip-sorting time by 70%. The scene detection is frighteningly accurate.',
-    name: 'A. Reza',
-    role: 'Post-production Lead',
-    hue: 210,
+    label: 'Scene detection',
+    title: 'Cuts are split into reviewable clips.',
+    detail: 'The pipeline writes scene entries with thumbnails, timing, labels, and confidence context for later review.',
   },
   {
-    quote: 'Role-aware review means our clients only see what is relevant. Game changer.',
-    name: 'S. Müller',
-    role: 'Director, KG Studio',
-    hue: 280,
+    label: 'Review queue',
+    title: 'Uncertain results stay visible.',
+    detail: 'Reviewers can approve, flag, or skip clips from a visual grid instead of searching through raw footage.',
   },
   {
-    quote: 'The organized video pipeline saved us an entire editing day on our last project.',
-    name: 'J. Park',
-    role: 'Freelance Cinematographer',
-    hue: 150,
+    label: 'Export',
+    title: 'Outputs remain structured.',
+    detail: 'Teams can download organized folders or use JSON and CSV manifests for downstream editing and datasets.',
   },
 ];
-
-const heroFrameAssets = [
-  new URL('../../thumbnails/Drone_shot_202512101744_ddeo6/Drone_shot_202512101744_ddeo6_scene_001.jpg', import.meta.url).href,
-  new URL('../../thumbnails/eva radu/eva radu_scene_003.jpg', import.meta.url).href,
-  new URL('../../thumbnails/WorldLink X KG QA video 3/WorldLink X KG QA video 3_scene_010.jpg', import.meta.url).href,
-];
-
-const HERO_FRAMES = [
-  { title: 'Interview close-up', tag: 'Human / dialogue', tone: 'rgba(88, 166, 255, 0.75)', image: heroFrameAssets[1] },
-  { title: 'Crowd energy', tag: 'Motion / event', tone: 'rgba(210, 153, 34, 0.75)', image: heroFrameAssets[2] },
-  { title: 'Product detail', tag: 'Clean / exportable', tone: 'rgba(35, 134, 54, 0.8)', image: heroFrameAssets[0] },
-];
-
-/* ─── Particle canvas ─────────────────────────────────────────── */
-function ParticleCanvas() {
-  const canvasRef = useRef(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let animId;
-    const particles = [];
-    const N = 56;
-
-    const resize = () => {
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-    };
-    resize();
-    window.addEventListener('resize', resize);
-
-    for (let i = 0; i < N; i++) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        r: Math.random() * 1.4 + 0.4,
-        dx: (Math.random() - 0.5) * 0.28,
-        dy: (Math.random() - 0.5) * 0.28,
-        o: Math.random() * 0.5 + 0.15,
-      });
-    }
-
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      particles.forEach(p => {
-        p.x += p.dx;
-        p.y += p.dy;
-        if (p.x < 0) p.x = canvas.width;
-        if (p.x > canvas.width) p.x = 0;
-        if (p.y < 0) p.y = canvas.height;
-        if (p.y > canvas.height) p.y = 0;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(88,166,255,${p.o})`;
-        ctx.fill();
-      });
-      animId = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => {
-      cancelAnimationFrame(animId);
-      window.removeEventListener('resize', resize);
-    };
-  }, []);
-  return (
-    <canvas
-      ref={canvasRef}
-      className="hero-particle-canvas"
-      aria-hidden="true"
-    />
-  );
-}
-
-/* ─── Capability panel (GSAP cross-fade) ─────────────────────── */
-function CapPanel({ cap }) {
-  const innerRef = useRef(null);
-
-  useEffect(() => {
-    if (!innerRef.current) return;
-    gsap.fromTo(
-      innerRef.current,
-      { opacity: 0, y: -10 },
-      { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' },
-    );
-  }, [cap]);
-
-  return (
-    <div className="cap-panel" style={{ '--cap-accent': cap.accent }}>
-      <div ref={innerRef} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <div className="cap-panel-icon-wrap">
-          <cap.Icon size={28} className="cap-panel-icon" />
-          <div className="cap-panel-icon-ring" />
-        </div>
-        <div className="cap-panel-title">{cap.title}</div>
-        <div className="cap-panel-desc">{cap.desc}</div>
-        <div className="cap-panel-bar" />
-      </div>
-    </div>
-  );
-}
-
-/* ─── 3D hooks ────────────────────────────────────────────────── */
 function useMouseTilt(strength = 1) {
   const ref = useRef(null);
   const target = useRef({ x: 0, y: 0 });
@@ -225,7 +92,7 @@ function useReveal() {
   }, []);
 }
 
-/* ─── Film reel SVG ───────────────────────────────────────────── */
+/* Film reel SVG */
 const FilmReel = ({ size = 120 }) => (
   <svg className="film-reel" viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
     <defs>
@@ -248,7 +115,7 @@ const FilmReel = ({ size = 120 }) => (
   </svg>
 );
 
-/* ─── 3D Hero Diorama ─────────────────────────────────────────── */
+/* Hero workspace preview */
 const HeroDiorama = () => {
   const stageRef = useMouseTilt(1);
   const idleRef = useRef(null);
@@ -343,7 +210,7 @@ const HeroDiorama = () => {
   );
 };
 
-/* ─── 3D Capability card ──────────────────────────────────────── */
+/* Capability card */
 const CapCard3D = ({ c, i }) => {
   const ref = useRef(null);
   const onMove = useCallback((e) => {
@@ -370,7 +237,6 @@ const CapCard3D = ({ c, i }) => {
       <div className="lp2-cap-kicker mono-caps">{c.kicker}</div>
       <h3 className="lp2-cap-title">{c.title}</h3>
       <p className="lp2-cap-body">{c.desc}</p>
-      <div className="lp2-cap-arrow">→</div>
     </div>
   );
 };
@@ -382,16 +248,14 @@ const CAPS_3D = [
   { kicker: 'Export',   title: 'Structured downloads',    desc: 'JSON / CSV manifests or auto-organized folders — batch-ready in one click.' },
 ];
 
-/* ─── Main component ──────────────────────────────────────────── */
+/* Main component */
 export default function Landing() {
   const containerRef = useRef(null);
   const curtainRef = useRef(null);
   const deviceRef = useRef(null);
   const btnLaunchNavRef = useRef(null);
   const pageSpotRef = useRef(null);
-  const [activeCapIdx, setActiveCapIdx] = useState(0);
-  const [activeHeroFrame, setActiveHeroFrame] = useState(0);
-  const [curtainDone, setCurtainDone] = useState(false);
+  const [, setCurtainDone] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const isLoggedIn = !!localStorage.getItem('token');
 
@@ -419,15 +283,7 @@ export default function Landing() {
     typeof window !== 'undefined' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* ── auto-cycle hero frames ── */
-  useEffect(() => {
-    const id = setInterval(() => {
-      setActiveHeroFrame(f => (f + 1) % HERO_FRAMES.length);
-    }, 3200);
-    return () => clearInterval(id);
-  }, []);
-
-  /* ── cursor parallax on device ── */
+  /* Cursor parallax on the preview */
   const onMouseMove = useCallback(e => {
     if (!deviceRef.current || prefersReducedMotion) return;
     const cx = window.innerWidth / 2;
@@ -442,7 +298,7 @@ export default function Landing() {
     gsap.to(deviceRef.current, { x: 0, y: 0, duration: 0.8, ease: 'power1.out' });
   }, []);
 
-  /* ── magnetic nav CTA ── */
+  /* Magnetic nav CTA */
   const onLaunchMove = useCallback(e => {
     if (prefersReducedMotion) return;
     const btn = btnLaunchNavRef.current;
@@ -457,8 +313,10 @@ export default function Landing() {
     gsap.to(btnLaunchNavRef.current, { x: 0, y: 0, duration: 0.5, ease: 'elastic.out(1,0.5)' });
   }, []);
 
-  /* ── main GSAP context ── */
+  /* GSAP page setup */
   useLayoutEffect(() => {
+    if (!containerRef.current) return;
+
     const lenis = new Lenis({
       duration: 1.2,
       easing: t => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
@@ -470,7 +328,7 @@ export default function Landing() {
     gsap.ticker.add(tickerRAF);
     gsap.ticker.lagSmoothing(0);
 
-    const nav = containerRef.current?.querySelector('.landing-nav');
+    const nav = containerRef.current.querySelector('.landing-nav');
     const onScroll = () => nav?.classList.toggle('scrolled', window.scrollY > 60);
     window.addEventListener('scroll', onScroll, { passive: true });
 
@@ -489,7 +347,7 @@ export default function Landing() {
         },
       });
 
-      /* curtain lift → hero entrance sequence */
+      /* Curtain lift into the hero entrance sequence */
       const tl = gsap.timeline({
         onComplete: () => setCurtainDone(true),
       });
@@ -597,7 +455,7 @@ export default function Landing() {
           scrollTrigger: { trigger: footerH2, start: 'top 85%' },
         });
       }
-    }, containerRef);
+    }, containerRef.current);
 
     return () => {
       gsap.ticker.remove(tickerRAF);
@@ -607,14 +465,6 @@ export default function Landing() {
       splitInstances.forEach(s => s.revert());
     };
   }, [prefersReducedMotion]);
-
-  const activeCap = CAPABILITIES[activeCapIdx];
-
-  /* hero frame reorder so active is span-2 */
-  const orderedFrames = [
-    HERO_FRAMES[activeHeroFrame],
-    ...HERO_FRAMES.filter((_, i) => i !== activeHeroFrame),
-  ];
 
   return (
     <div
@@ -639,7 +489,7 @@ export default function Landing() {
       <div className="landing-atmosphere landing-atmosphere-c" aria-hidden="true" />
       <div className="landing-grid-overlay" aria-hidden="true" />
 
-      {/* ── nav ── */}
+      {/* Navigation */}
       <nav className="landing-nav">
         <div className="landing-container landing-nav-inner">
           <Link to="/" className="landing-logo" aria-label="EditEase home">
@@ -662,15 +512,10 @@ export default function Landing() {
         </div>
       </nav>
 
-      {/* ── hero ── */}
+      {/* Hero */}
       <section className="landing-section hero">
         <div className="landing-container hero-grid">
           <div className="hero-copy">
-            <ParticleCanvas />
-            <div className="mono-caps fade-up hero-badge">
-              <span className="hero-badge-dot" />
-              AI-Powered Scene Analysis
-            </div>
             <h1 className="display-h1" style={{ marginBottom: '2rem' }}>
               Stop sorting
               <br />
@@ -711,7 +556,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── how it works ── */}
+      {/* How it works */}
       <section className="landing-section" id="how-it-works">
         <div className="landing-container">
           <div className="section-kicker fade-up">
@@ -731,7 +576,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── capabilities ── */}
+      {/* Capabilities */}
       <section className="landing-section" id="capabilities">
         <div className="landing-container">
           <div className="section-kicker fade-up">
@@ -744,7 +589,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── review workspace preview ── */}
+      {/* Review workspace preview */}
       <section className="landing-section fade-up" style={{ paddingTop: 0 }}>
         <div className="landing-container">
           <div className="section-kicker section-kicker-centered">
@@ -785,52 +630,33 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── testimonials ── */}
+      {/* Product evidence */}
       <section className="landing-section social-proof">
         <div className="landing-container">
-          <div className="mono-caps fade-up" style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
-            Trusted for real footage workflows
+          <div className="section-kicker section-kicker-centered fade-up">
+            <div className="mono-caps">Product evidence</div>
+            <p>Grounded in the workflow EditEase already supports: ingest footage, review uncertain clips, and export usable structure.</p>
           </div>
-          <div className="testimonial-row">
-            {TESTIMONIALS.map((t, i) => (
-              <div key={i} className="testimonial-card fade-up">
-                <div className="testimonial-stars" aria-label="5 stars">
-                  {Array.from({ length: 5 }).map((_, s) => (
-                    <span key={s} className="testimonial-star">★</span>
-                  ))}
-                </div>
-                <p className="testimonial-quote">"{t.quote}"</p>
-                <div className="testimonial-author">
-                  <div
-                    className="testimonial-avatar"
-                    style={{ background: `linear-gradient(135deg, hsl(${t.hue},60%,22%), hsl(${t.hue + 30},60%,14%))` }}
-                  >
-                    <span>{t.name[0]}</span>
-                  </div>
-                  <div>
-                    <div className="testimonial-name">{t.name}</div>
-                    <div className="testimonial-role">{t.role}</div>
-                  </div>
-                </div>
+          <div className="evidence-row">
+            {PRODUCT_EVIDENCE.map((item, i) => (
+              <div key={item.label} className="evidence-card fade-up" style={{ '--rd': `${i * 80}ms` }}>
+                <div className="evidence-label">{item.label}</div>
+                <h3>{item.title}</h3>
+                <p>{item.detail}</p>
+                <div className="evidence-line" />
               </div>
             ))}
           </div>
+          <div className="evidence-note fade-up">
+            <span>Review roles</span>
+            <span>Scene index JSON</span>
+            <span>CSV manifests</span>
+            <span>Organized folders</span>
+          </div>
         </div>
       </section>
 
-      {/* ── marquee ── */}
-      <section className="marquee-wrapper" aria-hidden="true">
-        <div className="marquee-track">
-          <span className="marquee-content">
-            SCENE DETECTION · BATCH REVIEW · AUTO-ORGANIZE · EMOTION TAGS · EXPORT PIPELINE · ROLE ACCESS ·&nbsp;
-          </span>
-          <span className="marquee-content" aria-hidden="true">
-            SCENE DETECTION · BATCH REVIEW · AUTO-ORGANIZE · EMOTION TAGS · EXPORT PIPELINE · ROLE ACCESS ·&nbsp;
-          </span>
-        </div>
-      </section>
-
-      {/* ── footer ── */}
+      {/* Footer */}
       <footer className="landing-section landing-footer fade-up">
         <div className="landing-container landing-footer-inner">
           <div>
@@ -845,15 +671,8 @@ export default function Landing() {
               {isLoggedIn ? 'Open Workspace →' : 'Get Started →'}
             </Link>
           </div>
-          <div className="footer-meta">
-            <div className="mono-caps" style={{ marginBottom: 8 }}>System Status</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--success)', fontWeight: 600, fontSize: '0.96rem' }}>
-              <span className="pulse-dot" style={{ background: 'var(--success)' }} />
-              Online
-            </div>
-            <div className="mono-caps" style={{ marginTop: 24, color: 'var(--text-muted)' }}>
-              © {new Date().getFullYear()} EditEase
-            </div>
+          <div className="mono-caps footer-copyright">
+            Copyright © {new Date().getFullYear()} EditEase. All rights reserved.
           </div>
         </div>
       </footer>

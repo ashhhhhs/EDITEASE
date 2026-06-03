@@ -129,6 +129,91 @@ def test_delete_selected_organized_videos(client, monkeypatch):
     assert deleted_assets == [("editease/organized-videos/presenter/delete", "video")]
 
 
+def test_organized_video_search_treats_parentheses_literally(client, monkeypatch):
+    """Filename search should not fail when video names contain regex characters."""
+    import mongomock
+    from services import organized_video_service
+
+    fake_col = mongomock.MongoClient()["editease"]["organized_videos"]
+    fake_col.insert_one({
+        "display_name": "C3864(1)",
+        "original_filename": "C3864(1).mp4",
+        "dominant_label": "b-roll",
+        "status": "organized",
+        "uploaded_by": _TEST_USER["id"],
+        "cloudinary_public_id": "editease/organized-videos/b-roll/c3864-1",
+        "cloudinary_url": "https://example.test/C3864(1).mp4",
+        "created_at": "2026-05-22T00:00:00",
+    })
+    monkeypatch.setattr(organized_video_service, "_get_col", lambda: fake_col)
+
+    rv = client.get(
+        '/organized-videos?label=b-roll&search=C3864(1)',
+        headers={"Origin": "http://localhost:5173"},
+    )
+
+    assert rv.status_code == 200
+    assert rv.headers["Access-Control-Allow-Origin"] == "http://localhost:5173"
+    data = rv.get_json()
+    assert data["total"] == 1
+    assert data["videos"][0]["original_filename"] == "C3864(1).mp4"
+
+
+def test_editor_sees_review_related_organized_videos(client, monkeypatch):
+    """Editors should see organized videos connected to clips they reviewed."""
+    import mongomock
+    from services import auth_service, clip_service, organized_video_service
+
+    editor = {
+        **_TEST_USER,
+        "id": "editor-2",
+        "email": "editor2@test.com",
+        "role": "editor",
+    }
+    monkeypatch.setattr(auth_service, "get_user_by_token", lambda t: editor)
+
+    fake_clip_col = mongomock.MongoClient()["editease"]["scenes"]
+    monkeypatch.setattr(clip_service, "col", fake_clip_col)
+    fake_clip_col.insert_one({
+        "_key": "client-video::1",
+        "video": "client-video",
+        "scene_id": 1,
+        "uploaded_by": "owner-1",
+        "assigned_to": "editor-2",
+        "review_resolved_by": "editor-2",
+        "review_request_status": "resolved",
+        "reviewed": True,
+    })
+
+    organized_col = mongomock.MongoClient()["editease"]["organized_videos"]
+    organized_col.insert_one({
+        "display_name": "Client Video",
+        "original_filename": "client-video.mp4",
+        "safe_name": "client-video",
+        "dominant_label": "b-roll",
+        "status": "organized",
+        "uploaded_by": "owner-1",
+        "cloudinary_public_id": "editease/organized-videos/b-roll/client-video",
+        "cloudinary_url": "https://example.test/client-video.mp4",
+        "created_at": "2026-05-22T00:00:00",
+    })
+    monkeypatch.setattr(organized_video_service, "_get_col", lambda: organized_col)
+
+    list_rv = client.get('/organized-videos?label=b-roll&search=client-video')
+    stats_rv = client.get('/organized-videos/stats')
+
+    assert list_rv.status_code == 200
+    assert list_rv.get_json()["total"] == 1
+    assert list_rv.get_json()["videos"][0]["original_filename"] == "client-video.mp4"
+    assert list_rv.get_json()["videos"][0]["can_delete"] is False
+    assert stats_rv.status_code == 200
+    assert stats_rv.get_json()["b-roll"] == 1
+
+    delete_rv = client.delete('/organized-videos', json={"ids": [list_rv.get_json()["videos"][0]["id"]]})
+    assert delete_rv.status_code == 403
+    assert "Only the uploader" in delete_rv.get_json()["error"]
+
+
 def test_reviewer_role_is_assignable(client, monkeypatch):
     """Reviewer is an active role in the admin role endpoint."""
     from services import auth_service
@@ -185,6 +270,46 @@ def test_job_list_includes_initiating_user(monkeypatch):
         "email": "reviewer@example.com",
         "role": "reviewer",
     }
+
+
+def test_task_status_falls_back_to_mongo_when_celery_is_unavailable(monkeypatch):
+    """Completed task polling should survive a temporary Celery/Redis status failure."""
+    import mongomock
+    from services import task_service
+
+    fake_db = mongomock.MongoClient()["editease"]
+    fake_tasks = fake_db["tasks"]
+    fake_tasks.insert_one({
+        "task_id": "task-auto-1",
+        "type": "auto_organize",
+        "status": "SUCCESS",
+        "progress_step": "done",
+        "output_path": "editease/organized-videos/b-roll/hash/demo",
+    })
+    fake_db["organized_videos"].insert_one({
+        "batch_id": "task-auto-1",
+        "original_filename": "demo.mp4",
+        "status": "organized",
+        "dominant_label": "b-roll",
+        "cloudinary_public_id": "editease/organized-videos/b-roll/hash/demo",
+        "ai_metadata": {"total_scenes_detected": 2},
+        "created_at": "2026-05-28T10:00:00",
+    })
+
+    class BrokenCelery:
+        def AsyncResult(self, _task_id):
+            raise RuntimeError("redis unavailable")
+
+    monkeypatch.setattr(task_service, "db", fake_db)
+    monkeypatch.setattr(task_service, "tasks_col", fake_tasks)
+    monkeypatch.setattr(task_service, "celery_app", BrokenCelery())
+
+    data = task_service.get_task_status("task-auto-1")
+
+    assert data["status"] == "SUCCESS"
+    assert data["result"]["video"] == "demo"
+    assert data["result"]["dominant_label"] == "b-roll"
+    assert data["result"]["ai_metadata"]["total_scenes_detected"] == 2
 
 
 def test_cloudinary_service_upload_mock(monkeypatch):

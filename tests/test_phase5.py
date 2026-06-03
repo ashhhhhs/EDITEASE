@@ -3,7 +3,7 @@ from flask import Flask
 from api.api_server import create_app
 from services import auth_service
 import config
-from pymongo import MongoClient
+import pymongo
 
 @pytest.fixture
 def app():
@@ -18,7 +18,7 @@ def app():
     config.GOOGLE_CLIENT_ID = "test_google_client_id"
     
     # Clean DB completely to reset indexes
-    client = MongoClient(config.MONGO_URI)
+    client = pymongo.MongoClient(config.MONGO_URI)
     db = client[config.DB_NAME]
     db.users.drop()
     db.password_reset_tokens.drop()
@@ -140,6 +140,11 @@ def test_update_password(client):
     res_new = client.get('/me', headers={"Authorization": f"Bearer {new_token}"})
     assert res_new.status_code == 200
 
+@pytest.mark.skip(
+    reason="Email-change endpoint (PATCH /user/email) was removed and replaced by "
+    "PATCH /user/profile (name + avatar). Kept for reference; re-enable if email "
+    "change is reintroduced."
+)
 def test_update_email(client, monkeypatch):
     client.post('/register', json={
         "email": "emailchange@example.com",
@@ -182,9 +187,8 @@ def test_invitation_flow(client, monkeypatch):
     admin_res = client.post('/login', json={"email": "admin@example.com", "password": "Pass123!"})
     admin_token = admin_res.get_json()["token"]
     admin_id = admin_res.get_json()["user"]["id"]
-    from pymongo import MongoClient
     from bson import ObjectId
-    db = MongoClient(config.MONGO_URI)[config.DB_NAME]
+    db = pymongo.MongoClient(config.MONGO_URI)[config.DB_NAME]
     db.users.update_one({"_id": ObjectId(admin_id)}, {"$set": {"role": "admin"}})
     
     # Admin creates invite

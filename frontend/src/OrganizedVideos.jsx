@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Folder, Download, RefreshCw, Search,
   CheckCircle, Archive, X, ChevronLeft, PlayCircle,
@@ -229,7 +230,7 @@ function FolderCard({ label, count, onClick, onDownloadAll, isDownloading }) {
 }
 
 /* ── Video card ── */
-function VideoCard({ doc, selected, onSelect, onPreview, onDownload, showMeta }) {
+function VideoCard({ doc, selected, highlighted, onSelect, onPreview, onDownload, showMeta }) {
   const [isHovering, setIsHovering] = useState(false);
   const date = doc.created_at
     ? new Date(doc.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -239,31 +240,37 @@ function VideoCard({ doc, selected, onSelect, onPreview, onDownload, showMeta })
   // Compute thumbnail URL
   const videoUrl = doc.cloudinary_url;
   const thumbnailUrl = videoUrl ? videoUrl.replace(/\.(mp4|mov|mkv|avi)$/i, '.jpg') : '';
+  const borderColor = selected ? 'var(--accent)' : highlighted ? 'var(--success)' : 'var(--border-subtle)';
+  const hoverBorderColor = selected ? 'var(--accent)' : highlighted ? 'var(--success)' : 'var(--border-default)';
 
   return (
     <div
       className="video-card gs-reveal tour-video-card"
       style={{
         background: 'var(--surface-panel)',
-        border: `1px solid ${selected ? 'var(--accent)' : 'var(--border-subtle)'}`,
+        border: `1px solid ${borderColor}`,
         borderRadius: 'var(--radius-lg)',
         padding: 'var(--space-16)', // Adjusted padding
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--space-12)',
         transition: 'border-color 0.18s, box-shadow 0.18s',
-        boxShadow: selected ? '0 0 0 2px rgba(88,166,255,0.2)' : 'none',
+        boxShadow: selected
+          ? '0 0 0 2px rgba(88,166,255,0.2)'
+          : highlighted
+            ? '0 0 0 2px rgba(35,134,54,0.22)'
+            : 'none',
         cursor: 'pointer',
         position: 'relative',
         overflow: 'hidden'
       }}
       onClick={() => onSelect(doc.id)}
       onMouseEnter={e => { 
-        e.currentTarget.style.borderColor = selected ? 'var(--accent)' : 'var(--border-default)'; 
+        e.currentTarget.style.borderColor = hoverBorderColor;
         setIsHovering(true);
       }}
       onMouseLeave={e => { 
-        e.currentTarget.style.borderColor = selected ? 'var(--accent)' : 'var(--border-subtle)';
+        e.currentTarget.style.borderColor = borderColor;
         setIsHovering(false);
       }}
     >
@@ -654,6 +661,9 @@ function LogsPanel({ currentFolder, search }) {
 /* ── Main page ── */
 export default function OrganizedVideos() {
   const toast = useToast();
+  const [routeParams] = useSearchParams();
+  const routeQuery = routeParams.toString();
+  const isResolvedRoute = routeParams.get('review_resolved') === 'true';
   
   // Navigation State
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -667,6 +677,8 @@ export default function OrganizedVideos() {
   const [page, setPage]           = useState(1);
   const [selected, setSelected]   = useState(new Set());
   const [previewDoc, setPreviewDoc] = useState(null); // Preview modal state
+  const [highlightedVideoId, setHighlightedVideoId] = useState(null);
+  const [resolvedTarget, setResolvedTarget] = useState(null);
 
   // Filters & toggles
   const [search, setSearch]         = useState('');
@@ -714,16 +726,76 @@ export default function OrganizedVideos() {
     }
   }, [search, filterDup, currentFolder, toast]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(routeQuery);
+    if (params.get('review_resolved') !== 'true') return;
+
+    let cancelled = false;
+    const routeVideo = (params.get('video') || '').trim();
+    const routeLabel = (params.get('label') || '').trim();
+    const clipKey = (params.get('clip_key') || '').trim();
+
+    const acknowledgeResolvedRequest = async () => {
+      try {
+        await api.post('/review/requests/acknowledge-resolved');
+        window.dispatchEvent(new Event('review-requests-changed'));
+      } catch {
+        // Keep the destination page usable even if the seen-state update fails.
+      }
+    };
+
+    const openTarget = (doc = null) => {
+      if (cancelled) return;
+
+      const label = doc?.dominant_label || routeLabel || null;
+      const filename = doc?.original_filename || routeVideo;
+      const displayName = doc?.display_name || filename || 'resolved video';
+
+      if (label) setCurrentFolder(label);
+      if (filename) setSearch(filename);
+      setHighlightedVideoId(doc?.id || null);
+      setShowLogs(false);
+      setResolvedTarget({ displayName, label, found: Boolean(doc), clipKey });
+      toast.success(`Review resolved: ${displayName}`);
+      acknowledgeResolvedRequest();
+    };
+
+    const resolveTarget = async () => {
+      if (!routeVideo) {
+        openTarget(null);
+        return;
+      }
+
+      try {
+        const lookupParams = new URLSearchParams({ search: routeVideo, page: '1', limit: '5' });
+        const res = await api.get(`/organized-videos?${lookupParams}`);
+        const docs = res.data.videos || [];
+        const doc = docs.find(video => video.original_filename === routeVideo) || docs[0] || null;
+        openTarget(doc);
+      } catch (err) {
+        if (!cancelled) {
+          if (routeLabel) openTarget(null);
+          else toast.error(err.friendlyMessage || 'Failed to find the resolved video');
+        }
+      }
+    };
+
+    resolveTarget();
+    return () => { cancelled = true; };
+  }, [routeQuery, toast]);
+
   // GSAP Batch entrance effect
   const mainRef = React.useRef(null);
 
   React.useLayoutEffect(() => {
-    if (loading || statsLoading) return;
+    if (loading || statsLoading || !mainRef.current) return;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) return;
 
-    let t = setTimeout(() => {
-      const ctx = gsap.context(() => {
+    let ctx;
+    const t = setTimeout(() => {
+      if (!mainRef.current) return;
+      ctx = gsap.context(() => {
         ScrollTrigger.batch('.gs-reveal', {
           onEnter: elements => {
             gsap.fromTo(elements,
@@ -734,12 +806,13 @@ export default function OrganizedVideos() {
           once: true
         });
         ScrollTrigger.refresh();
-      }, mainRef);
-
-      return () => ctx.revert();
+      }, mainRef.current);
     }, 50); // slight delay to allow React to paint DOM elements
 
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      if (ctx) ctx.revert();
+    };
   }, [loading, statsLoading, videos, folderStats]);
 
   // Load stats or videos depending on folder state
@@ -748,12 +821,16 @@ export default function OrganizedVideos() {
       fetchStats();
       setVideos([]);  // Clear videos when going back to folders
       setSelected(new Set()); // clear selection
-      setSearch(''); // clear search
+      if (!isResolvedRoute) setSearch(''); // clear search
       setShowLogs(false); // close logs when going back
+      if (!isResolvedRoute) {
+        setHighlightedVideoId(null);
+        setResolvedTarget(null);
+      }
     } else {
       fetchVideos(1); 
     }
-  }, [currentFolder, fetchStats, fetchVideos]);
+  }, [currentFolder, fetchStats, fetchVideos, isResolvedRoute]);
 
   const toggleSelect = useCallback((id) => {
     setSelected(prev => {
@@ -762,6 +839,13 @@ export default function OrganizedVideos() {
       return next;
     });
   }, []);
+
+  const handleBackToFolders = () => {
+    setCurrentFolder(null);
+    setSearch('');
+    setHighlightedVideoId(null);
+    setResolvedTarget(null);
+  };
 
   const selectAll = () => setSelected(new Set(videos.map(v => v.id)));
   const clearAll  = () => setSelected(new Set());
@@ -804,12 +888,21 @@ export default function OrganizedVideos() {
       toast.error('Select at least one video to delete');
       return;
     }
+    if (nonDeletableSelected.length > 0) {
+      toast.error('Only your own uploads can be deleted. Clear shared review videos first.');
+      return;
+    }
     setDeleteConfirmOpen(true);
   };
 
   const handleDeleteSelected = async () => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
+    if (nonDeletableSelected.length > 0) {
+      toast.error('Only your own uploads can be deleted. Clear shared review videos first.');
+      setDeleteConfirmOpen(false);
+      return;
+    }
 
     setDeleting(true);
     try {
@@ -852,6 +945,8 @@ export default function OrganizedVideos() {
 
   const totalPages = Math.ceil(total / limit);
   const selCount   = selected.size;
+  const selectedDocs = videos.filter(doc => selected.has(doc.id));
+  const nonDeletableSelected = selectedDocs.filter(doc => doc.can_delete === false);
   const previewEmotion = getSafeDominantEmotion(previewDoc?.ai_metadata);
 
   return (
@@ -862,10 +957,20 @@ export default function OrganizedVideos() {
         description="Videos classified and organized intelligently. Select a category below to browse files."
       />
 
+      {resolvedTarget && (
+        <div className="resolved-review-banner">
+          <CheckCircle size={16} />
+          <span>
+            Resolved review: {resolvedTarget.displayName}
+            {resolvedTarget.label ? ` in ${getDisplayLabel(resolvedTarget.label)}` : ''}
+          </span>
+        </div>
+      )}
+
       {/* ── Breadcrumb / Folder Navigation ── */}
       {currentFolder && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 'var(--space-24)' }}>
-          <button className="btn" onClick={() => setCurrentFolder(null)} style={{ padding: '6px 12px' }}>
+          <button className="btn" onClick={handleBackToFolders} style={{ padding: '6px 12px' }}>
             <ChevronLeft size={16} /> <span style={{ fontWeight: 600 }}>Folders</span>
           </button>
           <div style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -1015,6 +1120,7 @@ export default function OrganizedVideos() {
                 style={{ fontSize: 'var(--font-meta)', padding: '4px 14px' }}
                 onClick={requestDeleteSelected}
                 disabled={loading || deleting}
+                title={nonDeletableSelected.length > 0 ? 'Shared review videos can be downloaded, but only their uploader or an admin can delete them.' : 'Delete selected videos'}
               >
                 <Trash2 size={12} /> Delete Selected ({selCount})
               </button>
@@ -1073,6 +1179,7 @@ export default function OrganizedVideos() {
                 key={doc.id} 
                 doc={doc} 
                 selected={selected.has(doc.id)} 
+                highlighted={highlightedVideoId === doc.id}
                 onSelect={toggleSelect} 
                 onPreview={setPreviewDoc} 
                 onDownload={handleSingleDownload}

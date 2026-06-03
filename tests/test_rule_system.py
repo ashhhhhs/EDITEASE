@@ -88,6 +88,44 @@ def test_prediction_fusion_handles_agreement_and_conflict():
     assert conflict_action == "escalated_disagreement"
 
 
+def test_audience_reaction_gate_requires_face_evidence_and_crowd(monkeypatch):
+    monkeypatch.setattr(run_pipeline, "_detect_face_count_for_gate", lambda _path: 1)
+
+    label, confidence, debug, blocked = run_pipeline._apply_audience_reaction_face_gate(
+        "audience_reaction",
+        0.94,
+        {"classifier_used": "ml_pytorch"},
+        face_any=False,
+        face_ratio=0.0,
+        thumbnail_path="thumb.jpg",
+    )
+
+    assert blocked is True
+    assert label == "other"
+    assert confidence < run_pipeline.CONF_FUSE_LOW
+    assert debug["face_gate"]["reason"] == "audience_reaction_requires_3_or_more_faces"
+    assert debug["face_gate"]["detected_face_count"] == 1
+
+
+def test_audience_reaction_gate_allows_three_or_more_faces(monkeypatch):
+    monkeypatch.setattr(run_pipeline, "_detect_face_count_for_gate", lambda _path: 3)
+
+    label, confidence, debug, blocked = run_pipeline._apply_audience_reaction_face_gate(
+        "audience_reaction",
+        0.94,
+        {"classifier_used": "ml_pytorch"},
+        face_any=True,
+        face_ratio=0.75,
+        thumbnail_path="thumb.jpg",
+    )
+
+    assert blocked is False
+    assert label == "audience_reaction"
+    assert confidence == pytest.approx(0.94)
+    assert debug["face_gate"]["passed"] is True
+    assert debug["face_gate"]["detected_face_count"] == 3
+
+
 def test_emotion_sampling_suppresses_single_face_hit(monkeypatch, tmp_path):
     """One face-like false positive should not produce a scene-level emotion."""
     face_sequence = iter([True, False, False, False])
@@ -863,6 +901,62 @@ def test_update_clip_appends_label_audit(monkeypatch):
     assert audit["new_label"] == "testimonial"
     assert audit["confidence_before"] == 0.71
     assert {"field": "scene_label", "old": "b-roll", "new": "testimonial"} in audit["changes"]
+
+
+def test_update_clip_syncs_organized_video_folder(monkeypatch):
+    mongomock = pytest.importorskip("mongomock")
+    from services import organized_video_service
+
+    db = mongomock.MongoClient()["editease"]
+    clips_col = db["clips"]
+    organized_col = db["organized_videos"]
+    clips_col.insert_many([
+        {
+            "_key": "demo::1",
+            "video": "demo",
+            "scene_id": 1,
+            "scene_label": "b-roll",
+            "reviewed": False,
+            "uploaded_by": "editor-1",
+            "faces": {"face_present_any": False},
+        },
+        {
+            "_key": "demo::2",
+            "video": "demo",
+            "scene_id": 2,
+            "scene_label": "b-roll",
+            "reviewed": False,
+            "uploaded_by": "editor-1",
+            "faces": {"face_present_any": False},
+        },
+    ])
+    organized_col.insert_one({
+        "original_filename": "demo.mp4",
+        "display_name": "Demo",
+        "safe_name": "demo",
+        "dominant_label": "b-roll",
+        "status": "organized",
+        "uploaded_by": "editor-1",
+        "download_name": "b-roll_demo.mp4",
+        "ai_metadata": {"dominant_label": "b-roll"},
+    })
+    monkeypatch.setattr(clip_service, "col", clips_col)
+    monkeypatch.setattr(organized_video_service, "_get_col", lambda: organized_col)
+
+    result = clip_service.update_clip(
+        "demo",
+        1,
+        {"scene_label": "testimonial", "reviewed": True},
+        current_user={"id": "editor-1", "role": "editor", "name": "Editor One"},
+    )
+
+    organized_doc = organized_col.find_one({"safe_name": "demo"})
+    assert result["ok"] is True
+    assert result["organized_sync"][0]["updated_count"] == 1
+    assert organized_doc["dominant_label"] == "testimonial"
+    assert organized_doc["download_name"] == "testimonial_demo.mp4"
+    assert organized_doc["ai_metadata"]["dominant_label"] == "testimonial"
+    assert organized_doc["ai_metadata"]["label_distribution"]["testimonial"] == 1
 
 
 def test_admin_review_auto_resolves_open_request_when_marked_reviewed(monkeypatch):

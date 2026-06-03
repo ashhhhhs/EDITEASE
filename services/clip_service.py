@@ -198,6 +198,31 @@ def _push_audit_entries(docs, action, update_fields=None, current_user=None, not
             logger.error(f"Failed to append audit entry for {key}: {e}")
 
 
+def _sync_organized_videos_for_docs(docs):
+    """Refresh organized-video folder metadata for videos touched by review changes."""
+    videos = sorted({doc.get("video") for doc in (docs or []) if doc and doc.get("video")})
+    if not videos or not hasattr(col, "find"):
+        return []
+
+    try:
+        from services.organized_video_service import sync_organized_video_from_scenes
+    except Exception as e:
+        logger.error(f"Failed to load organized video sync helper: {e}")
+        return []
+
+    sync_results = []
+    for video in videos:
+        try:
+            scenes = list(col.find({"video": video}))
+            uploader = next((scene.get("uploaded_by") for scene in scenes if scene.get("uploaded_by")), None)
+            sync_results.append(
+                sync_organized_video_from_scenes(video, scenes, uploader=uploader)
+            )
+        except Exception as e:
+            logger.error(f"Failed to sync organized video metadata for {video}: {e}")
+    return sync_results
+
+
 def _reconcile_completed_review_requests(current_user=None):
     if not current_user or not hasattr(col, "update_many"):
         return 0
@@ -360,8 +385,11 @@ def search_clips(filters, limit=100, current_user=None):
     q = _apply_review_scope(q, current_user)
 
     total = col.count_documents(q)
-    cursor = col.find(q).sort("duration_sec", -1).skip(skip).limit(limit)
+    sort_field = "review_resolved_at" if review_request_status == "resolved" else "duration_sec"
+    cursor = col.find(q).sort(sort_field, -1).skip(skip).limit(limit)
     results = [clean_doc(d) for d in cursor]
+    if review_request_status == "resolved":
+        _sync_organized_videos_for_docs(results)
     return {"count": len(results), "total": total, "page": page, "limit": limit, "query": q, "results": results}
 
 
@@ -440,7 +468,13 @@ def resolve_review_requests(keys, status, note="", current_user=None):
         note,
         review_history=True,
     )
-    return {"ok": True, "resolved_count": res.modified_count, "fields": update_fields}
+    organized_sync = _sync_organized_videos_for_docs(audit_docs) if status == "resolved" else []
+    return {
+        "ok": True,
+        "resolved_count": res.modified_count,
+        "fields": update_fields,
+        "organized_sync": organized_sync,
+    }
 
 
 def assign_review_requests(keys, assignee, note="", current_user=None):
@@ -610,6 +644,9 @@ def bulk_update_clips(keys, update_data, current_user=None):
                 
     if not update_fields:
         return {"error": "No valid fields provided to update."}
+
+    if "scene_label" in update_fields and "manual_scene_label" not in update_fields:
+        update_fields["manual_scene_label"] = update_fields["scene_label"]
         
     query = {"_key": {"$in": keys}}
     query = _apply_review_scope(query, current_user)
@@ -659,11 +696,19 @@ def bulk_update_clips(keys, update_data, current_user=None):
         )
         auto_resolved_count = resolution_res.modified_count
 
+    sync_fields = {"scene_label", "manual_scene_label", "reviewed", "dominant_emotion_overall", "manual_emotion"}
+    organized_sync = (
+        _sync_organized_videos_for_docs(audit_docs)
+        if sync_fields.intersection(update_fields)
+        else []
+    )
+
     return {
         "ok": True,
         "updated_count": res.modified_count,
         "auto_resolved_count": auto_resolved_count,
         "fields": update_fields,
+        "organized_sync": organized_sync,
     }
 
 def update_clip(video, scene_id, data, current_user=None):
@@ -760,7 +805,13 @@ def update_clip(video, scene_id, data, current_user=None):
         return {"error": "scene not found", "key": key}
 
     doc2 = col.find_one({"_key": key})
-    return {"ok": True, "updated": update_fields, "doc": clean_doc(doc2)}
+    sync_fields = {"scene_label", "manual_scene_label", "reviewed", "dominant_emotion_overall", "manual_emotion"}
+    organized_sync = (
+        _sync_organized_videos_for_docs([doc2])
+        if sync_fields.intersection(update_fields)
+        else []
+    )
+    return {"ok": True, "updated": update_fields, "doc": clean_doc(doc2), "organized_sync": organized_sync}
 
 def get_clip_by_id(clip_id):
     try:

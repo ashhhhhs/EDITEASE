@@ -6,6 +6,12 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: 'localhost',
+    port: 5173,
+    strictPort: true,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
     fs: {
       allow: [
         path.resolve(__dirname),

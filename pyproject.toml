@@ -13,25 +13,45 @@ authors = [
 requires-python = ">=3.9"
 dependencies = [
     "flask",
+    "flask-cors",
+    "flask-mail",
+    "flasgger",
     "pymongo",
-    "streamlit",
-    "opencv-python",
-    "requests",
-    "numpy",
-    "scenedetect",
-    "deepface",
+    "python-dotenv",
     "celery",
     "redis",
-    "flasgger"
+    "requests",
+    "google-auth",
+    "cloudinary",
+    "numpy",
+    "opencv-python",
+    "scenedetect<0.7",
+    "torch",
+    "torchvision",
+    "pillow",
+    "tqdm",
+    "scikit-learn",
+    "python-dateutil",
+    "streamlit"
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-html",
     "mongomock",
     "black",
     "flake8"
 ]
+# Optional facial-emotion detection (pulls in TensorFlow). Pipeline runs
+# without it (emotion_detect.py degrades gracefully). Enable with:
+#   pip install -e .[full]
+full = [
+    "deepface"
+]
+
+[tool.setuptools.packages.find]
+include = ["api*", "services*", "pipeline*", "database*", "utils*", "ui*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

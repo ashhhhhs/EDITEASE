@@ -89,23 +89,98 @@ def dispatch_auto_organize(file_path, user_id=None):
     logger.info(f"Dispatched auto-organize task {task.id} for {file_path}")
     return task
 
+
+def _result_from_organized_video(task_id):
+    """Rebuild an auto-organize task result from Mongo when Celery metadata is unavailable."""
+    doc = db["organized_videos"].find_one(
+        {"batch_id": task_id},
+        sort=[("created_at", -1)],
+    )
+    if not doc:
+        return None
+
+    original_filename = doc.get("original_filename") or doc.get("display_name") or ""
+    video_name = os.path.splitext(original_filename)[0] if original_filename else doc.get("safe_name", "")
+
+    return {
+        "status": "duplicate" if doc.get("status") == "duplicate" else "success",
+        "video": video_name,
+        "dominant_label": doc.get("dominant_label"),
+        "export_path": doc.get("cloudinary_public_id"),
+        "ai_metadata": doc.get("ai_metadata") or {},
+    }
+
+
+def _status_from_task_record(task_id):
+    """Return a task-status payload from the durable tasks collection."""
+    task_doc = tasks_col.find_one({"task_id": task_id})
+    if not task_doc:
+        return None
+
+    status = task_doc.get("status", "PENDING")
+    if status == "SUCCESS":
+        result_data = _result_from_organized_video(task_id) or {
+            "status": "success",
+            "message": task_doc.get("progress_step") or "done",
+            "export_path": task_doc.get("output_path"),
+        }
+    elif status == "FAILURE":
+        result_data = {
+            "status": "error",
+            "message": task_doc.get("error_message") or "Processing failed",
+        }
+    else:
+        result_data = {
+            "step": "processing",
+            "message": task_doc.get("progress_step") or status,
+        }
+
+    return {
+        "task_id": task_id,
+        "status": status,
+        "result": result_data,
+    }
+
+
 def get_task_status(task_id):
     """Query celery worker for task status."""
-    task_result = celery_app.AsyncResult(task_id)
-    
-    if task_result.ready():
-        result_data = task_result.result
-    else:
-        # info holds the meta dictionary during PROGRESS
-        result_data = task_result.info
+    try:
+        task_result = celery_app.AsyncResult(task_id)
+        status = task_result.status
+
+        if task_result.ready():
+            result_data = task_result.result
+        else:
+            # info holds the meta dictionary during PROGRESS
+            result_data = task_result.info
+    except Exception as exc:
+        logger.warning("Celery status lookup failed for %s: %s", task_id, exc)
+        fallback = _status_from_task_record(task_id)
+        if fallback:
+            return fallback
+        return {
+            "task_id": task_id,
+            "status": "PENDING",
+            "result": {"message": "Task status temporarily unavailable"},
+        }
 
     # If info is just a string (sometimes Celery does this depending on backend), wrap it
     if isinstance(result_data, str):
         result_data = {"message": result_data}
+    elif isinstance(result_data, Exception):
+        result_data = {"message": str(result_data)}
+
+    fallback = _status_from_task_record(task_id)
+    if fallback and (
+        status == "PENDING"
+        or result_data in (None, {})
+        or fallback["status"] in ("SUCCESS", "FAILURE") and fallback["status"] != status
+    ):
+        return fallback
 
     return {
         "task_id": task_id,
-        "status": task_result.status,
+        "status": status,
         "result": result_data
     }
 

@@ -58,3 +58,46 @@ datasets/
 Thumbs.db
 .gemini/
 .pytest_cache/
+
+# Build / packaging output
+*.egg-info/
+
+# Test / run artifacts
+artifacts/
+
+# Temporary pip build/install folders
+pip-build-env-*/
+pip-build-tracker-*/
+pip-install-*/
+pip-metadata-*/
+pip-unpack-*/
+
+# Generated media app directory
+editease_app/
+
+# AI / dev tooling (not part of the code deliverable)
+.claude/
+CLAUDE.md
+SKILL.md
+.mcp.json
+
+# Personal shell / git config accidentally tracked
+.bash_profile
+.bashrc
+.profile
+.zprofile
+.zshrc
+.ripgreprc
+.gitconfig
+
+# Report drafts, backups, archives, generated report assets (not code deliverable)
+_archive/
+_report_backups/
+docs/
+outputs/
+report_assets/
+scripts/report/
+
+# Local cleanup helpers
+CLEANUP_MANIFEST.md
+make_submission.sh

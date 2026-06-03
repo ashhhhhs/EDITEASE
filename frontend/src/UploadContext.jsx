@@ -104,7 +104,16 @@ export const UploadProvider = ({ children }) => {
                            };
                        }
                     } catch (err) {
-                       console.error('Failed to get status for task', f.taskId, err);
+                       if (err.response) {
+                          console.warn('Failed to get status for task', f.taskId, err);
+                       }
+                       return {
+                          id: f.taskId,
+                          status: 'PROCESSING',
+                          progressMessage: err.response
+                            ? (err.friendlyMessage || err.message || 'Status check failed')
+                            : 'Waiting for API connection...'
+                       };
                     }
                  }
                  return null;

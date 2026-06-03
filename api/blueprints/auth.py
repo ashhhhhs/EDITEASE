@@ -3,6 +3,7 @@ import os
 import secrets
 import hashlib
 import datetime
+import tempfile
 
 from flask import Blueprint, request, jsonify, g
 from services import auth_service
@@ -230,35 +231,60 @@ def accept_invite_endpoint(token):
 # Account Settings
 # ---------------------------------------------------------------------------
 
+@auth_bp.post('/user/password/otp')
+@login_required
+def request_password_otp():
+    """Send a 6-digit OTP to the user's email (Google-only accounts only)."""
+    res = auth_service.send_password_set_otp(g.user['id'], g.user['email'])
+    if 'error' in res:
+        return jsonify(res), res.get('status', 400)
+    return jsonify({"ok": True})
+
+
 @auth_bp.patch('/user/password')
 @login_required
 def update_password():
     data = request.get_json(force=True) or {}
     current_password = data.get('current_password')
     new_password = data.get('new_password')
-    
-    if not current_password or not new_password:
-        return jsonify({"error": "Current and new password are required."}), 400
-        
-    res = auth_service.update_user_password(g.user['id'], current_password, new_password)
+    otp = data.get('otp', '').strip()
+
+    if not new_password:
+        return jsonify({"error": "New password is required."}), 400
+
+    res = auth_service.update_user_password(g.user['id'], current_password, new_password, otp=otp)
     if 'error' in res:
         return jsonify(res), res.get('status', 400)
     return jsonify({"ok": True, "token": res["token"]})
 
 
-@auth_bp.patch('/user/email')
+@auth_bp.patch('/user/profile')
 @login_required
-def update_email():
-    data = request.get_json(force=True) or {}
-    new_email = data.get('email')
-    
-    if not new_email:
-        return jsonify({"error": "New email is required."}), 400
-        
-    res = auth_service.update_user_email(g.user['id'], new_email)
+def update_profile():
+    name = request.form.get('name', '').strip()
+    avatar_file = request.files.get('avatar')
+
+    if not name and not avatar_file:
+        return jsonify({"error": "Nothing to update."}), 400
+
+    avatar_url = None
+    if avatar_file:
+        from services import cloudinary_service
+        suffix = os.path.splitext(avatar_file.filename)[1] or '.jpg'
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            avatar_file.save(tmp.name)
+            avatar_url = cloudinary_service.upload_image(
+                tmp.name,
+                public_id=f"editease/avatars/{g.user['id']}"
+            )
+        os.unlink(tmp.name)
+        if not avatar_url:
+            return jsonify({"error": "Avatar upload failed."}), 500
+
+    res = auth_service.update_user_profile(g.user['id'], name=name or None, avatar_url=avatar_url)
     if 'error' in res:
         return jsonify(res), res.get('status', 400)
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "user": res["user"]})
 
 
 @auth_bp.post('/user/logout-all')

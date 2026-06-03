@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Outlet, useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, UploadCloud, Download, Library, Wand2, Shield, LogOut, CheckSquare, Users, Activity, AlertTriangle, Settings, Zap, Bell } from 'lucide-react';
+import { LayoutDashboard, UploadCloud, Download, Library, Wand2, Shield, LogOut, CheckSquare, Users, Activity, AlertTriangle, Settings, Zap, Bell, CheckCircle } from 'lucide-react';
 import { Joyride, STATUS } from 'react-joyride';
 import api from './lib/api';
 
@@ -72,7 +72,9 @@ function GoogleLinkModal({ currentUser }) {
            localStorage.removeItem('pending_google_link');
         }
       }
-    } catch(e) {}
+    } catch {
+      localStorage.removeItem('pending_google_link');
+    }
   }, [currentUser]);
 
   if (!pendingLink) return null;
@@ -123,12 +125,22 @@ function GoogleLinkModal({ currentUser }) {
   );
 }
 
+function TourTip({ title, body }) {
+  return (
+    <div className="tour-tip">
+      <h4>{title}</h4>
+      <p>{body}</p>
+    </div>
+  );
+}
+
 export default function AppShell({ currentUser, onLogout }) {
   const location = useLocation();
   const role = currentUser?.role || 'editor';
   const [openReviewRequests, setOpenReviewRequests] = useState(0);
   const [assignedReviewRequests, setAssignedReviewRequests] = useState(0);
   const [resolvedReviewRequests, setResolvedReviewRequests] = useState(0);
+  const [resolvedReviewTarget, setResolvedReviewTarget] = useState(null);
   const navDescriptions = {
     Dashboard: 'Your creative hub. Track recent ingests and see what the system is organizing for you.',
     'Review Queue': 'Quickly review and sort ambiguous clips so they land in the right folders.',
@@ -212,8 +224,9 @@ export default function AppShell({ currentUser, onLogout }) {
   }, [role, location.pathname]);
 
   React.useEffect(() => {
-    if (!['editor', 'reviewer'].includes(role)) {
+    if (role !== 'editor') {
       setResolvedReviewRequests(0);
+      setResolvedReviewTarget(null);
       return;
     }
 
@@ -221,9 +234,15 @@ export default function AppShell({ currentUser, onLogout }) {
     const fetchResolvedReviewRequests = async () => {
       try {
         const res = await api.get('/search?review_request_status=resolved&requested_by_me=true&resolution_unseen=true&limit=1');
-        if (!cancelled) setResolvedReviewRequests(res.data.total || 0);
+        if (!cancelled) {
+          setResolvedReviewRequests(res.data.total || 0);
+          setResolvedReviewTarget((res.data.results || [])[0] || null);
+        }
       } catch {
-        if (!cancelled) setResolvedReviewRequests(0);
+        if (!cancelled) {
+          setResolvedReviewRequests(0);
+          setResolvedReviewTarget(null);
+        }
       }
     };
 
@@ -237,16 +256,24 @@ export default function AppShell({ currentUser, onLogout }) {
     };
   }, [role, location.pathname]);
 
-  // ── Tour Guide State ──
-  const acknowledgeResolvedReviewRequests = async () => {
-    setResolvedReviewRequests(0);
-    try {
-      await api.post('/review/requests/acknowledge-resolved');
-      window.dispatchEvent(new Event('review-requests-changed'));
-    } catch {
-      // Keep the UI quiet; the next poll will restore the count if the request fails.
+  const resolvedReviewLink = React.useMemo(() => {
+    const params = new URLSearchParams({ review_resolved: 'true' });
+    if (resolvedReviewTarget?.video) params.set('video', resolvedReviewTarget.video);
+    if (resolvedReviewTarget?.scene_id !== undefined && resolvedReviewTarget?.scene_id !== null) {
+      params.set('scene_id', String(resolvedReviewTarget.scene_id));
     }
-  };
+    const label = resolvedReviewTarget?.manual_scene_label || resolvedReviewTarget?.scene_label;
+    if (label) params.set('label', label);
+    const clipKey = resolvedReviewTarget?._key || (
+      resolvedReviewTarget?.video && resolvedReviewTarget?.scene_id !== undefined
+        ? `${resolvedReviewTarget.video}::${resolvedReviewTarget.scene_id}`
+        : ''
+    );
+    if (clipKey) params.set('clip_key', clipKey);
+    return `/app/organized-videos?${params.toString()}`;
+  }, [resolvedReviewTarget]);
+
+  // Tour guide state
 
   const [runTour, setRunTour] = useState(false);
   const tourSteps = [
@@ -254,46 +281,81 @@ export default function AppShell({ currentUser, onLogout }) {
       target: 'body',
       placement: 'center',
       content: (
-        <div style={{ textAlign: 'left' }}>
-          <h4 style={{ color: 'var(--accent)', marginBottom: '12px', fontSize: '1.15rem', fontWeight: 700 }}>Welcome to EditEase! 🎬</h4>
-          <p style={{ color: 'var(--text-secondary)', margin: '0', fontSize: '0.95rem', lineHeight: 1.6 }}>Let's take a quick 1-minute tour of your new automated video workflow.</p>
-        </div>
+        <TourTip
+          title="Welcome to EditEase"
+          body="Take a quick walkthrough of the main workspace areas and the path from upload to review to organized output."
+        />
       ),
       disableBeacon: true,
     },
     {
       target: '.tour-sidebar',
-      content: '🎯 Mission control center. Navigate between different stages of the video pipeline from here.',
+      content: (
+        <TourTip
+          title="Workspace navigation"
+          body="Use the sidebar to move between dashboard, uploads, review queue, organized videos, and admin tools."
+        />
+      ),
       placement: 'right',
     },
     {
       target: '.tour-nav-Dashboard',
-      content: '📊 Get a bird\'s-eye view of your project stats, recent activity, and system health at a glance.',
+      content: (
+        <TourTip
+          title="Dashboard"
+          body="Check recent activity, processing status, review workload, and system health before starting work."
+        />
+      ),
       placement: 'right',
     },
     {
       target: '.tour-nav-Uploads',
-      content: '⬆️ Start here! Drop your raw footage and our AI automatically splits scenes and organizes them.',
+      content: (
+        <TourTip
+          title="Uploads"
+          body="Start with raw footage here. EditEase creates scene records and prepares clips for review and organization."
+        />
+      ),
       placement: 'right',
     },
     {
       target: '.tour-nav-Review-Queue',
-      content: '🔍 Quick review station. Any clips the AI is uncertain about land here for your verification.',
+      content: (
+        <TourTip
+          title="Review queue"
+          body="Clips that need a human decision appear here, so reviewers can approve, flag, or leave notes."
+        />
+      ),
       placement: 'right',
     },
     {
       target: '.tour-nav-Organized-Videos',
-      content: '✨ Your organized clips beautifully sorted into folders (Testimonials, B-Roll, etc.) ready for download.',
+      content: (
+        <TourTip
+          title="Organized videos"
+          body="Reviewed assets and organized folders collect here for download, follow-up review, or export."
+        />
+      ),
       placement: 'right',
     },
     {
       target: '.workspace-topbar',
-      content: '📍 The topbar shows your current location and provides quick navigation actions.',
+      content: (
+        <TourTip
+          title="Current context"
+          body="The topbar confirms where you are and keeps quick navigation actions close by."
+        />
+      ),
       placement: 'bottom',
     },
     {
       target: '.tour-start-btn',
-      content: '⚡ Anytime you need a refresher, click here to relaunch this tour guide!',
+      content: (
+        <TourTip
+          title="Restart the tour"
+          body="Use this button any time you want to run the walkthrough again."
+        />
+      ),
       placement: 'left',
     }
   ];
@@ -305,8 +367,16 @@ export default function AppShell({ currentUser, onLogout }) {
     }
   };
 
+  const spotRef = useRef(null);
+  const onSpotMove = useCallback((e) => {
+    spotRef.current?.style.setProperty('--wx', `${e.clientX}px`);
+    spotRef.current?.style.setProperty('--wy', `${e.clientY}px`);
+  }, []);
+
   return (
-    <div className="app-container workspace-shell">
+    <div className="app-container workspace-shell" onMouseMove={onSpotMove}>
+      <div className="workspace-grid-overlay" aria-hidden="true" />
+      <div className="workspace-spotlight" ref={spotRef} aria-hidden="true" />
       <Joyride
         steps={tourSteps}
         run={runTour}
@@ -314,6 +384,13 @@ export default function AppShell({ currentUser, onLogout }) {
         showProgress
         showSkipButton
         callback={handleJoyrideCallback}
+        locale={{
+          back: 'Back',
+          close: 'Close',
+          last: 'Done',
+          next: 'Next',
+          skip: 'Skip tour',
+        }}
         styles={{
           options: {
             primaryColor: 'var(--accent)',
@@ -455,8 +532,10 @@ export default function AppShell({ currentUser, onLogout }) {
             </button>
           </div>
           <div className="workspace-account-card">
-            <div className="workspace-account-avatar">
-              {(currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
+            <div className="workspace-account-avatar" style={{ overflow: 'hidden', padding: 0 }}>
+              {currentUser.avatar_url
+                ? <img src={currentUser.avatar_url} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : (currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
             </div>
             <div className="workspace-account-copy">
               <div className="workspace-account-name">
@@ -499,14 +578,13 @@ export default function AppShell({ currentUser, onLogout }) {
                 <span>{assignedReviewRequests} assigned review{assignedReviewRequests === 1 ? '' : 's'}</span>
               </Link>
             )}
-            {role !== 'admin' && resolvedReviewRequests > 0 && (
+            {role === 'editor' && resolvedReviewRequests > 0 && (
               <Link
-                to="/app/organized-videos"
-                className="workspace-notification-pill"
-                title="Resolved review requests ready for download"
-                onClick={acknowledgeResolvedReviewRequests}
+                to={resolvedReviewLink}
+                className="workspace-notification-pill workspace-notification-pill-success"
+                title="Resolved review requests ready in Organized Videos"
               >
-                <Bell size={14} />
+                <CheckCircle size={14} />
                 <span>{resolvedReviewRequests} resolved request{resolvedReviewRequests === 1 ? '' : 's'}</span>
               </Link>
             )}
@@ -516,7 +594,7 @@ export default function AppShell({ currentUser, onLogout }) {
               style={{ gap: '8px' }}
             >
               <Zap size={14} color="var(--accent)" fill="var(--accent)" style={{ opacity: 0.8 }} />
-              Tour Guide
+              Start Tour
             </button>
             <Link
               to="/"

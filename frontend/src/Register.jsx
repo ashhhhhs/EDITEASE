@@ -131,6 +131,8 @@ export default function Register({ onLogin }) {
             theme="outline"
             size="large"
             text="continue_with"
+            shape="rectangular"
+            logo_alignment="left"
             width="320px"
           />
         </div>

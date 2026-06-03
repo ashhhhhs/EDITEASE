@@ -32,22 +32,33 @@ export default function AuthShell({
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) return;
 
+    if (!containerRef.current) return;
+
+    const root = containerRef.current;
+
     const ctx = gsap.context(() => {
-      gsap.from('.auth-card', {
+      const cards = root.querySelectorAll('.auth-card');
+      const aside = root.querySelector('.auth-aside');
+      const bullets = root.querySelectorAll('.auth-aside-bullet');
+      const brand = root.querySelector('.auth-brand, .auth-aside-brand');
+
+      if (cards.length) gsap.from(cards, {
         y: 20,
         opacity: 0,
         duration: 0.6,
         ease: 'power2.out',
         clearProps: 'transform,opacity',
       });
-      gsap.from('.auth-aside', {
+
+      if (aside) gsap.from(aside, {
         x: -20,
         opacity: 0,
         duration: 0.7,
         ease: 'power2.out',
         clearProps: 'transform,opacity',
       });
-      gsap.from('.auth-aside-bullet', {
+
+      if (bullets.length) gsap.from(bullets, {
         x: -10,
         opacity: 0,
         duration: 0.4,
@@ -56,12 +67,13 @@ export default function AuthShell({
         ease: 'power2.out',
         clearProps: 'transform,opacity',
       });
-      gsap.from('.auth-brand', {
+
+      if (brand) gsap.from(brand, {
         opacity: 0,
         duration: 0.8,
         ease: 'power2.out',
       });
-    }, containerRef);
+    }, root);
 
     return () => ctx.revert();
   }, []);

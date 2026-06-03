@@ -14,6 +14,8 @@ export default function PageHeader({ title, description, actions, breadcrumbs, e
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let splitTitle;
 
+    if (!headerRef.current) return;
+
     const ctx = gsap.context(() => {
       const h1 = headerRef.current?.querySelector('.display-title');
       const desc = headerRef.current?.querySelector('.display-subtitle');
@@ -53,7 +55,7 @@ export default function PageHeader({ title, description, actions, breadcrumbs, e
           ease: 'power2.out'
         }, prefersReducedMotion ? "-=0" : "-=0.4");
       }
-    }, headerRef);
+    }, headerRef.current);
 
     return () => {
       if (splitTitle) splitTitle.revert();

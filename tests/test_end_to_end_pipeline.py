@@ -182,6 +182,54 @@ def test_process_video_traces_raw_video_through_storage(tmp_path, monkeypatch, c
     )
 
 
+def test_process_video_escalates_audience_reaction_without_faces(tmp_path, monkeypatch):
+    video_path = tmp_path / "no_faces.avi"
+    _write_synthetic_video(video_path)
+
+    stored = {}
+
+    def fake_upsert(docs, source_name=None):
+        stored["docs"] = json.loads(json.dumps(docs))
+        return len(docs)
+
+    fake_classifier, _fake_rule_classifier = _patch_pipeline_dependencies(
+        monkeypatch,
+        upsert_fn=fake_upsert,
+    )
+
+    def classify_as_audience(video_path, start_sec, end_sec, thumbnail_path):
+        fake_classifier.calls.append({
+            "video_path": video_path,
+            "start_sec": start_sec,
+            "end_sec": end_sec,
+            "thumbnail_path": thumbnail_path,
+        })
+        return (
+            "audience_reaction",
+            0.96,
+            {
+                "classifier_used": "ml_pytorch",
+                "normalised_features": {"motion_mean": 0.25},
+            },
+        )
+
+    fake_classifier.classify = classify_as_audience
+    monkeypatch.setattr(run_pipeline, "_detect_face_count_for_gate", lambda _path: 0)
+
+    run_pipeline.process_video(str(video_path), str(tmp_path), threshold=12.0)
+
+    scene_docs = stored["docs"]
+    assert scene_docs
+    assert all(doc["scene_label"] == "other" for doc in scene_docs)
+    assert all(doc["reviewed"] is False for doc in scene_docs)
+    assert all(doc["uncertain"] is True for doc in scene_docs)
+    assert all(doc["scene_debug"]["agent_action"] == "escalated_face_gate" for doc in scene_docs)
+    assert all(
+        doc["scene_debug"]["face_gate"]["reason"] == "audience_reaction_requires_3_or_more_faces"
+        for doc in scene_docs
+    )
+
+
 def test_process_video_logs_database_failures_and_reraises(tmp_path, monkeypatch, caplog):
     video_path = tmp_path / "db_failure.avi"
     _write_synthetic_video(video_path)

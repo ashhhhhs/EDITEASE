@@ -1,19 +1,52 @@
+# EditEase — Python dependencies
+# Install:  pip install -r Requirements.txt
+# (or, with the package + dev/test tools:  pip install -e .[dev])
+#
+# Every package below is actually imported by the code. Verified against source.
+
+# --- Web API ---
 flask
+flask-cors
+flask-mail
+flasgger
+
+# --- Database ---
 pymongo
-streamlit
-opencv-python
-requests
-numpy
+
+# --- Config ---
+python-dotenv     # config.py loads .env at import time — REQUIRED to start
+
+# --- Background jobs ---
 celery
 redis
-resend
-flask-mail
-google-auth
-flask-cors
+
+# --- HTTP / auth ---
+requests
+google-auth       # Google OAuth sign-in
+
+# --- Media storage ---
 cloudinary
+
+# --- Video / ML pipeline ---
+numpy
+opencv-python
+scenedetect<0.7
 torch
 torchvision
+pillow
 tqdm
-scikit-learn
+scikit-learn      # metrics in the ML quality test
 python-dateutil
+
+# --- Legacy Streamlit UI (ui/ui_api.py) ---
+streamlit
+
+# --- Testing (so a single install enables `pytest`) ---
+pytest
+pytest-html
 mongomock
+
+# --- Optional: facial-emotion detection in the pipeline ---
+# deepface is lazy-imported (pipeline degrades gracefully without it) and pulls
+# in TensorFlow, which can be slow/fragile to install. Uncomment to enable:
+# deepface

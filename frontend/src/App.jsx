@@ -116,7 +116,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
               <Route path="/" element={<Landing />} />
@@ -136,8 +136,8 @@ export default function App() {
                 <Route path="admin/jobs" element={<RoleGuard allowedRoles={['admin']}><VerifiedGuard><JobMonitor /></VerifiedGuard></RoleGuard>} />
                 <Route path="uploads" element={<RoleGuard allowedRoles={['admin', 'editor']}><VerifiedGuard><Upload /></VerifiedGuard></RoleGuard>} />
                 <Route path="organized-videos" element={<RoleGuard allowedRoles={['admin', 'editor']}><VerifiedGuard><OrganizedVideos /></VerifiedGuard></RoleGuard>} />
-                <Route path="settings" element={<VerifiedGuard><Settings currentUser={currentUser} /></VerifiedGuard>} />
-                <Route path="*" element={<Navigate to="dashboard" replace />} />
+                <Route path="settings" element={<VerifiedGuard><Settings currentUser={currentUser} onUserUpdate={(u) => setCurrentUser(prev => ({ ...prev, ...u }))} /></VerifiedGuard>} />
+                <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
               </Route>
 
               <Route path="*" element={<Navigate to="/" replace />} />

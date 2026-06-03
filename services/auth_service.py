@@ -170,6 +170,8 @@ def get_user_by_token(token):
             "is_active": user.get("is_active", True),
             "created_at": user.get("created_at"),
             "last_login_at": user.get("last_login_at"),
+            "avatar_url": user.get("avatar_url"),
+            "has_password": bool(user.get("password_hash")),
         }
     return None
 
@@ -512,22 +514,71 @@ def _log_login_event(user_id, method):
     except Exception as e:
         logger.error(f"Failed to log login event: {e}")
 
-def update_user_password(user_id, current_password, new_password):
+def send_password_set_otp(user_id, email):
+    """Generate and email a 6-digit OTP for Google-only users setting a local password."""
+    import hashlib
     from bson import ObjectId
     users_col = _get_users_col()
     user = users_col.find_one({"_id": ObjectId(user_id)})
     if not user:
         return {"error": "User not found.", "status": 404}
-        
-    if not user.get("password_hash"):
-        return {"error": "You signed up with a linked provider (like Google). Please use the reset password flow to set a local password first.", "status": 400}
-        
-    if not check_password_hash(user["password_hash"], current_password):
-        return {"error": "Incorrect current password.", "status": 403}
-        
+    if user.get("password_hash"):
+        return {"error": "Your account already has a password.", "status": 400}
+
+    now = datetime.datetime.utcnow()
+    one_hour_ago = (now - datetime.timedelta(hours=1)).isoformat()
+    recent = user.get("password_otp_sent_at")
+    if recent and recent > one_hour_ago:
+        sent_count = user.get("password_otp_count", 0)
+        if sent_count >= 3:
+            return {"error": "Too many code requests. Please try again later.", "status": 429}
+
+    otp = str(secrets.randbelow(900000) + 100000)
+    otp_hash = hashlib.sha256(otp.encode()).hexdigest()
+    expires_at = (now + datetime.timedelta(minutes=10)).isoformat()
+
+    users_col.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {
+            "password_otp_hash": otp_hash,
+            "password_otp_expires_at": expires_at,
+            "password_otp_sent_at": now.isoformat(),
+        }, "$inc": {"password_otp_count": 1}}
+    )
+
+    from services.email_service import send_password_otp_email
+    send_password_otp_email(email, otp)
+    return {"ok": True}
+
+
+def update_user_password(user_id, current_password, new_password, otp=None):
+    import hashlib
+    from bson import ObjectId
+    users_col = _get_users_col()
+    user = users_col.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return {"error": "User not found.", "status": 404}
+
+    if user.get("password_hash"):
+        if not current_password:
+            return {"error": "Current password is required.", "status": 400}
+        if not check_password_hash(user["password_hash"], current_password):
+            return {"error": "Incorrect current password.", "status": 400}
+    else:
+        if not otp:
+            return {"error": "A verification code is required.", "status": 400}
+        stored_hash = user.get("password_otp_hash")
+        expires_at = user.get("password_otp_expires_at")
+        if not stored_hash or not expires_at:
+            return {"error": "No verification code found. Please request a new one.", "status": 400}
+        if datetime.datetime.utcnow().isoformat() > expires_at:
+            return {"error": "Verification code has expired. Please request a new one.", "status": 400}
+        if hashlib.sha256(otp.encode()).hexdigest() != stored_hash:
+            return {"error": "Incorrect verification code.", "status": 400}
+
     if len(new_password) < 8:
         return {"error": "New password must be at least 8 characters.", "status": 400}
-        
+
     hashed = generate_password_hash(new_password)
     now = datetime.datetime.utcnow().isoformat()
     new_token = secrets.token_hex(32)
@@ -536,10 +587,40 @@ def update_user_password(user_id, current_password, new_password):
         {"$set": {
             "password_hash": hashed,
             "password_changed_at": now,
-            "token": new_token
+            "token": new_token,
+        }, "$unset": {
+            "password_otp_hash": "",
+            "password_otp_expires_at": "",
+            "password_otp_sent_at": "",
+            "password_otp_count": "",
         }}
     )
     return {"ok": True, "token": new_token}
+
+
+def update_user_profile(user_id, name=None, avatar_url=None):
+    from bson import ObjectId
+    users_col = _get_users_col()
+    updates = {}
+    if name:
+        updates["name"] = name
+    if avatar_url:
+        updates["avatar_url"] = avatar_url
+    if not updates:
+        return {"error": "Nothing to update.", "status": 400}
+    users_col.update_one({"_id": ObjectId(user_id)}, {"$set": updates})
+    user = users_col.find_one({"_id": ObjectId(user_id)}, {"password_hash": 0, "token": 0})
+    return {
+        "ok": True,
+        "user": {
+            "id": str(user["_id"]),
+            "name": user.get("name"),
+            "email": user.get("email"),
+            "role": user.get("role", "editor"),
+            "email_verified": user.get("email_verified", False),
+            "avatar_url": user.get("avatar_url"),
+        }
+    }
 
 
 def update_user_email(user_id, new_email):

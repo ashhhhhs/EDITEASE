@@ -29,10 +29,10 @@ def find_scenes(video_path, threshold=config.SCENE_DETECT_THRESHOLD):
         video_path = os.path.join(script_folder, video_path)
 
     if not os.path.exists(video_path):
-        logger.error("❌ Error: Cannot find file at: %s", video_path)
+        logger.error(" Error: Cannot find file at: %s", video_path)
         return []
 
-    logger.info("🎬 Processing video at: %s …", video_path)
+    logger.info(" Processing video at: %s …", video_path)
 
     video_manager = VideoManager([video_path])
     scene_manager = SceneManager()
@@ -58,7 +58,7 @@ def find_scenes(video_path, threshold=config.SCENE_DETECT_THRESHOLD):
 
     # Fallback: treat whole video as a single scene.
     if not scene_list:
-        logger.warning("⚠️ No cuts found after filtering. Using full video as a single scene.")
+        logger.warning(" No cuts found after filtering. Using full video as a single scene.")
         scene_list = [
             (
                 FrameTimecode(0, fps=fps),
@@ -66,7 +66,7 @@ def find_scenes(video_path, threshold=config.SCENE_DETECT_THRESHOLD):
             )
         ]
 
-    logger.info("✅ Found %s scenes (after dedup + short-scene filter).", len(scene_list))
+    logger.info(" Found %s scenes (after dedup + short-scene filter).", len(scene_list))
     for i, scene in enumerate(scene_list):
         logger.debug(
             "  Scene %s: %.2fs  -->  %.2fs  (%.2fs)",

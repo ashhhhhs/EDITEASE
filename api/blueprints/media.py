@@ -13,6 +13,30 @@ logger = setup_logger('media_bp')
 media_bp = Blueprint('media', __name__)
 
 
+def _editor_visible_video_names(user) -> list[str] | None:
+    """Videos an editor can see through ownership or review participation."""
+    if not user or user.get('role') == 'admin':
+        return None
+
+    user_id = user.get('id')
+    if not user_id:
+        return []
+
+    query = {
+        "$or": [
+            {"uploaded_by": user_id},
+            {"assigned_to": user_id},
+            {"review_requested_by": user_id},
+            {"review_resolved_by": user_id},
+        ]
+    }
+    try:
+        return sorted(v for v in clip_service.col.distinct("video", query) if v)
+    except Exception as exc:
+        logger.warning("Failed to load review-related videos for %s: %s", user_id, exc)
+        return []
+
+
 def _filter_existing_cloudinary_ids(public_ids: list[str]) -> tuple[list[str], list[str]]:
     """Return (existing_ids, missing_ids) for a list of Cloudinary public IDs.
 
@@ -71,7 +95,7 @@ def upload_video():
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
-    file_path = config.DATA_DIR / file.filename
+    file_path = config.DATA_DIR / file.filename  # pyright: ignore[reportOperatorIssue]
     file.save(str(file_path))
     logger.info(f'Video saved locally to {file_path}')
     user_id = str(g.user['id']) if g.user else None
@@ -88,7 +112,7 @@ def auto_organize():
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
-    file_path = config.DATA_DIR / file.filename
+    file_path = config.DATA_DIR / file.filename # type: ignore
     file.save(str(file_path))
     logger.info(f'Auto-organize upload saved locally: {file_path}')
     user_id = str(g.user['id']) if g.user else None
@@ -127,18 +151,21 @@ def open_folder():
 @role_required(['admin', 'editor'])
 def get_organized_video_stats():
     """Return count of videos per dominant_label.
-    Admins see all users. Editors only see their own.
+    Admins see all users. Editors see owned and review-related videos.
     """
     from flask import g
     from services.organized_video_service import get_label_counts
     user_id = None if g.user.get('role') == 'admin' else g.user.get('id')
-    return jsonify(get_label_counts(uploader=user_id))
+    return jsonify(get_label_counts(
+        uploader=user_id,
+        accessible_video_names=_editor_visible_video_names(g.user),
+    ))
 
 @media_bp.get('/organized-videos')
 @role_required(['admin', 'editor'])
 def list_organized_videos():
     """List organized videos with optional filters.
-    Admins see all. Editors are scoped to their own uploads.
+    Admins see all. Editors are scoped to owned and review-related videos.
     Query params: label, from_date, to_date, is_duplicate, search, page, limit
     """
     from flask import g
@@ -147,13 +174,15 @@ def list_organized_videos():
     is_dup_bool = None
     if is_dup is not None:
         is_dup_bool = is_dup.lower() in ('1', 'true', 'yes')
-    # Scope to the current user unless they are an admin
-    uploader = None if g.user.get('role') == 'admin' else g.user.get('id')
+    user_id = g.user.get('id')
     result = svc_list(
         label=request.args.get('label'),
         from_date=request.args.get('from_date'),
         to_date=request.args.get('to_date'),
-        uploader=uploader,
+        uploader=user_id,
+        accessible_video_names=_editor_visible_video_names(g.user),
+        requester_id=user_id,
+        is_admin=False,
         is_duplicate=is_dup_bool,
         search=request.args.get('search'),
         page=request.args.get('page', 1, type=int),
@@ -166,9 +195,12 @@ def list_organized_videos():
 @role_required(['admin', 'editor'])
 def get_organized_video(video_id):
     """Fetch a single organized video record by ID."""
+    from flask import g
     from services.organized_video_service import get_organized_video as svc_get
     doc = svc_get(video_id)
     if not doc:
+        return jsonify({'error': 'Not found'}), 404
+    if doc.get('uploaded_by') != g.user.get('id'):
         return jsonify({'error': 'Not found'}), 404
     return jsonify(doc)
 
@@ -188,7 +220,7 @@ def delete_organized_videos():
     result = svc_delete(
         data.get('ids', []),
         requester_id=g.user.get('id'),
-        is_admin=g.user.get('role') == 'admin',
+        is_admin=False,
     )
     if 'error' in result:
         return jsonify(result), result.get('status', 400)
@@ -202,12 +234,14 @@ def get_organized_video_logs():
     Links organized_videos → tasks via batch_id.
     Query params: label, page, limit, search
     """
+    from flask import g
     from services.organized_video_service import get_processing_logs
     result = get_processing_logs(
         label=request.args.get('label'),
         search=request.args.get('search'),
         page=request.args.get('page', 1, type=int),
         limit=request.args.get('limit', 30, type=int),
+        requester_id=g.user.get('id'),
     )
     return jsonify(result)
 
@@ -217,6 +251,7 @@ def get_organized_video_logs():
 @require_verified_email
 def download_organized_video():
     """Generate a signed Cloudinary URL with the attachment flag for direct download."""
+    from flask import g
     from services.organized_video_service import get_organized_video as svc_get
     data = request.get_json(force=True) or {}
     video_id = data.get('id')
@@ -224,6 +259,8 @@ def download_organized_video():
         return jsonify({'error': 'id is required'}), 400
     doc = svc_get(video_id)
     if not doc:
+        return jsonify({'error': 'Not found'}), 404
+    if doc.get('uploaded_by') != g.user.get('id'):
         return jsonify({'error': 'Not found'}), 404
         
     pid = doc.get('cloudinary_public_id')

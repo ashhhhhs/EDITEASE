@@ -102,7 +102,7 @@ function AdminOverview() {
         stagger: 0.05,
         ease: 'power2.out',
       });
-    }, containerRef);
+    }, containerRef.current);
     return () => ctx.revert();
   }, [loading]);
 
@@ -180,8 +180,8 @@ function AdminOverview() {
       {/* ── Bento Grid ── */}
       <div className="admin-bento-grid">
 
-        {/* Wide: Total Clips — primary metric */}
-        <BentoCard span={2} accent="var(--accent)" to="/app/organized-videos">
+        {/* Total Clips — primary metric */}
+        <BentoCard accent="var(--accent)" to="/app/organized-videos">
           <StatLabel><Scissors size={13} style={{verticalAlign:'middle',marginRight:4}} /> Clips Extracted</StatLabel>
           <StatValue value={stats?.total_clips} color="var(--accent)" />
           <div style={{ fontSize: 'var(--font-small)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
@@ -236,12 +236,80 @@ function AdminOverview() {
         </BentoCard>
       </div>
 
+      {/* ── Figurative Charts ── */}
+      <div className="dashboard-chart-grid">
+        <BentoCard>
+          <h3 style={{ margin: '0 0 var(--space-8) 0', fontSize: 'var(--font-title-card)' }}>Review Pipeline Status</h3>
+          <p style={{ margin: '0 0 var(--space-16) 0', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)' }}>Distribution of raw clips by human review state.</p>
+          {clipStatusData.length > 0 ? (
+            <div style={{ width: '100%', height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={clipStatusData}
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={70}
+                    outerRadius={90}
+                    paddingAngle={5}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {clipStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.name.includes('Reviewed') ? 'var(--success)' : entry.name.includes('Pending') ? 'var(--warning)' : 'var(--danger)'} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: 'var(--surface-elevated)', border: '1px solid var(--border-strong)', borderRadius: 8 }}
+                    itemStyle={{ color: 'var(--text-primary)' }}
+                  />
+                  <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: 'var(--font-small)', color: 'var(--text-primary)' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-small)', padding: 'var(--space-48) 0', textAlign: 'center' }}>No clip data found.</div>
+          )}
+        </BentoCard>
+
+        <BentoCard>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-8)' }}>
+            <h3 style={{ margin: 0, fontSize: 'var(--font-title-card)' }}>Classification Breakdown</h3>
+            <Link to="/app/organized-videos" className="btn" style={{ fontSize: 'var(--font-meta)', padding: '4px 10px' }}>Browse</Link>
+          </div>
+          <p style={{ margin: '0 0 var(--space-16) 0', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)' }}>Total organized assets by AI detected category.</p>
+          {labelData.length > 0 ? (
+            <div style={{ width: '100%', height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsBarChart data={labelData} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-subtle)" />
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" width={110} axisLine={false} tickLine={false} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
+                  <Tooltip
+                    cursor={{ fill: 'var(--surface-hover)' }}
+                    contentStyle={{ backgroundColor: 'var(--surface-elevated)', border: '1px solid var(--border-strong)', borderRadius: 8 }}
+                    itemStyle={{ color: 'var(--accent)' }}
+                  />
+                  <Bar dataKey="value" name="Count" radius={[0, 4, 4, 0]}>
+                    {labelData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </RechartsBarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-small)', padding: 'var(--space-48) 0', textAlign: 'center' }}>No organized footage.</div>
+          )}
+        </BentoCard>
+      </div>
+
       {/* ── Recent Activity Feed ── */}
       <h2 style={{ margin: 'var(--space-32) 0 var(--space-16)', fontSize: 'var(--font-title-section)' }}>Recent Activity</h2>
-      <div className="activity-feed" style={{ 
-        background: 'var(--surface-panel)', 
-        border: '1px solid var(--border-subtle)', 
-        borderRadius: 'var(--radius-lg)', 
+      <div className="activity-feed" style={{
+        background: 'var(--surface-panel)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-lg)',
         padding: '0 var(--space-20)',
         marginBottom: 'var(--space-32)'
       }}>
@@ -269,74 +337,6 @@ function AdminOverview() {
         )}
       </div>
 
-      {/* ── Figurative Charts ── */}
-      <div className="dashboard-chart-grid">
-        <BentoCard>
-          <h3 style={{ margin: '0 0 var(--space-8) 0', fontSize: 'var(--font-title-card)' }}>Review Pipeline Status</h3>
-          <p style={{ margin: '0 0 var(--space-16) 0', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)' }}>Distribution of raw clips by human review state.</p>
-          {clipStatusData.length > 0 ? (
-            <div style={{ width: '100%', height: 260 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={clipStatusData}
-                    cx="50%"
-                    cy="45%"
-                    innerRadius={70}
-                    outerRadius={90}
-                    paddingAngle={5}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {clipStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.name.includes('Reviewed') ? 'var(--success)' : entry.name.includes('Pending') ? 'var(--warning)' : 'var(--danger)'} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: 'var(--surface-elevated)', border: '1px solid var(--border-strong)', borderRadius: 8 }}
-                    itemStyle={{ color: 'var(--text-primary)' }}
-                  />
-                  <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: 'var(--font-small)', color: 'var(--text-primary)' }} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-small)', padding: 'var(--space-48) 0', textAlign: 'center' }}>No clip data found.</div>
-          )}
-        </BentoCard>
-
-        <BentoCard>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-8)' }}>
-            <h3 style={{ margin: 0, fontSize: 'var(--font-title-card)' }}>Classification Breakdown</h3>
-            <Link to="/app/organized-videos" className="btn" style={{ fontSize: 'var(--font-meta)', padding: '4px 10px' }}>Browse</Link>
-          </div>
-          <p style={{ margin: '0 0 var(--space-16) 0', fontSize: 'var(--font-meta)', color: 'var(--text-secondary)' }}>Total organized assets by AI detected category.</p>
-          {labelData.length > 0 ? (
-            <div style={{ width: '100%', height: 260 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsBarChart data={labelData} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-subtle)" />
-                  <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" width={110} axisLine={false} tickLine={false} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
-                  <Tooltip 
-                    cursor={{ fill: 'var(--surface-hover)' }}
-                    contentStyle={{ backgroundColor: 'var(--surface-elevated)', border: '1px solid var(--border-strong)', borderRadius: 8 }}
-                    itemStyle={{ color: 'var(--accent)' }}
-                  />
-                  <Bar dataKey="value" name="Count" radius={[0, 4, 4, 0]}>
-                    {labelData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </RechartsBarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-small)', padding: 'var(--space-48) 0', textAlign: 'center' }}>No organized footage.</div>
-          )}
-        </BentoCard>
-      </div>
-
     </div>
   );
 }
@@ -356,7 +356,7 @@ function EditorDashboard({ currentUser }) {
       gsap.from('.bento-card, .editor-banner, .class-dist-row', {
         y: 20, opacity: 0, duration: 0.5, stagger: 0.04, ease: 'power2.out',
       });
-    }, containerRef);
+    }, containerRef.current);
     return () => ctx.revert();
   }, [loading]);
 
