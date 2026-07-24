@@ -93,7 +93,6 @@ editease/
 │       ├── hooks/          # Custom React hooks
 │       └── lib/api.js      # Single API client for all pages
 ├── tests/                  # pytest suite
-├── ui/                     # Legacy Streamlit UI
 ├── utils/                  # Logger and shared helpers
 ├── scripts/                # Maintenance / evaluation scripts
 ├── Requirements.txt        # Python dependencies

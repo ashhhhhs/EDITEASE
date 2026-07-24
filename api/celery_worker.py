@@ -57,13 +57,31 @@ def process_video_task(self, video_path_str: str, base_dir_str: str, user_id: st
         raise e
 
 
+def _ffprobe_path() -> str:
+    """Locate ffprobe next to the configured ffmpeg binary.
+
+    config.FFMPEG_PATH may be an absolute path or a bare command name. Deriving
+    ffprobe from it means a custom ffmpeg install — this project's documented
+    default — is actually honoured instead of silently failing.
+    """
+    import shutil
+
+    ffmpeg = config.FFMPEG_PATH
+    if os.path.isabs(ffmpeg) and os.path.exists(ffmpeg):
+        directory, filename = os.path.split(ffmpeg)
+        candidate = os.path.join(directory, filename.replace('ffmpeg', 'ffprobe'))
+        if os.path.exists(candidate):
+            return candidate
+    return shutil.which('ffprobe') or 'ffprobe'
+
+
 def check_if_edited_by_metadata(video_path: str) -> bool:
     """Check video metadata for editing software signatures via ffprobe."""
     import subprocess
     import json
     try:
         cmd = [
-            'ffprobe', '-v', 'quiet', '-print_format', 'json', 
+            _ffprobe_path(), '-v', 'quiet', '-print_format', 'json',
             '-show_format', video_path
         ]
         res = subprocess.check_output(cmd).decode('utf-8')
@@ -224,8 +242,12 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
     # ── Step 1: Compute file hash before any upload ───────────────────────────
     _update_task(self.request.id, status="STARTED", progress_step="Generating secure file hash...")
     try:
+        # Chunked read — a 4 GB upload must not become a 4 GB resident allocation.
+        digest = hashlib.sha256()
         with open(video_path_str, "rb") as fh:
-            file_hash = hashlib.sha256(fh.read()).hexdigest()
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                digest.update(chunk)
+        file_hash = digest.hexdigest()
         safe_name = slugify(video_name)
         logger.info(f"File hash for {video_name}: {file_hash[:12]}...")
         

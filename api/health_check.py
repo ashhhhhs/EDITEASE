@@ -1,5 +1,6 @@
 import sys
 import os
+import shutil
 import requests
 import pymongo
 from pymongo.errors import ConnectionFailure
@@ -61,13 +62,20 @@ def check_redis():
 
 def check_ffmpeg():
     print("\nChecking FFmpeg installation...")
-    if not os.path.exists(config.FFMPEG_PATH):
-        print(f"❌ FFmpeg not found at {config.FFMPEG_PATH}")
-        return False
-        
+    # FFMPEG_PATH may be an absolute path OR a bare command name resolved via
+    # PATH — SETUP.md documents `FFMPEG_PATH=ffmpeg`, for which os.path.exists
+    # is always False. Fall back to a PATH lookup before declaring it missing.
+    ffmpeg_cmd = config.FFMPEG_PATH
+    if not os.path.exists(ffmpeg_cmd):
+        resolved = shutil.which(ffmpeg_cmd)
+        if not resolved:
+            print(f"❌ FFmpeg not found at {ffmpeg_cmd} and not on PATH")
+            return False
+        ffmpeg_cmd = resolved
+
     import subprocess
     try:
-        result = subprocess.run([config.FFMPEG_PATH, "-version"], 
+        result = subprocess.run([ffmpeg_cmd, "-version"],
                               stdout=subprocess.PIPE, 
                               stderr=subprocess.PIPE,
                               text=True)

@@ -28,14 +28,23 @@ else:
 
 VIDEO_EXTENSIONS = (".mp4", ".mov", ".avi", ".mkv")
 
+# Built once at import. Constructing a CascadeClassifier re-parses the XML from
+# disk, and has_face() runs up to 12 times per scene for every scene in a video.
+_FACE_CASCADE = cv2.CascadeClassifier(
+    os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")  # type: ignore
+)
+
 # ---------------------------------------------------------------------------
 # Confidence bands for the agentic decision layer
 # ---------------------------------------------------------------------------
-CONF_AUTO_HIGH   = float(os.getenv("CONF_AUTO_HIGH",   "0.85"))  # ML auto-accepts above this
-CONF_FUSE_LOW    = float(os.getenv("CONF_FUSE_LOW",    "0.58"))  # fusion below this → uncertain
-ML_WEIGHT        = float(os.getenv("ML_WEIGHT",        "0.65"))  # ML share in weighted fusion
+# Sourced from config.py so tuning a default there actually changes pipeline
+# behaviour. Previously these re-read the env directly, which silently ignored
+# any change made in config.py.
+CONF_AUTO_HIGH   = config.CONF_AUTO_HIGH   # ML auto-accepts above this
+CONF_FUSE_LOW    = config.CONF_FUSE_LOW    # fusion below this → uncertain
+ML_WEIGHT        = config.ML_WEIGHT        # ML share in weighted fusion
 RULE_WEIGHT      = 1.0 - ML_WEIGHT
-AUDIENCE_REACTION_MIN_FACES = int(os.getenv("AUDIENCE_REACTION_MIN_FACES", "3"))
+AUDIENCE_REACTION_MIN_FACES = config.AUDIENCE_REACTION_MIN_FACES
 
 
 # ---------------------------------------------------------------------------
@@ -47,9 +56,7 @@ def has_face(img_path):
     if img is None:
         return False
     gray    = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    cascade = cv2.CascadeClassifier(
-        os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")  # type: ignore
-    )
+    cascade = _FACE_CASCADE
     h, w = gray.shape
     # Face must be at least 6% of the smaller frame dimension — kills tiny
     # texture hits (leaves, rocks, building details) that Haar misreads as faces.
@@ -278,6 +285,14 @@ def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene
             "face_detected": True,
             "emotion"      : dominant if dominant else None,
             "confidence"   : conf     if dominant else None,
+            # Full per-frame distribution, not just the winner. _resolve_dominant
+            # aggregates over the whole distribution, so without this the voting
+            # rule and NEUTRAL_MARGIN cannot be re-tuned offline — every
+            # experiment would mean re-running DeepFace over every video.
+            "probs": (
+                {k: round(float(v), 2) for k, v in probs.items()}
+                if isinstance(probs, dict) and probs else None
+            ),
         })
 
         w = _sample_weight(i, n_samples)

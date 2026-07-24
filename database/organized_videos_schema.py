@@ -54,6 +54,15 @@ def _get_col():
     return col
 
 
+def _get_tasks_col():
+    """Return the `tasks` collection, reusing the cached client."""
+    global _client
+    from pymongo import MongoClient
+    if _client is None:
+        _client = MongoClient(config.MONGO_URI)
+    return _client[config.DB_NAME]["tasks"]
+
+
 def slugify(text: str) -> str:
     """Convert a string to a URL/path-safe slug."""
     text = text.lower()

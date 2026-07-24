@@ -34,6 +34,10 @@ CASCADE_PATH = os.path.join(
     cv2.data.haarcascades, "haarcascade_frontalface_default.xml"  # type: ignore
 )
 
+# Built once at import — see the note in run_pipeline.py. detect_faces_info()
+# is called for every thumbnail, so re-parsing the XML per call is pure waste.
+FACE_CASCADE = cv2.CascadeClassifier(CASCADE_PATH)
+
 
 # ---------------------------------------------------------------------------
 # Feature normalisation ceilings
@@ -123,7 +127,7 @@ SCENE_PROFILES = {
 def detect_faces_info(image_bgr):
     """Return (face_count, largest_face_area_ratio, dominant_face_aspect_ratio)."""
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
-    face_cascade = cv2.CascadeClassifier(CASCADE_PATH)
+    face_cascade = FACE_CASCADE
     faces = face_cascade.detectMultiScale(
         gray, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40)
     )

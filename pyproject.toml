@@ -31,8 +31,7 @@ dependencies = [
     "pillow",
     "tqdm",
     "scikit-learn",
-    "python-dateutil",
-    "streamlit"
+    "python-dateutil"
 ]
 
 [project.optional-dependencies]

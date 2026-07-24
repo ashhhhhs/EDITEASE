@@ -1,16 +1,48 @@
-"""Media blueprint: /upload, /export, /thumbnail, /video_clip, /task_status,
-/auto_organize, /open_folder, /organized-videos, /organized-videos/download-batch"""
+"""Media blueprint: /thumbnail, /task_status, /auto_organize, /organized-videos,
+/organized-videos/download-batch"""
 import os
+from pathlib import Path
 from flask import Blueprint, request, jsonify, send_file, redirect, g
+from werkzeug.utils import secure_filename
 import cloudinary.api
 import cloudinary.utils
 import config
 from utils.logger import setup_logger
-from services import clip_service, task_service, export_service
+from services import clip_service, task_service
 from api.decorators import login_required, role_required, require_verified_email
 
 logger = setup_logger('media_bp')
 media_bp = Blueprint('media', __name__)
+
+
+def _resolve_upload_path(filename: str) -> tuple[Path | None, str | None]:
+    """Sanitize an uploaded filename and resolve it to a safe path inside DATA_DIR.
+
+    Werkzeug does not sanitize `file.filename` — a name like `../../evil.mp4` arrives
+    verbatim and would escape DATA_DIR. Returns (path, None) on success, or
+    (None, error_message) when the name is unusable or resolves outside DATA_DIR.
+    """
+    name = secure_filename(filename or '')
+    if not name:
+        return None, 'Invalid filename'
+
+    if not name.lower().endswith(config.ALLOWED_VIDEO_EXTENSIONS):
+        allowed = ', '.join(config.ALLOWED_VIDEO_EXTENSIONS)
+        return None, f'Unsupported file type. Allowed extensions: {allowed}'
+
+    data_dir = Path(config.DATA_DIR).resolve()
+    dest = (data_dir / name).resolve()
+    if not dest.is_relative_to(data_dir):
+        return None, 'Invalid filename'
+
+    # Two users uploading `interview.mp4` must not clobber each other.
+    stem, suffix = os.path.splitext(dest.name)
+    counter = 1
+    while dest.exists():
+        dest = data_dir / f'{stem}_{counter}{suffix}'
+        counter += 1
+
+    return dest, None
 
 
 def _editor_visible_video_names(user) -> list[str] | None:
@@ -71,36 +103,10 @@ def serve_thumbnail(clip_id):
         return redirect(url_or_path, code=302)
     return send_file(url_or_path, mimetype='image/jpeg')
 
-@media_bp.get('/video_clip/<clip_id>')
-def serve_video_clip(clip_id):
-    url_or_path = clip_service.resolve_video_path(clip_id)
-    if not url_or_path:
-        return jsonify({'error': 'file not found'}), 404
-    # Cloudinary URL → redirect; local path → send_file
-    if url_or_path.startswith('http'):
-        return redirect(url_or_path, code=302)
-    return send_file(url_or_path, mimetype='video/mp4')
-
 @media_bp.get('/task_status/<task_id>')
 @login_required
 def get_task_status(task_id):
     return jsonify(task_service.get_task_status(task_id))
-
-@media_bp.post('/upload')
-@role_required(['admin', 'editor'])
-@require_verified_email
-def upload_video():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-    file_path = config.DATA_DIR / file.filename  # pyright: ignore[reportOperatorIssue]
-    file.save(str(file_path))
-    logger.info(f'Video saved locally to {file_path}')
-    user_id = str(g.user['id']) if g.user else None
-    task = task_service.dispatch_process(str(file_path), user_id=user_id)
-    return jsonify({'status': 'uploaded', 'message': 'Processing started', 'video_path': str(file_path), 'task_id': task.id})
 
 @media_bp.post('/auto_organize')
 @role_required(['admin', 'editor'])
@@ -112,38 +118,14 @@ def auto_organize():
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
-    file_path = config.DATA_DIR / file.filename # type: ignore
+    file_path, err = _resolve_upload_path(file.filename)
+    if err:
+        return jsonify({'error': err}), 400
     file.save(str(file_path))
     logger.info(f'Auto-organize upload saved locally: {file_path}')
     user_id = str(g.user['id']) if g.user else None
     task = task_service.dispatch_auto_organize(str(file_path), user_id=user_id)
     return jsonify({'status': 'uploaded', 'message': 'Auto-organize started', 'video_path': str(file_path), 'task_id': task.id})
-
-@media_bp.post('/export')
-@role_required(['admin', 'editor'])
-@require_verified_email
-def export_scene():
-    data = request.get_json(force=True) or {}
-    res = export_service.export_single_clip(data.get('video'), data.get('scene_id'))
-    return jsonify(res) if 'error' not in res else (jsonify(res), 400)
-
-@media_bp.post('/export_batch')
-@role_required(['admin', 'editor'])
-@require_verified_email
-def export_batch():
-    return jsonify(export_service.export_batch(request.get_json(force=True) or {}))
-
-@media_bp.post('/open_folder')
-@role_required(['admin'])
-def open_folder():
-    data = request.get_json(force=True) or {}
-    path = data.get('path')
-    if not path or not os.path.exists(path):
-        return jsonify({'error': 'invalid path'}), 400
-    if os.name == 'nt':
-        os.startfile(path)
-    return jsonify({'ok': True, 'opened': path})
-
 
 # ── Organized Videos ────────────────────────────────────────────────────────
 
@@ -175,14 +157,15 @@ def list_organized_videos():
     if is_dup is not None:
         is_dup_bool = is_dup.lower() in ('1', 'true', 'yes')
     user_id = g.user.get('id')
+    is_admin = g.user.get('role') == 'admin'
     result = svc_list(
         label=request.args.get('label'),
         from_date=request.args.get('from_date'),
         to_date=request.args.get('to_date'),
-        uploader=user_id,
+        uploader=None if is_admin else user_id,
         accessible_video_names=_editor_visible_video_names(g.user),
         requester_id=user_id,
-        is_admin=False,
+        is_admin=is_admin,
         is_duplicate=is_dup_bool,
         search=request.args.get('search'),
         page=request.args.get('page', 1, type=int),
@@ -200,7 +183,8 @@ def get_organized_video(video_id):
     doc = svc_get(video_id)
     if not doc:
         return jsonify({'error': 'Not found'}), 404
-    if doc.get('uploaded_by') != g.user.get('id'):
+    is_admin = g.user.get('role') == 'admin'
+    if not is_admin and doc.get('uploaded_by') != g.user.get('id'):
         return jsonify({'error': 'Not found'}), 404
     return jsonify(doc)
 
@@ -220,7 +204,7 @@ def delete_organized_videos():
     result = svc_delete(
         data.get('ids', []),
         requester_id=g.user.get('id'),
-        is_admin=False,
+        is_admin=g.user.get('role') == 'admin',
     )
     if 'error' in result:
         return jsonify(result), result.get('status', 400)
@@ -260,9 +244,10 @@ def download_organized_video():
     doc = svc_get(video_id)
     if not doc:
         return jsonify({'error': 'Not found'}), 404
-    if doc.get('uploaded_by') != g.user.get('id'):
+    is_admin = g.user.get('role') == 'admin'
+    if not is_admin and doc.get('uploaded_by') != g.user.get('id'):
         return jsonify({'error': 'Not found'}), 404
-        
+
     pid = doc.get('cloudinary_public_id')
     if not pid:
         return jsonify({'error': 'No cloud asset available'}), 404

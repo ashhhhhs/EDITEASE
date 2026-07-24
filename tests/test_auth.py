@@ -323,8 +323,56 @@ def test_email_verification_already_used_token(client, monkeypatch):
     assert rv.status_code == 400
 
 
-def test_export_blocked_for_unverified_user(client, monkeypatch):
-    """POST /export must return 403 EMAIL_UNVERIFIED for an unverified email user."""
+def test_login_throttled_after_repeated_failures(client, monkeypatch):
+    """S6: repeated bad passwords must eventually return 429, not unlimited 401s."""
+    from services import auth_service, verification_service
+    monkeypatch.setattr(verification_service, "send_verification_email", lambda e, t: None)
+
+    client.post('/register', json={"email": "throttle@example.com", "password": "Password123!"})
+
+    codes = []
+    for _ in range(auth_service.LOGIN_MAX_ATTEMPTS + 1):
+        rv = client.post('/login', json={"email": "throttle@example.com", "password": "wrong"})
+        codes.append(rv.status_code)
+
+    assert codes[0] == 401, f"first bad attempt should be 401, got {codes[0]}"
+    assert codes[-1] == 429, f"attempt past the limit should be 429, got {codes}"
+
+
+def test_login_throttle_does_not_leak_account_existence(client):
+    """S6: unknown emails must also be throttled, or the 429 becomes an oracle."""
+    from services import auth_service
+
+    for _ in range(auth_service.LOGIN_MAX_ATTEMPTS + 1):
+        rv = client.post('/login', json={"email": "ghost@example.com", "password": "wrong"})
+
+    assert rv.status_code == 429, (
+        "an unknown email must throttle the same way a real one does, "
+        "otherwise the response distinguishes real accounts"
+    )
+
+
+def test_successful_login_clears_throttle(client, monkeypatch):
+    """S6: a correct password resets the failure counter."""
+    from services import auth_service, verification_service
+    monkeypatch.setattr(verification_service, "send_verification_email", lambda e, t: None)
+
+    client.post('/register', json={"email": "clears@example.com", "password": "Password123!"})
+
+    # Burn attempts, but stay one under the limit.
+    for _ in range(auth_service.LOGIN_MAX_ATTEMPTS - 1):
+        client.post('/login', json={"email": "clears@example.com", "password": "wrong"})
+
+    rv = client.post('/login', json={"email": "clears@example.com", "password": "Password123!"})
+    assert rv.status_code == 200
+
+    # Counter cleared, so a fresh bad attempt is 401 rather than an immediate 429.
+    rv = client.post('/login', json={"email": "clears@example.com", "password": "wrong"})
+    assert rv.status_code == 401
+
+
+def test_download_blocked_for_unverified_user(client, monkeypatch):
+    """A require_verified_email route must 403 EMAIL_UNVERIFIED for an unverified user."""
     from services import verification_service
     monkeypatch.setattr(verification_service, "send_verification_email", lambda e, t: None)
 
@@ -332,15 +380,15 @@ def test_export_blocked_for_unverified_user(client, monkeypatch):
     rv = client.post('/login', json={"email": "noexport@example.com", "password": "Password123!"})
     token = rv.get_json()["token"]
 
-    rv = client.post('/export', json={"video": "test.mp4", "scene_id": 1},
+    rv = client.post('/organized-videos/download', json={"id": "abc123"},
                      headers={"Authorization": f"Bearer {token}"})
     assert rv.status_code == 403
     data = rv.get_json()
     assert data.get("code") == "EMAIL_UNVERIFIED"
 
 
-def test_export_allowed_for_verified_user(client, monkeypatch):
-    """POST /export should not gate a verified user (export service may fail for other reasons)."""
+def test_download_allowed_for_verified_user(client, monkeypatch):
+    """A verified user must clear the email gate (the route may still fail for other reasons)."""
     from services import verification_service
     monkeypatch.setattr(verification_service, "send_verification_email", lambda e, t: None)
 
@@ -355,8 +403,8 @@ def test_export_allowed_for_verified_user(client, monkeypatch):
     rv = client.post('/login', json={"email": "doexport@example.com", "password": "Password123!"})
     token = rv.get_json()["token"]
 
-    # Should NOT get 403 EMAIL_UNVERIFIED (export service may still 400 for other reasons)
-    rv = client.post('/export', json={"video": "nonexistent.mp4", "scene_id": 999},
+    # Should NOT get 403 EMAIL_UNVERIFIED (the route may still 404 for other reasons)
+    rv = client.post('/organized-videos/download', json={"id": "nonexistent999"},
                      headers={"Authorization": f"Bearer {token}"})
     assert rv.status_code != 403 or rv.get_json().get("code") != "EMAIL_UNVERIFIED"
 

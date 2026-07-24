@@ -41,33 +41,57 @@ def test_search_endpoint_basic(client):
     assert 'results' in data
     assert isinstance(data['results'], list)
 
-def test_upload_endpoint_no_file(client):
-    """Test that the upload endpoint correctly rejects requests without a file."""
-    rv = client.post('/upload')
-    assert rv.status_code == 400
-    data = json.loads(rv.data)
-    assert 'error' in data
-    
-def test_update_scene_missing_params(client):
-    """Test that update_scene requires video and scene_id."""
-    rv = client.post('/update_scene', json={"scene_label": "b-roll"})
-    assert rv.status_code == 400
-    data = json.loads(rv.data)
-    assert data['error'] == "video and scene_id required"
+def test_upload_path_rejects_traversal():
+    """S1: a hostile filename must never resolve outside DATA_DIR."""
+    from pathlib import Path
+    import config
+    from api.blueprints.media import _resolve_upload_path
 
-def test_export_missing_params(client):
-    """Test that /export rejects requests without video and scene_id."""
-    rv = client.post('/export', json={})
-    assert rv.status_code == 400
-    data = json.loads(rv.data)
-    assert 'error' in data
+    data_dir = Path(config.DATA_DIR).resolve()
+    hostile_names = [
+        "../../evil.mp4",
+        "..\\..\\evil.mp4",
+        "/etc/evil.mp4",
+        "D:\\evil.mkv",
+        "....//....//evil.mp4",
+    ]
+    for name in hostile_names:
+        path, err = _resolve_upload_path(name)
+        assert err is None, f"{name!r} was rejected outright, expected containment"
+        assert path is not None
+        assert path.resolve().is_relative_to(data_dir), f"{name!r} escaped DATA_DIR -> {path}"
 
-def test_export_batch_empty(client):
-    """Test that /export_batch with no matching data returns zero counts."""
-    rv = client.post('/export_batch', json={"video": "nonexistent_video_xyz"})
-    assert rv.status_code == 200
-    data = json.loads(rv.data)
-    assert data.get('exported_count', 0) == 0
+
+def test_upload_path_rejects_blank_filename():
+    """S1: a filename that sanitizes to nothing must be refused, not saved."""
+    from api.blueprints.media import _resolve_upload_path
+
+    for blank in ("", "   "):
+        path, err = _resolve_upload_path(blank)
+        assert path is None
+        assert err == 'Invalid filename'
+
+
+def test_upload_path_rejects_non_video_extension():
+    """S2: only allow-listed video extensions may be written to disk."""
+    from api.blueprints.media import _resolve_upload_path
+
+    for name in ("evil.py", "passwd", "shell.sh", "payload.mp4.exe", "notes.txt"):
+        path, err = _resolve_upload_path(name)
+        assert path is None, f"{name!r} should not have produced a path"
+        assert err is not None and 'Unsupported file type' in err
+
+
+def test_upload_path_accepts_allowed_extensions():
+    """S2: the documented video extensions must still be accepted."""
+    import config
+    from api.blueprints.media import _resolve_upload_path
+
+    for ext in config.ALLOWED_VIDEO_EXTENSIONS:
+        path, err = _resolve_upload_path(f"interview{ext}")
+        assert err is None, f"{ext} was rejected: {err}"
+        assert path is not None
+
 
 def test_auto_organize_no_file(client):
     """Test that /auto_organize rejects requests without a file."""
@@ -75,6 +99,106 @@ def test_auto_organize_no_file(client):
     assert rv.status_code == 400
     data = json.loads(rv.data)
     assert 'error' in data
+
+
+def _client_as(monkeypatch, role, user_id="000000000000000000000001"):
+    """Build a test client authenticated as the given role."""
+    from services import auth_service
+    user = dict(_TEST_USER, role=role, id=user_id)
+    monkeypatch.setattr(auth_service, "get_user_by_token", lambda t: user)
+    app.config['TESTING'] = True
+    return app.test_client()
+
+
+def test_list_organized_videos_admin_is_unscoped(monkeypatch):
+    """A1: admins must see everyone's uploads, not just their own."""
+    from services import organized_video_service
+
+    captured = {}
+
+    def fake_list(**kwargs):
+        captured.update(kwargs)
+        return {'results': [], 'total': 0}
+
+    monkeypatch.setattr(organized_video_service, 'list_organized_videos', fake_list)
+    rv = _client_as(monkeypatch, 'admin').get('/organized-videos')
+
+    assert rv.status_code == 200
+    assert captured['uploader'] is None, "admin listing must not be scoped to one uploader"
+    assert captured['is_admin'] is True
+
+
+def test_list_organized_videos_editor_is_scoped(monkeypatch):
+    """A1: editors must stay scoped to their own uploads."""
+    from services import organized_video_service
+
+    captured = {}
+
+    def fake_list(**kwargs):
+        captured.update(kwargs)
+        return {'results': [], 'total': 0}
+
+    monkeypatch.setattr(organized_video_service, 'list_organized_videos', fake_list)
+    rv = _client_as(monkeypatch, 'editor', user_id='editor-1').get('/organized-videos')
+
+    assert rv.status_code == 200
+    assert captured['uploader'] == 'editor-1'
+    assert captured['is_admin'] is False
+
+
+def test_get_organized_video_admin_can_read_other_users(monkeypatch):
+    """A2: an admin must not get a 404 on another user's record."""
+    from services import organized_video_service
+
+    monkeypatch.setattr(
+        organized_video_service, 'get_organized_video',
+        lambda vid: {'id': str(vid), 'uploaded_by': 'someone-else', 'name': 'clip'},
+    )
+    rv = _client_as(monkeypatch, 'admin').get('/organized-videos/abc123')
+    assert rv.status_code == 200
+
+
+def test_get_organized_video_editor_blocked_from_other_users(monkeypatch):
+    """A2: an editor must still be denied another user's record."""
+    from services import organized_video_service
+
+    monkeypatch.setattr(
+        organized_video_service, 'get_organized_video',
+        lambda vid: {'id': str(vid), 'uploaded_by': 'someone-else', 'name': 'clip'},
+    )
+    rv = _client_as(monkeypatch, 'editor', user_id='editor-1').get('/organized-videos/abc123')
+    assert rv.status_code == 404
+
+
+def test_download_organized_video_admin_bypasses_ownership(monkeypatch):
+    """A2: admin download must not 404 on another user's record."""
+    from services import organized_video_service
+
+    monkeypatch.setattr(
+        organized_video_service, 'get_organized_video',
+        lambda vid: {'id': str(vid), 'uploaded_by': 'someone-else'},
+    )
+    rv = _client_as(monkeypatch, 'admin').post('/organized-videos/download', json={'id': 'abc123'})
+    # No cloudinary_public_id on the doc, so it stops at 404 'No cloud asset' —
+    # the point is that it got PAST the ownership gate.
+    assert json.loads(rv.data).get('error') == 'No cloud asset available'
+
+
+def test_delete_organized_videos_passes_admin_flag(monkeypatch):
+    """A2: delete must tell the service the caller is an admin."""
+    from services import organized_video_service
+
+    captured = {}
+
+    def fake_delete(ids, **kwargs):
+        captured.update(kwargs)
+        return {'deleted_count': 0}
+
+    monkeypatch.setattr(organized_video_service, 'delete_organized_videos', fake_delete)
+    rv = _client_as(monkeypatch, 'admin').delete('/organized-videos', json={'ids': ['abc123']})
+
+    assert rv.status_code == 200
+    assert captured['is_admin'] is True
 
 
 def test_delete_selected_organized_videos(client, monkeypatch):

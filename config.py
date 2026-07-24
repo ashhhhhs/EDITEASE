@@ -24,8 +24,28 @@ COLLECTION = os.getenv("COLLECTION", "scenes")
 # API Settings
 API_HOST    = os.getenv("API_HOST",    "127.0.0.1")
 API_PORT    = int(os.getenv("API_PORT", 5000))
-API_DEBUG   = os.getenv("API_DEBUG",   "True").lower() == "true"
+API_DEBUG   = os.getenv("API_DEBUG",   "False").lower() == "true"
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:5173")
+
+# Origins permitted to call the API. Defaults to the SPA origin plus the 127.0.0.1
+# dev variant, since Vite is reachable under both hostnames locally.
+# In production set CORS_ORIGINS explicitly to your deployed frontend origin.
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS", f"{APP_BASE_URL},http://127.0.0.1:5173"
+    ).split(",")
+    if origin.strip()
+]
+
+# Upload limits — enforced by the API before anything touches disk.
+# MAX_UPLOAD_BYTES is wired to Flask's MAX_CONTENT_LENGTH in create_app().
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(2 * 1024 ** 3)))  # 2 GiB
+ALLOWED_VIDEO_EXTENSIONS = tuple(
+    ext.strip().lower()
+    for ext in os.getenv("ALLOWED_VIDEO_EXTENSIONS", ".mp4,.mov,.avi,.mkv").split(",")
+    if ext.strip()
+)
 
 # Email Settings — Gmail SMTP with App Password
 RESEND_API_KEY      = os.environ.get("RESEND_API_KEY",      "")   # kept for transition period
@@ -68,6 +88,9 @@ CONF_FUSE_LOW  = float(os.getenv("CONF_FUSE_LOW",  "0.58"))
 
 # Weight of ML prediction in the fusion step (rule-based gets 1 - ML_WEIGHT).
 ML_WEIGHT = float(os.getenv("ML_WEIGHT", "0.65"))
+
+# An `audience_reaction` label requires at least this many visible faces.
+AUDIENCE_REACTION_MIN_FACES = int(os.getenv("AUDIENCE_REACTION_MIN_FACES", "3"))
 
 # ---------------------------------------------------------------------------
 # Cloudinary Settings

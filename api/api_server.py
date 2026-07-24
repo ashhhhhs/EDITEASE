@@ -16,8 +16,15 @@ logger = setup_logger('api_server')
 
 def create_app():
     app = Flask(__name__)
-    CORS(app)
+    # Cap request bodies so one upload cannot exhaust the API server's disk.
+    app.config['MAX_CONTENT_LENGTH'] = config.MAX_UPLOAD_BYTES
+    CORS(app, origins=config.CORS_ORIGINS, supports_credentials=True)
     Swagger(app)
+
+    @app.errorhandler(413)
+    def upload_too_large(_err):
+        limit_mb = config.MAX_UPLOAD_BYTES // (1024 * 1024)
+        return jsonify({'error': f'File too large. Maximum upload size is {limit_mb} MB.'}), 413
 
     # Flask-Mail configuration (Gmail SMTP with App Password)
     app.config.update(
@@ -34,8 +41,8 @@ def create_app():
     # Register all domain blueprints
     app.register_blueprint(auth_bp)     # /register /login /logout /me
     app.register_blueprint(admin_bp)    # /admin/*
-    app.register_blueprint(review_bp)   # /search /update_scene /review/bulk-update
-    app.register_blueprint(media_bp)    # /upload /thumbnail /task_status /auto_organize ...
+    app.register_blueprint(review_bp)   # /search /review/bulk-update
+    app.register_blueprint(media_bp)    # /thumbnail /task_status /auto_organize ...
 
     @app.get('/health')
     def health():

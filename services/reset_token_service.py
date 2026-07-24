@@ -25,11 +25,21 @@ RATE_LIMIT_PER_HOUR = 3
 # Lazy DB accessor — avoids import-time connection issues
 # ---------------------------------------------------------------------------
 
+_client = None
+
+
+def _get_client():
+    """Cache the MongoClient — one per call leaks a connection pool and monitor
+    threads that are never closed."""
+    global _client
+    if _client is None:
+        from pymongo import MongoClient
+        _client = MongoClient(config.MONGO_URI)
+    return _client
+
+
 def _get_col():
-    from pymongo import MongoClient
-    client = MongoClient(config.MONGO_URI)
-    db = client[config.DB_NAME]
-    col = db["password_reset_tokens"]
+    col = _get_client()[config.DB_NAME]["password_reset_tokens"]
     # TTL index on expires_at so MongoDB auto-cleans expired docs
     try:
         col.create_index("expires_at", expireAfterSeconds=0)
@@ -40,10 +50,7 @@ def _get_col():
 
 
 def _get_users_col():
-    from pymongo import MongoClient
-    client = MongoClient(config.MONGO_URI)
-    db = client[config.DB_NAME]
-    return db["users"]
+    return _get_client()[config.DB_NAME]["users"]
 
 
 # ---------------------------------------------------------------------------
