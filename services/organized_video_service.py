@@ -6,7 +6,7 @@ from collections import Counter
 
 from bson import ObjectId
 
-from database.organized_videos_schema import _get_col, slugify
+from database.organized_videos_schema import _get_col, _get_tasks_col, slugify
 from utils.logger import setup_logger
 
 logger = setup_logger("organized_video_service")
@@ -374,12 +374,8 @@ def get_processing_logs(
     """Return processing logs for organized videos.
     Each entry merges organized_video record with its task record.
     """
-    from pymongo import MongoClient
-    import config
-
     col = _get_col()
-    client = MongoClient(config.MONGO_URI)
-    tasks_col = client[config.DB_NAME]["tasks"]
+    tasks_col = _get_tasks_col()
 
     page = max(1, page)
     limit = max(1, min(limit, 100))

@@ -38,9 +38,6 @@ tqdm
 scikit-learn      # metrics in the ML quality test
 python-dateutil
 
-# --- Legacy Streamlit UI (ui/ui_api.py) ---
-streamlit
-
 # --- Testing (so a single install enables `pytest`) ---
 pytest
 pytest-html

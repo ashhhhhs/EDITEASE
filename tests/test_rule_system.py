@@ -175,6 +175,121 @@ def test_emotion_sampling_requires_deepface_face_confirmation(monkeypatch, tmp_p
     assert calls == [{"enforce_detection": True}, {"enforce_detection": True}]
 
 
+def test_emotion_sampling_prefers_runner_up_over_marginal_neutral(monkeypatch, tmp_path):
+    """Sad footage reads as sad even when neutral edges the per-frame argmax every time."""
+    monkeypatch.setattr(run_pipeline, "extract_frame", lambda *_args: True)
+    monkeypatch.setattr(run_pipeline, "has_face", lambda *_args: True)
+    monkeypatch.setattr(
+        run_pipeline,
+        "detect_emotion",
+        lambda *_args, **_kwargs: ("neutral", {"neutral": 41.0, "sad": 38.0, "fear": 21.0}, 41.0),
+    )
+
+    _timeline, dominant, _face_any, _face_ratio = run_pipeline.sample_emotions_over_scene(
+        "demo.mp4",
+        0,
+        5,
+        str(tmp_path),
+        1,
+    )
+
+    assert dominant == "sad"
+
+
+def test_emotion_sampling_keeps_confident_neutral(monkeypatch, tmp_path):
+    """A clear neutral read still wins — the margin rule must not invert every scene."""
+    monkeypatch.setattr(run_pipeline, "extract_frame", lambda *_args: True)
+    monkeypatch.setattr(run_pipeline, "has_face", lambda *_args: True)
+    monkeypatch.setattr(
+        run_pipeline,
+        "detect_emotion",
+        lambda *_args, **_kwargs: ("neutral", {"neutral": 88.0, "sad": 7.0, "happy": 5.0}, 88.0),
+    )
+
+    _timeline, dominant, _face_any, _face_ratio = run_pipeline.sample_emotions_over_scene(
+        "demo.mp4",
+        0,
+        5,
+        str(tmp_path),
+        1,
+    )
+
+    assert dominant == "neutral"
+
+
+def test_emotion_sampling_weights_confident_frames_over_marginal_ones(monkeypatch, tmp_path):
+    """One confident sad frame outweighs several near-tie neutral frames."""
+    reads = iter([
+        ("sad", {"sad": 92.0, "neutral": 5.0}, 92.0),
+        ("neutral", {"neutral": 36.0, "sad": 34.0, "fear": 30.0}, 36.0),
+        ("neutral", {"neutral": 36.0, "sad": 34.0, "fear": 30.0}, 36.0),
+        ("neutral", {"neutral": 36.0, "sad": 34.0, "fear": 30.0}, 36.0),
+    ])
+
+    monkeypatch.setattr(run_pipeline, "extract_frame", lambda *_args: True)
+    monkeypatch.setattr(run_pipeline, "has_face", lambda *_args: True)
+    monkeypatch.setattr(run_pipeline, "detect_emotion", lambda *_args, **_kwargs: next(reads))
+
+    _timeline, dominant, _face_any, _face_ratio = run_pipeline.sample_emotions_over_scene(
+        "demo.mp4",
+        0,
+        5,
+        str(tmp_path),
+        1,
+    )
+
+    assert dominant == "sad"
+
+
+def _tl(*frames):
+    """Build an emotion_timeline from (emotion, confidence) pairs; None emotion => no face."""
+    out = []
+    for emotion, conf in frames:
+        out.append({
+            "face_detected": emotion is not None,
+            "emotion": emotion,
+            "confidence": conf,
+        })
+    return out
+
+
+def test_emotion_shift_detects_mid_scene_change():
+    """A neutral opening that turns sad is reported as a shift, with from/to labels."""
+    timeline = _tl(("neutral", 90.0), ("neutral", 82.0), ("sad", 88.0), ("sad", 91.0))
+    shift = run_pipeline.detect_emotion_shift(timeline)
+    assert shift["shifted"] is True
+    assert shift["from"] == "neutral"
+    assert shift["to"] == "sad"
+
+
+def test_emotion_shift_ignores_steady_emotion():
+    """A scene that stays sad throughout is not a shift, even with minor flicker."""
+    timeline = _tl(("sad", 88.0), ("sad", 76.0), ("sad", 91.0), ("sad", 80.0))
+    assert run_pipeline.detect_emotion_shift(timeline)["shifted"] is False
+
+
+def test_emotion_shift_requires_enough_confident_frames():
+    """Two confident frames is too little evidence to call an arc."""
+    timeline = _tl(("neutral", 90.0), ("sad", 90.0))
+    assert run_pipeline.detect_emotion_shift(timeline)["shifted"] is False
+
+
+def test_emotion_shift_ignores_low_confidence_flicker():
+    """A single low-confidence 'sad' blip in an otherwise-neutral scene is not a shift."""
+    timeline = _tl(("neutral", 90.0), ("neutral", 85.0), ("sad", 32.0), ("neutral", 88.0))
+    assert run_pipeline.detect_emotion_shift(timeline)["shifted"] is False
+
+
+def test_emotion_shift_ignores_frames_without_faces():
+    """No-face frames carry no emotion and must not tip the arc."""
+    timeline = _tl(("neutral", 90.0), (None, None), ("sad", 89.0), ("sad", 84.0))
+    shift = run_pipeline.detect_emotion_shift(timeline)
+    # Only three confident frames remain: neutral | sad, sad -> a real change.
+    assert shift["shifted"] is True
+    assert shift["from"] == "neutral"
+    assert shift["to"] == "sad"
+
+
 def test_metadata_tagging_detects_edited_filename_and_ffprobe_tags(monkeypatch):
     assert celery_worker.check_if_edited_by_filename("client_final_render.mp4")
     assert not celery_worker.check_if_edited_by_filename("C0018_raw_take.mp4")

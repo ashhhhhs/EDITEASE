@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, CheckSquare, Search, Save, Settings2, Video, Square, CheckSquare as CheckSquareIcon, ListFilter, Send, ShieldCheck, XCircle, UserPlus } from 'lucide-react';
-import { SCENE_LABELS, EMOTIONS } from './constants';
+import { ChevronLeft, ChevronRight, CheckSquare, Search, Save, Settings2, Video, Square, CheckSquare as CheckSquareIcon, ListFilter, Send, ShieldCheck, XCircle, UserPlus, Activity } from 'lucide-react';
+import { SCENE_LABELS, EMOTIONS, emotionColors } from './constants';
 import PageHeader from './components/PageHeader';
 import LoadingState from './components/LoadingState';
 import EmptyState from './components/EmptyState';
@@ -18,6 +18,60 @@ const formatAuditAction = (action = '') => action
   .filter(Boolean)
   .map(part => part.charAt(0).toUpperCase() + part.slice(1))
   .join(' ');
+
+// Compact per-clip emotion readout: the scene's dominant emotion, a mid-clip shift badge when
+// the expression changes partway through, and a segmented strip of the per-frame samples so a
+// reviewer can see the arc a single label can't represent.
+function EmotionTimeline({ clip }) {
+  const timeline = Array.isArray(clip.emotion_timeline) ? clip.emotion_timeline : [];
+  const dominant = clip.dominant_emotion_overall;
+  const shift = clip.emotion_shift;
+
+  if (timeline.length === 0 && !dominant && !shift?.shifted) return null;
+
+  const colorFor = (emo) => (emo && emotionColors[emo]) || emotionColors._none;
+
+  return (
+    <div className="emotion-block">
+      <div className="emotion-head">
+        {dominant ? (
+          <span className="emotion-dom">
+            <span className="emotion-dot" style={{ background: colorFor(dominant) }} />
+            {dominant}
+          </span>
+        ) : (
+          <span className="emotion-dom muted">no emotion</span>
+        )}
+        {shift?.shifted && (
+          <span
+            className="badge warning emotion-shift-badge"
+            title={`Expression changes mid-clip: ${shift.from} → ${shift.to}`}
+          >
+            <Activity size={11} /> {shift.from} → {shift.to}
+          </span>
+        )}
+      </div>
+      {timeline.length > 0 && (
+        <div className="emotion-strip" aria-hidden="true">
+          {timeline.map((f, i) => {
+            const emo = f.face_detected ? f.emotion : null;
+            const title = emo
+              ? `${emo}${f.confidence != null ? ` · ${Math.round(f.confidence)}%` : ''}`
+              : 'no face';
+            return (
+              <span
+                key={i}
+                className="emotion-seg"
+                style={{ background: colorFor(emo) }}
+                title={title}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Inspector({ currentUser }) {
   const toast = useToast();
@@ -559,6 +613,7 @@ export default function Inspector({ currentUser }) {
                           {clip.review_request_status === 'assigned' && <span className="badge warning">Assigned Review</span>}
                           {clip.review_request_status === 'resolved' && <span className="badge success">Request Resolved</span>}
                         </div>
+                        <EmotionTimeline clip={clip} />
                         {(clip.review_request_status === 'open' || clip.review_request_status === 'assigned') && (
                           <div className="review-card-note">
                             {clip.review_request_reason || 'Admin review requested'}

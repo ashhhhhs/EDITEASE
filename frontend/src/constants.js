@@ -28,3 +28,16 @@ export const labelColors = {
   establishing_shot: '#79c0ff',
   other: '#8b949e'
 };
+
+// Per-emotion colors for the timeline strip on review cards. `_none` is the muted
+// fill for sampled frames where no face was detected.
+export const emotionColors = {
+  happy: '#e3b341',
+  sad: '#58a6ff',
+  angry: '#f85149',
+  fear: '#bc8cff',
+  surprise: '#ff9bce',
+  disgust: '#56d364',
+  neutral: '#8b949e',
+  _none: '#30363d'
+};

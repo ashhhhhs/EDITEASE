@@ -13,6 +13,12 @@ logger = setup_logger("auth_service")
 _client = None
 ACTIVE_ROLES = {"admin", "editor", "reviewer"}
 
+# Login throttling. Mongo-backed rather than Redis, matching the approach already
+# used for password reset / verification. Failed attempts are recorded for unknown
+# emails too, so the throttle cannot be used to probe which accounts exist.
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_WINDOW_MINUTES = 15
+
 def _normalize_email(email):
     return (email or "").strip().lower()
 
@@ -29,6 +35,55 @@ def _get_users_col():
     except Exception as e:
         logger.error(f"Failed to verify users indexes: {e}")
     return col
+
+
+def _get_login_attempts_col():
+    """Collection of recent failed login attempts, TTL-cleaned by MongoDB."""
+    global _client
+    if _client is None:
+        _client = MongoClient(config.MONGO_URI)
+    col = _client[config.DB_NAME]["login_attempts"]
+    try:
+        col.create_index("expires_at", expireAfterSeconds=0)
+        col.create_index("email")
+    except Exception as e:
+        logger.error(f"Failed to verify login_attempts indexes: {e}")
+    return col
+
+
+def _recent_failed_logins(email: str) -> int:
+    window_start = (
+        datetime.datetime.utcnow() - datetime.timedelta(minutes=LOGIN_WINDOW_MINUTES)
+    ).isoformat()
+    try:
+        return _get_login_attempts_col().count_documents({
+            "email": email,
+            "created_at": {"$gte": window_start},
+        })
+    except Exception as e:
+        # Never let the throttle lock everyone out if the collection misbehaves.
+        logger.error(f"Login throttle lookup failed: {e}")
+        return 0
+
+
+def _record_failed_login(email: str) -> None:
+    now = datetime.datetime.utcnow()
+    try:
+        _get_login_attempts_col().insert_one({
+            "email": email,
+            "created_at": now.isoformat(),
+            # datetime (not ISO string) so the TTL index can act on it
+            "expires_at": now + datetime.timedelta(minutes=LOGIN_WINDOW_MINUTES),
+        })
+    except Exception as e:
+        logger.error(f"Could not record failed login: {e}")
+
+
+def _clear_failed_logins(email: str) -> None:
+    try:
+        _get_login_attempts_col().delete_many({"email": email})
+    except Exception as e:
+        logger.error(f"Could not clear failed logins: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -99,13 +154,25 @@ def login_user(email, password):
         "status": 401,
     }
 
+    if _recent_failed_logins(email) >= LOGIN_MAX_ATTEMPTS:
+        logger.warning(f"Login throttled for {email}")
+        return {
+            "error": (
+                "Too many failed sign-in attempts. "
+                f"Please wait {LOGIN_WINDOW_MINUTES} minutes and try again."
+            ),
+            "status": 429,
+        }
+
     users_col = _get_users_col()
     user = users_col.find_one({"email": email})
     if not user:
+        _record_failed_login(email)
         return _CREDENTIAL_ERROR
 
     pass_hash = user.get("password_hash")
     if not pass_hash or not check_password_hash(pass_hash, password):
+        _record_failed_login(email)
         return _CREDENTIAL_ERROR
 
     if not user.get("is_active", True):
@@ -118,6 +185,8 @@ def login_user(email, password):
         {"$set": {"token": token, "last_login_at": now}}
     )
 
+    # A successful sign-in clears the throttle for this account.
+    _clear_failed_logins(email)
     _log_login_event(str(user["_id"]), "password")
     logger.info(f"User {str(user['_id'])} authenticated successfully with password.")
 

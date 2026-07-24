@@ -1,4 +1,4 @@
-"""Review blueprint: /search, /update_scene, /review/bulk-update"""
+"""Review blueprint: /search, /review/bulk-update"""
 from flask import Blueprint, request, jsonify, g
 from services import clip_service
 from api.decorators import role_required
@@ -20,17 +20,6 @@ def search():
     filters = {k: v for k, v in filters.items() if v is not None}
     limit = request.args.get('limit', 100, type=int)
     return jsonify(clip_service.search_clips(filters, limit=limit, current_user=g.user))
-
-@review_bp.post('/update_scene')
-@role_required(['admin', 'editor', 'reviewer'])
-def update_scene():
-    data = request.get_json(force=True) or {}
-    video = data.get('video')
-    scene_id = data.get('scene_id')
-    res = clip_service.update_clip(video, scene_id, data, current_user=g.user)
-    if 'error' in res:
-        return jsonify(res), res.get('status', 404 if 'not found' in res['error'] else 400)
-    return jsonify(res)
 
 @review_bp.post('/review/bulk-update')
 @role_required(['admin', 'editor', 'reviewer'])

@@ -8,7 +8,7 @@ import numpy as np
 import config
 from database.ingest_to_mongo import upsert_scene_docs
 from pipeline.classifiers.rule_based_classifier import RuleBasedClassifier
-from pipeline.processing.scene_type_detect import detect_faces_info
+from pipeline.processing.scene_type_detect import compute_scene_features, detect_faces_info
 from pipeline.processing.detect_scenes import find_scenes
 from pipeline.processing.emotion_detect import detect_emotion
 from services import cloudinary_service
@@ -28,14 +28,23 @@ else:
 
 VIDEO_EXTENSIONS = (".mp4", ".mov", ".avi", ".mkv")
 
+# Built once at import. Constructing a CascadeClassifier re-parses the XML from
+# disk, and has_face() runs up to 12 times per scene for every scene in a video.
+_FACE_CASCADE = cv2.CascadeClassifier(
+    os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")  # type: ignore
+)
+
 # ---------------------------------------------------------------------------
 # Confidence bands for the agentic decision layer
 # ---------------------------------------------------------------------------
-CONF_AUTO_HIGH   = float(os.getenv("CONF_AUTO_HIGH",   "0.85"))  # ML auto-accepts above this
-CONF_FUSE_LOW    = float(os.getenv("CONF_FUSE_LOW",    "0.58"))  # fusion below this → uncertain
-ML_WEIGHT        = float(os.getenv("ML_WEIGHT",        "0.65"))  # ML share in weighted fusion
+# Sourced from config.py so tuning a default there actually changes pipeline
+# behaviour. Previously these re-read the env directly, which silently ignored
+# any change made in config.py.
+CONF_AUTO_HIGH   = config.CONF_AUTO_HIGH   # ML auto-accepts above this
+CONF_FUSE_LOW    = config.CONF_FUSE_LOW    # fusion below this → uncertain
+ML_WEIGHT        = config.ML_WEIGHT        # ML share in weighted fusion
 RULE_WEIGHT      = 1.0 - ML_WEIGHT
-AUDIENCE_REACTION_MIN_FACES = int(os.getenv("AUDIENCE_REACTION_MIN_FACES", "3"))
+AUDIENCE_REACTION_MIN_FACES = config.AUDIENCE_REACTION_MIN_FACES
 
 
 # ---------------------------------------------------------------------------
@@ -47,9 +56,7 @@ def has_face(img_path):
     if img is None:
         return False
     gray    = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    cascade = cv2.CascadeClassifier(
-        os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")  # type: ignore
-    )
+    cascade = _FACE_CASCADE
     h, w = gray.shape
     # Face must be at least 6% of the smaller frame dimension — kills tiny
     # texture hits (leaves, rocks, building details) that Haar misreads as faces.
@@ -129,6 +136,18 @@ def extract_frame(video_path, timestamp, out_path):
 MIN_EMOTION_FACE_HITS = 2
 MIN_EMOTION_FACE_RATIO = 0.40
 
+# `neutral` is the emotion model's no-signal class: on subdued expressions (sad footage
+# especially) it wins the per-frame argmax by a very small margin, so a plurality vote reads
+# "narrowly ahead everywhere" as "certainly neutral". Require it to lead the runner-up by this
+# share of the aggregated distribution before it takes the scene.
+NEUTRAL_MARGIN = 0.10
+
+# A single scalar `dominant_emotion` hides the case where the subject's expression genuinely
+# changes mid-scene (e.g. neutral → sad). We don't split the scene — scene detection is
+# cut-based and an emotion change isn't a cut — but we flag the arc so a reviewer can see it.
+SHIFT_MIN_CONF = 55.0       # a frame must be at least this confident to count toward the arc
+SHIFT_MIN_CONFIDENT = 3     # need this many confident frames before an arc is judged at all
+
 
 def _get_sample_count(duration_seconds: float) -> int:
     """Scale sample count to scene length — avoids under-sampling long scenes."""
@@ -141,12 +160,90 @@ def _get_sample_count(duration_seconds: float) -> int:
     return 12   # cap — diminishing returns beyond this
 
 
+def _sample_weight(i: int, total: int) -> float:
+    """Edge samples carry more editorial weight — first and last get 1.5×, the rest 1.0×."""
+    return 1.5 if i == 0 or i == total - 1 else 1.0
+
+
+def _resolve_dominant(emotion_votes: dict[str, float]):
+    """
+    Pick the scene emotion from the aggregated distribution, with a margin rule on `neutral`.
+
+    Neutral absorbs probability mass whenever no expression is strongly present, so a bare
+    argmax reports it for subdued-but-real emotions. When it leads by less than
+    NEUTRAL_MARGIN, the runner-up carries the scene instead.
+    """
+    if not emotion_votes:
+        return None
+
+    ranked = sorted(emotion_votes.items(), key=lambda kv: kv[1], reverse=True)
+    top_label, top_score = ranked[0]
+    if top_label != "neutral" or len(ranked) == 1:
+        return top_label
+
+    runner_label, runner_score = ranked[1]
+    total = sum(emotion_votes.values()) or 1.0
+    if (top_score - runner_score) / total < NEUTRAL_MARGIN:
+        return runner_label
+    return top_label
+
+
+def _confidence_weighted_top(frames):
+    """Given (label, confidence) pairs, return the label carrying the most confidence mass."""
+    agg: dict[str, float] = {}
+    for label, conf in frames:
+        agg[label] = agg.get(label, 0.0) + conf
+    return max(agg, key=agg.get) if agg else None
+
+
+def detect_emotion_shift(emotion_timeline):
+    """
+    Detect a genuine mid-scene emotion change from the per-frame timeline.
+
+    The timeline is temporally ordered. We keep only confident, face-present frames, split
+    them into an earlier and a later half, and compare each half's dominant emotion. A change
+    between the two halves — backed by confident evidence on both sides — is reported as a shift.
+
+    Returns: {"shifted": bool, "from": str | None, "to": str | None}. The `from`/`to` labels are
+    populated only when `shifted` is True.
+    """
+    result = {"shifted": False, "from": None, "to": None}
+
+    confident = [
+        (f.get("emotion"), float(f.get("confidence")))
+        for f in (emotion_timeline or [])
+        if f.get("face_detected")
+        and f.get("emotion")
+        and f.get("confidence") is not None
+        and float(f.get("confidence")) >= SHIFT_MIN_CONF
+    ]
+    if len(confident) < SHIFT_MIN_CONFIDENT:
+        return result
+
+    # First half gets the extra frame when the count is odd, so the split never leaves the
+    # later half empty.
+    mid = (len(confident) + 1) // 2
+    first, second = confident[:mid], confident[mid:]
+    if not first or not second:
+        return result
+
+    from_emotion = _confidence_weighted_top(first)
+    to_emotion = _confidence_weighted_top(second)
+    if from_emotion and to_emotion and from_emotion != to_emotion:
+        result.update(shifted=True)
+        result["from"] = from_emotion
+        result["to"] = to_emotion
+    return result
+
+
 def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene_id):
     """
     Temporal emotion sampling inside a scene.
     - Sample count adapts to scene duration.
     - Frames at the start/end are weighted more heavily for dominant emotion
       (editorially more significant than mid-scene).
+    - Votes accumulate the full per-frame probability distribution, not just the argmax, so a
+      weak win contributes proportionally less than a confident one.
     - Enforces: if face evidence is weak => dominant emotion None.
     """
     scene_duration = end_sec - start_sec
@@ -154,11 +251,6 @@ def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene
 
     # Evenly spaced ratios; keep away from exact edges (0 / 1) to avoid black frames.
     sample_ratios = np.linspace(0.1, 0.9, n_samples).tolist()
-
-    # Edge positions carry more editorial weight for dominant-emotion voting.
-    # First and last sample get weight 1.5×; the rest get 1.0×.
-    def _weight(i, total):
-        return 1.5 if i == 0 or i == total - 1 else 1.0
 
     emotion_timeline  = []
     emotion_votes: dict[str, float] = {}
@@ -193,10 +285,25 @@ def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene
             "face_detected": True,
             "emotion"      : dominant if dominant else None,
             "confidence"   : conf     if dominant else None,
+            # Full per-frame distribution, not just the winner. _resolve_dominant
+            # aggregates over the whole distribution, so without this the voting
+            # rule and NEUTRAL_MARGIN cannot be re-tuned offline — every
+            # experiment would mean re-running DeepFace over every video.
+            "probs": (
+                {k: round(float(v), 2) for k, v in probs.items()}
+                if isinstance(probs, dict) and probs else None
+            ),
         })
 
-        if dominant:
-            w = _weight(i, n_samples)
+        w = _sample_weight(i, n_samples)
+        if isinstance(probs, dict) and probs:
+            # Spread the frame's weight across the distribution: a 0.41/0.38 frame is close to
+            # a tie and should be counted as one, not as a clean win for the leader.
+            total_prob = sum(float(p) for p in probs.values()) or 1.0
+            for label, p in probs.items():
+                emotion_votes[label] = emotion_votes.get(label, 0.0) + w * (float(p) / total_prob)
+        elif dominant:
+            # Older DeepFace versions may hand back a label with no distribution.
             emotion_votes[dominant] = emotion_votes.get(dominant, 0.0) + w
 
     face_present_any    = face_hits > 0
@@ -205,11 +312,7 @@ def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene
         face_hits >= MIN_EMOTION_FACE_HITS
         and face_present_ratio >= MIN_EMOTION_FACE_RATIO
     )
-    dominant_overall = (
-        max(emotion_votes, key=emotion_votes.get)
-        if has_emotion_evidence and emotion_votes
-        else None
-    )  # type: ignore
+    dominant_overall = _resolve_dominant(emotion_votes) if has_emotion_evidence else None
 
     return emotion_timeline, dominant_overall, face_present_any, face_present_ratio
 
@@ -457,6 +560,7 @@ def process_video(
             thumbs_dir=thumbs_dir,
             scene_id=idx,
         )
+        emotion_shift = detect_emotion_shift(emotion_timeline)
         log_pipeline_checkpoint(
             "emotion_sampling",
             video_name,
@@ -466,14 +570,26 @@ def process_video(
             face_present=face_any,
             face_ratio=round(face_ratio, 3),
             dominant_emotion=dominant_overall,
+            emotion_shift=emotion_shift["shifted"],
         )
 
         if progress_callback:
             if face_any:
                 emo_text = dominant_overall if dominant_overall else 'complex emotions'
+                if emotion_shift["shifted"]:
+                    emo_text = f"{emotion_shift['from']} → {emotion_shift['to']}"
                 progress_callback(f"Scene {idx}/{len(scenes)}: Found faces! Detected emotion: {emo_text}. Classifying scene type...")
             else:
                 progress_callback(f"Scene {idx}/{len(scenes)}: No faces detected. Classifying scene type...")
+
+        # ── Scene feature vector ───────────────────────────────────────
+        # Computed once per scene here, not inside whichever classifier happens to
+        # win. Two reasons: every scene then carries a vector for retraining (a
+        # high-confidence ML scene used to record nothing), and the fusion path
+        # below reuses it instead of re-reading the thumbnail and re-sampling motion.
+        scene_features, scene_raw_signals = compute_scene_features(
+            video_path, start, end, thumb_path,
+        )
 
         # ── Classification ─────────────────────────────────────────────
         scene_label, scene_conf, scene_debug = scene_classifier.classify(
@@ -481,6 +597,8 @@ def process_video(
             start_sec=start,
             end_sec=end,
             thumbnail_path=thumb_path,
+            features=scene_features,
+            raw_signals=scene_raw_signals,
         )
         log_pipeline_checkpoint(
             "ml_classification",
@@ -523,6 +641,7 @@ def process_video(
             # Medium confidence — run weighted fusion with rule-based.
             rb_label, rb_conf, rb_debug = RuleBasedClassifier().classify(
                 video_path, start, end, thumb_path,
+                features=scene_features, raw_signals=scene_raw_signals,
             )
             scene_label, scene_conf, uncertain, action = _fuse_predictions(
                 scene_label, scene_conf, rb_label, rb_conf,
@@ -568,6 +687,7 @@ def process_video(
                 "face_present_ratio": round(face_ratio, 3),
             },
             "emotion_timeline"   : emotion_timeline,
+            "emotion_shift"      : emotion_shift,
             "created_at"         : datetime.now().isoformat(),
             "reviewed"           : reviewed,
             "uncertain"          : uncertain,
@@ -580,7 +700,12 @@ def process_video(
             #   this scene; used by retrain_profiles.py to update Gaussian mu/sigma.
             # used_for_training: set to True after this scene is consumed by retraining.
             "human_label"               : None,
-            "feature_vector_for_training": scene_debug.get("normalised_features", {}),
+            # Taken from scene_features directly, not from scene_debug. Reading it
+            # out of the debug dict silently produced {} whenever the ML model won,
+            # so the scenes most likely to be corrected recorded no features at all.
+            "feature_vector_for_training": {
+                k: round(float(v), 6) for k, v in scene_features.items()
+            },
             "used_for_training"         : False,
         }))
 

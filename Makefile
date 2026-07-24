@@ -1,13 +1,10 @@
-.PHONY: install run-api run-ui run-pipeline clean health
+.PHONY: install run-api run-frontend run-celery run-pipeline clean health
 
 install:
 	pip install -e .[dev]
 
 run-api:
 	python -m api.api_server
-
-run-ui:
-	python -m streamlit run ui/ui_api.py
 
 run-frontend:
 	cd frontend && npm run dev

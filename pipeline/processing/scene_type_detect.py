@@ -34,6 +34,10 @@ CASCADE_PATH = os.path.join(
     cv2.data.haarcascades, "haarcascade_frontalface_default.xml"  # type: ignore
 )
 
+# Built once at import — see the note in run_pipeline.py. detect_faces_info()
+# is called for every thumbnail, so re-parsing the XML per call is pure waste.
+FACE_CASCADE = cv2.CascadeClassifier(CASCADE_PATH)
+
 
 # ---------------------------------------------------------------------------
 # Feature normalisation ceilings
@@ -123,7 +127,7 @@ SCENE_PROFILES = {
 def detect_faces_info(image_bgr):
     """Return (face_count, largest_face_area_ratio, dominant_face_aspect_ratio)."""
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
-    face_cascade = cv2.CascadeClassifier(CASCADE_PATH)
+    face_cascade = FACE_CASCADE
     faces = face_cascade.detectMultiScale(
         gray, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40)
     )
@@ -437,25 +441,18 @@ class SceneSmoothing:
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def detect_scene_type(video_path, start_sec, end_sec, thumbnail_path=None, smoother=None):
-    """
-    Classify the scene type for a video segment.
+def compute_scene_features(video_path, start_sec, end_sec, thumbnail_path=None):
+    """Gather the raw vision/motion signals for a segment and normalise them.
 
-    Args:
-        video_path     : path to the video file
-        start_sec      : segment start in seconds
-        end_sec        : segment end in seconds
-        thumbnail_path : optional representative frame for vision signals
-        smoother       : optional SceneSmoothing instance
+    Split out of `detect_scene_type` because the feature vector describes the
+    *scene*, not the classifier that happened to run on it. Every scene needs one
+    recorded for retraining, including scenes the ML model classifies confidently
+    and which therefore never touch the rule-based path.
 
     Returns:
-        label       – scene label string
-        confidence  – probability in [0.40, 0.95]
-        debug       – raw signals, normalised features, per-scene probabilities,
-                      and the raw feature vector ready for MongoDB logging
+        features    – normalised feature dict, all values in [0, 1]
+        raw_signals – the pre-normalisation measurements, for debugging
     """
-    logger.info("━━━━ SCENE DETECTION START [%.1fs → %.1fs] ━━━━", start_sec, end_sec)
-    
     face_count = largest_face_ratio = face_aspect_ratio = 0
     edge_density = sharpness = text_density = color_variance = color_temperature = 0.0
 
@@ -483,6 +480,55 @@ def detect_scene_type(video_path, start_sec, end_sec, thumbnail_path=None, smoot
         edge_density, sharpness, text_density, color_variance, color_temperature,
     )
 
+    raw_signals = {
+        "face_count"          : int(face_count),
+        "largest_face_ratio"  : round(float(largest_face_ratio), 4),
+        "face_aspect_ratio"   : round(float(face_aspect_ratio), 4),
+        "mean_motion"         : round(float(mean_motion), 4),
+        "peak_motion"         : round(float(peak_motion), 4),
+        "motion_std"          : round(float(motion_std), 4),
+        "edge_density"        : round(float(edge_density), 4),
+        "sharpness"           : round(float(sharpness), 2),
+        "text_density"        : round(float(text_density), 2),
+        "color_variance"      : round(float(color_variance), 4),
+        "color_temperature"   : round(float(color_temperature), 4),
+    }
+    return features, raw_signals
+
+
+def detect_scene_type(
+    video_path, start_sec, end_sec, thumbnail_path=None, smoother=None,
+    features=None, raw_signals=None,
+):
+    """
+    Classify the scene type for a video segment.
+
+    Args:
+        video_path     : path to the video file
+        start_sec      : segment start in seconds
+        end_sec        : segment end in seconds
+        thumbnail_path : optional representative frame for vision signals
+        smoother       : optional SceneSmoothing instance
+        features       : optional precomputed feature dict from
+                         compute_scene_features(). Pass it to avoid re-reading the
+                         thumbnail and re-sampling motion when the caller has
+                         already done that work.
+        raw_signals    : the raw signals that accompany `features`
+
+    Returns:
+        label       – scene label string
+        confidence  – probability in [0.40, 0.95]
+        debug       – raw signals, normalised features, per-scene probabilities,
+                      and the raw feature vector ready for MongoDB logging
+    """
+    logger.info("━━━━ SCENE DETECTION START [%.1fs → %.1fs] ━━━━", start_sec, end_sec)
+
+    if features is None:
+        features, raw_signals = compute_scene_features(
+            video_path, start_sec, end_sec, thumbnail_path
+        )
+    raw_signals = raw_signals or {}
+
     label, confidence, all_probs = classify_scene(features)
 
     if smoother is not None:
@@ -494,19 +540,7 @@ def detect_scene_type(video_path, start_sec, end_sec, thumbnail_path=None, smoot
     logger.info("━━━━ SCENE DETECTION DONE: %s (%.0f%%) ━━━━", label.upper(), confidence * 100)
     
     debug = {
-        "raw_signals": {
-            "face_count"          : int(face_count),
-            "largest_face_ratio"  : round(float(largest_face_ratio), 4),
-            "face_aspect_ratio"   : round(float(face_aspect_ratio), 4),
-            "mean_motion"         : round(float(mean_motion), 4),
-            "peak_motion"         : round(float(peak_motion), 4),
-            "motion_std"          : round(float(motion_std), 4),
-            "edge_density"        : round(float(edge_density), 4),
-            "sharpness"           : round(float(sharpness), 2),
-            "text_density"        : round(float(text_density), 2),
-            "color_variance"      : round(float(color_variance), 4),
-            "color_temperature"   : round(float(color_temperature), 4),
-        },
+        "raw_signals": raw_signals,
         "normalised_features"  : {k: round(v, 4) for k, v in features.items()},
         "scene_probabilities"  : all_probs,
         # ── Ready to log to MongoDB for offline profile re-calibration ──
