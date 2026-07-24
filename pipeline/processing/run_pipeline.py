@@ -58,17 +58,18 @@ def has_face(img_path):
     gray    = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     cascade = _FACE_CASCADE
     h, w = gray.shape
-    # Face must be at least 6% of the smaller frame dimension — kills tiny
-    # texture hits (leaves, rocks, building details) that Haar misreads as faces.
-    min_side = max(60, int(min(h, w) * 0.06))
+    # Permissive on purpose. This is a pre-filter, not a decision: the emotion
+    # detector's own backend makes the real call, so a false positive here costs
+    # only wasted compute, while a false negative silently discards a real face.
+    # The previously strict settings were rejecting genuine faces in wide shots.
+    min_side = max(32, int(min(h, w) * 0.035))
     faces = cascade.detectMultiScale(
-        gray, scaleFactor=1.1, minNeighbors=10, minSize=(min_side, min_side)
+        gray, scaleFactor=1.1, minNeighbors=5, minSize=(min_side, min_side)
     )
     if len(faces) == 0:
         return False
-    # Require face to occupy ≥1.5% of frame area before we trust it.
     frame_area = float(h * w)
-    return any((fw * fh) / frame_area >= 0.015 for (_, _, fw, fh) in faces)
+    return any((fw * fh) / frame_area >= 0.005 for (_, _, fw, fh) in faces)
 
 
 def make_json_safe(obj):
@@ -266,23 +267,31 @@ def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene
             continue
 
         total_samples += 1
-        face_ok = has_face(thumb_path)
-        if face_ok:
-            face_hits += 1
-
-        if not face_ok:
+        # Cheap Haar pre-filter. Deliberately permissive: its only job is to decide
+        # whether the expensive verifier is worth running. It is not trusted on its
+        # own — it reports faces on foliage and misses real ones in wide shots.
+        if not has_face(thumb_path):
             emotion_timeline.append({
                 "time_ratio"   : round(ratio, 3),
                 "face_detected": False,
                 "emotion"      : None,
                 "confidence"   : None,
+                "probs"        : None,
             })
             continue
 
         dominant, probs, conf = detect_emotion(thumb_path, enforce_detection=True)
+
+        # A face counts only when the strong detector confirms it. Counting Haar
+        # hits here is what let a hanging flower pot record face_present_ratio=1.0
+        # and a dominant emotion of "sad".
+        verified = dominant is not None
+        if verified:
+            face_hits += 1
+
         emotion_timeline.append({
             "time_ratio"   : round(ratio, 3),
-            "face_detected": True,
+            "face_detected": verified,
             "emotion"      : dominant if dominant else None,
             "confidence"   : conf     if dominant else None,
             # Full per-frame distribution, not just the winner. _resolve_dominant

@@ -1,6 +1,7 @@
 import os
 import sys
 
+import config
 from utils.logger import setup_logger
 from utils.exceptions import EmotionDetectionError
 
@@ -26,8 +27,15 @@ def _ensure_deepface_available():
         )
 
 
-def detect_emotion(image_path, enforce_detection=False):
+def detect_emotion(image_path, enforce_detection=False, detector_backend=None):
     """
+    Args:
+      detector_backend: which face detector verifies a face before the emotion
+        model runs. Defaults to config.EMOTION_DETECTOR_BACKEND. This is the
+        gate that makes enforce_detection meaningful — with DeepFace's own
+        "opencv" default it shares the Haar blind spot of the caller's cheap
+        pre-filter, so foliage gets scored as a sad face.
+
     Returns:
       dominant_emotion (str | None)
       emotion_probs (dict | None)
@@ -37,11 +45,16 @@ def detect_emotion(image_path, enforce_detection=False):
     if _deepface_import_error is not None:
         return None, None, None
 
+    if detector_backend is None:
+        detector_backend = getattr(config, "EMOTION_DETECTOR_BACKEND", "retinaface")
+
     try:
         result = DeepFace.analyze(
             img_path=image_path,
             actions=["emotion"],
-            enforce_detection=enforce_detection  # False = won't crash if no face
+            detector_backend=detector_backend,
+            enforce_detection=enforce_detection,  # False = won't crash if no face
+            silent=True,
         )
 
         # DeepFace may return list[dict] or dict depending on version/settings

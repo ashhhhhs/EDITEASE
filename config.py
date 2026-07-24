@@ -92,6 +92,16 @@ ML_WEIGHT = float(os.getenv("ML_WEIGHT", "0.65"))
 # An `audience_reaction` label requires at least this many visible faces.
 AUDIENCE_REACTION_MIN_FACES = int(os.getenv("AUDIENCE_REACTION_MIN_FACES", "3"))
 
+# Face detector used to verify a face before an emotion is trusted.
+#
+# The default was "opencv", the same Haar family as the cheap pre-filter, so
+# enforce_detection=True could never catch what the pre-filter got wrong. Measured
+# against 120 human-labelled clips, opencv reported faces on foliage (a hanging
+# flower pot scored "sad") and simultaneously missed real faces in wide shots.
+# retinaface and mtcnn both got every checked case right; retinaface costs about
+# 2.3s per frame against opencv's 0.2s, which is the price of the correctness.
+EMOTION_DETECTOR_BACKEND = os.getenv("EMOTION_DETECTOR_BACKEND", "retinaface")
+
 # ---------------------------------------------------------------------------
 # Cloudinary Settings
 # ---------------------------------------------------------------------------
