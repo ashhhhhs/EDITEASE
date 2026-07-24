@@ -4,10 +4,14 @@ from utils.logger import setup_logger
 import os
 import json
 import torch
-import torch.nn as nn
-from torchvision import models, transforms
 from PIL import Image
 import config
+from pipeline.classifiers.scene_model import (
+    MODELS_DIR,
+    build_scene_model,
+    inference_transform,
+    model_paths,
+)
 
 logger = setup_logger("ml_classifier")
 
@@ -54,9 +58,11 @@ class MLClassifier(BaseClassifier):
         self.transform = None
         self.idx_to_label: dict[str, str] = {}
 
-        models_dir    = os.path.join(config.BASE_DIR, "pipeline", "models")
-        model_path    = os.path.join(models_dir, "scene_classifier_v2.pth")
-        encoder_path  = os.path.join(models_dir, "label_encoder_v2.json")
+        # Architecture, label order and file layout all come from scene_model so
+        # training and inference cannot drift apart. They previously had, badly:
+        # a freshly trained checkpoint would not load at all.
+        model_path, encoder_path = model_paths(config.SCENE_MODEL_VERSION)
+        models_dir = MODELS_DIR
 
         try:
             if os.path.exists(encoder_path):
@@ -64,29 +70,14 @@ class MLClassifier(BaseClassifier):
                     self.idx_to_label = json.load(f)
 
             if os.path.exists(model_path) and self.idx_to_label:
-                self.model = models.resnet18(weights=None)
-                num_ftrs   = self.model.fc.in_features
-                self.model.fc = nn.Sequential(
-                    nn.Linear(num_ftrs, 256),
-                    nn.LayerNorm(256),
-                    nn.ReLU(inplace=True),
-                    nn.Dropout(p=0.3),
-                    nn.Linear(256, len(self.idx_to_label)),
-                )
+                self.model = build_scene_model(len(self.idx_to_label), pretrained=False)
                 ckpt = torch.load(model_path, map_location=self.device, weights_only=False)
                 state_dict = ckpt.get("model_state_dict", ckpt)
                 self.model.load_state_dict(state_dict)
                 self.model.to(self.device)
                 self.model.eval()
 
-                self.transform = transforms.Compose([
-                    transforms.Resize((224, 224)),
-                    transforms.ToTensor(),
-                    transforms.Normalize(
-                        mean=[0.485, 0.456, 0.406],
-                        std =[0.229, 0.224, 0.225],
-                    ),
-                ])
+                self.transform = inference_transform()
                 logger.info("ML model loaded successfully (device=%s).", self.device)
             else:
                 logger.warning(

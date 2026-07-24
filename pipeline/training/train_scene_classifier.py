@@ -10,17 +10,22 @@ from PIL import Image
 from tqdm import tqdm
 import numpy as np
 import config
+from pipeline.classifiers.scene_model import (
+    IMAGENET_MEAN,
+    IMAGENET_STD,
+    build_scene_model,
+    load_label_order,
+    save_checkpoint,
+)
 from utils.logger import setup_logger
 
 logger = setup_logger("train_scene_classifier")
 
-ALLOWED_LABELS = [
-    "testimonial",
-    "b-roll",
-    "audience_reaction",
-    "establishing_shot",
-    "other",
-]
+# Label order is read from the deployed encoder rather than hardcoded here.
+# It previously disagreed with inference (`0` meant "testimonial" when training
+# and "b-roll" when serving), which would relabel every prediction even when the
+# tensor shapes happened to line up.
+ALLOWED_LABELS = load_label_order("v2")
 LABEL_TO_IDX = {k: i for i, k in enumerate(ALLOWED_LABELS)}
 IDX_TO_LABEL = {i: k for k, i in LABEL_TO_IDX.items()}
 
@@ -81,27 +86,21 @@ class SceneDataset(Dataset):
 
 def build_model(num_classes: int, device: torch.device):
     """
-    ResNet-18 with ImageNet pretrained weights, partially frozen, and a
-    deeper classification head.
+    ResNet-18, ImageNet-pretrained, partially frozen.
+
+    The architecture itself comes from pipeline.classifiers.scene_model so that
+    what is trained here is exactly what ml_classifier loads. This used to build
+    a bare `Linear(512, num_classes)` while inference expected a Sequential head
+    with LayerNorm, so a newly trained checkpoint could not be loaded at all —
+    and the docstring described a third architecture that neither side built.
 
     Freezing strategy
     -----------------
-    - layer1, layer2, layer3  → frozen   (low-level features: edges, textures)
+    - layer1, layer2, layer3  → frozen    (low-level features: edges, textures)
     - layer4                  → trainable (high-level features: shapes, patterns)
     - fc head                 → trainable (your scene classes)
-
-    This protects the expensive ImageNet knowledge while letting the top of
-    the network adapt to your specific scene semantics.
-
-    Head architecture
-    -----------------
-    ResNet-18 body (512-d)
-        → Linear(512 → 256) → BatchNorm → ReLU → Dropout(0.4)
-        → Linear(256 → num_classes)
-
-    The extra hidden layer + dropout reduces overfitting on small datasets.
     """
-    model = models.resnet18(pretrained=True)
+    model = build_scene_model(num_classes, pretrained=True)
 
     # ── Step 1: Freeze ALL layers ────────────────────────────────────────
     for param in model.parameters():
@@ -111,10 +110,9 @@ def build_model(num_classes: int, device: torch.device):
     for param in model.layer4.parameters():
         param.requires_grad = True
 
-    # ── Step 3: Replace the head with a deeper classifier ───────────────
-    in_features = model.fc.in_features   # 512 for ResNet-18
-    model.fc = nn.Linear(in_features, num_classes)
-    # New head is trainable by default (requires_grad=True)
+    # ── Step 3: The classification head is always trainable ─────────────
+    for param in model.fc.parameters():
+        param.requires_grad = True
 
     model = model.to(device)
 
@@ -132,13 +130,24 @@ def build_model(num_classes: int, device: torch.device):
 # ---------------------------------------------------------------------------
 
 def train_model(
-    data_dir   = "datasets/scene_type/v1",
+    data_dir   = "datasets/scene_type/train",
     epochs     = 20,
     batch_size = 32,
     head_lr    = 1e-3,   # learning rate for the new head
     body_lr    = 1e-4,   # lower LR for the unfrozen layer4 body
     patience   = 5,      # early-stopping patience (epochs without improvement)
+    version    = "v3",   # NEVER default to the deployed version
 ):
+    """Train a scene classifier.
+
+    `version` deliberately defaults to a new version rather than the deployed
+    one: writing straight to v2 would let a bad training run destroy the working
+    model with no way back. Train, evaluate the result against the held-out test
+    set, and only then promote by pointing SCENE_MODEL_VERSION at it.
+
+    `data_dir` is the training set, which must not contain any scene that
+    appears in the evaluation set — see scripts/export_training_set.py.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info("Using device: %s", device)
 
@@ -154,14 +163,14 @@ def train_model(
         transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.05),
         transforms.RandomGrayscale(p=0.05),                  # occasional grayscale
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
         transforms.RandomErasing(p=0.1, scale=(0.02, 0.1)), # randomly mask small regions
     ])
 
     val_transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
     ])
 
     # ── Datasets ──────────────────────────────────────────────────────────
@@ -221,14 +230,10 @@ def train_model(
     # Smoothly decays LR to near-zero over training; avoids sharp drops.
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
 
-    # ── Paths ─────────────────────────────────────────────────────────────
-    models_dir      = os.path.join(config.BASE_DIR, "pipeline", "models")
-    os.makedirs(models_dir, exist_ok=True)
-    best_model_path = os.path.join(models_dir, "scene_classifier.pth")
-
     # ── Training loop ─────────────────────────────────────────────────────
     best_val_acc    = 0.0
     epochs_no_improve = 0
+    best_model_path = None
 
     for epoch in range(epochs):
 
@@ -299,8 +304,21 @@ def train_model(
         if val_acc > best_val_acc:
             best_val_acc    = val_acc
             epochs_no_improve = 0
-            torch.save(model.state_dict(), best_model_path)
-            logger.info("✅ New best model saved — Val Acc: %.2f%%", best_val_acc)
+            # Written through save_checkpoint so the filename, wrapper format and
+            # label encoder all match what ml_classifier loads. Saving a raw
+            # state_dict to scene_classifier.pth, as this used to, produced a file
+            # inference never even looked at.
+            best_model_path, encoder_path = save_checkpoint(
+                model,
+                ALLOWED_LABELS,
+                version=version,
+                epoch=epoch + 1,
+                val_acc=val_acc,
+            )
+            logger.info(
+                "✅ New best model saved — Val Acc: %.2f%% → %s",
+                best_val_acc, best_model_path,
+            )
         else:
             epochs_no_improve += 1
             logger.info(
@@ -315,15 +333,15 @@ def train_model(
             )
             break
 
-    # ── Save label encoder ────────────────────────────────────────────────
-    encoder_path = os.path.join(models_dir, "label_encoder.json")
-    with open(encoder_path, "w") as f:
-        json.dump(IDX_TO_LABEL, f)
-
-    logger.info(
-        "Training complete. Best Val Acc: %.2f%%. Model saved to %s",
-        best_val_acc, best_model_path,
-    )
+    # The encoder is written alongside every checkpoint by save_checkpoint, so
+    # the two can never describe different label orders.
+    if best_model_path is None:
+        logger.warning("No epoch improved on the initial validation accuracy — nothing saved.")
+    else:
+        logger.info(
+            "Training complete. Best Val Acc: %.2f%%. Model saved to %s",
+            best_val_acc, best_model_path,
+        )
 
 
 if __name__ == "__main__":

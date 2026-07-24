@@ -62,10 +62,32 @@ def main():
                         help="how many clips to put in the labelling queue")
     parser.add_argument("--out", default="datasets",
                         help="output root (relative to repo root)")
+    parser.add_argument("--batch", default="v1",
+                        help="subdirectory name, e.g. 'v1' for the held-out "
+                             "evaluation set or 'batch2' for a training pass")
+    parser.add_argument("--force", action="store_true",
+                        help="allow overwriting a batch that already has labels")
     parser.add_argument("--seed", type=int, default=20260724)
+    parser.add_argument(
+        "--exclude-labelled", action="store_true",
+        help="skip scenes that already appear in an annotations.jsonl, so a "
+             "second labelling pass extends the dataset instead of repeating it",
+    )
     args = parser.parse_args()
 
     random.seed(args.seed)
+
+    already_labelled: set[str] = set()
+    if args.exclude_labelled:
+        for path in Path(config.BASE_DIR).glob("datasets/**/annotations.jsonl"):
+            for line in path.read_text(encoding="utf-8-sig").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                ref = json.loads(line).get("scene_ref")
+                if ref:
+                    already_labelled.add(ref)
+        print(f"excluding {len(already_labelled)} already-labelled scenes\n")
 
     client = MongoClient(config.MONGO_URI, serverSelectionTimeoutMS=5000)
     col = client[config.DB_NAME][config.COLLECTION]
@@ -80,6 +102,9 @@ def main():
         "faces": 1, "start_sec": 1, "end_sec": 1,
     }):
         total += 1
+        scene_ref = doc.get("_key") or f"{doc.get('video')}::{doc.get('scene_id')}"
+        if scene_ref in already_labelled:
+            continue
         thumbnail = doc.get("thumbnail")
         if not thumbnail or not Path(thumbnail).exists():
             skipped_no_local_frame += 1
@@ -90,7 +115,7 @@ def main():
             continue
 
         eligible.append({
-            "scene_ref": doc.get("_key") or f"{doc.get('video')}::{doc.get('scene_id')}",
+            "scene_ref": scene_ref,
             "video": doc.get("video"),
             "scene_id": doc.get("scene_id"),
             "image": Path(thumbnail).resolve().as_uri(),
@@ -129,8 +154,21 @@ def main():
     random.shuffle(selected)  # order must not encode the bucket
 
     out_root = Path(config.BASE_DIR) / args.out
-    emotion_dir = out_root / "emotion" / "v1"
-    scene_dir = out_root / "scene_type" / "v1"
+    emotion_dir = out_root / "emotion" / args.batch
+    scene_dir = out_root / "scene_type" / args.batch
+
+    # Refuse to clobber a batch that has already been labelled. Overwriting the
+    # candidates of a completed set destroys the predictions the scorers compare
+    # against, and silently invalidates the benchmark.
+    if not args.force:
+        for directory in (emotion_dir, scene_dir):
+            if (directory / "annotations.jsonl").exists():
+                raise SystemExit(
+                    f"{directory} already contains annotations.jsonl.\n"
+                    f"Overwriting it would invalidate that labelled set.\n"
+                    f"Use --batch <name> to write a new batch, or --force to override."
+                )
+
     for directory in (emotion_dir, scene_dir):
         directory.mkdir(parents=True, exist_ok=True)
 
@@ -146,7 +184,7 @@ def main():
     # Strip every underscore-prefixed key: those hold the model's predictions, and
     # showing them while labelling would measure agreement with the model.
     blind = [{k: v for k, v in c.items() if not k.startswith("_")} for c in selected]
-    page_path = out_root / "label_eval.html"
+    page_path = out_root / f"label_eval_{args.batch}.html"
     page_path.write_text(render_page(json.dumps({
         "candidates": blind,
         "emotion_options": EMOTION_OPTIONS,

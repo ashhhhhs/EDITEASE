@@ -15,10 +15,10 @@ from pathlib import Path
 
 import config
 
-# downloaded name -> destination, and the key every record must contain
+# downloaded name -> destination template, and the key every record must contain
 TRANSFERS = [
-    ("editease-emotion-labels.jsonl", "datasets/emotion/v1/annotations.jsonl", "human_emotion"),
-    ("editease-scene-type-labels.jsonl", "datasets/scene_type/v1/annotations.jsonl", "label"),
+    ("editease-emotion-labels.jsonl", "datasets/emotion/{batch}/annotations.jsonl", "human_emotion"),
+    ("editease-scene-type-labels.jsonl", "datasets/scene_type/{batch}/annotations.jsonl", "label"),
 ]
 
 
@@ -57,6 +57,11 @@ def main():
         default=str(Path.home() / "Downloads"),
         help="folder the browser saved the files into",
     )
+    parser.add_argument(
+        "--batch", default="v1",
+        help="which batch these labels belong to; must match the --batch used "
+             "when the labelling page was generated",
+    )
     args = parser.parse_args()
 
     downloads = Path(args.downloads)
@@ -64,7 +69,8 @@ def main():
         raise SystemExit(f"Downloads folder not found: {downloads}")
 
     moved = 0
-    for filename, destination, required_key in TRANSFERS:
+    for filename, destination_template, required_key in TRANSFERS:
+        destination = destination_template.format(batch=args.batch)
         source = downloads / filename
         if not source.exists():
             print(f"  skip    {filename} — not in {downloads}")

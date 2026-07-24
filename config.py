@@ -102,6 +102,11 @@ AUDIENCE_REACTION_MIN_FACES = int(os.getenv("AUDIENCE_REACTION_MIN_FACES", "3"))
 # 2.3s per frame against opencv's 0.2s, which is the price of the correctness.
 EMOTION_DETECTOR_BACKEND = os.getenv("EMOTION_DETECTOR_BACKEND", "retinaface")
 
+# Which trained scene-classifier version the pipeline serves. Training writes a
+# new version rather than overwriting this one, so promoting a retrained model
+# is a deliberate switch made after evaluating it, not a side effect of training.
+SCENE_MODEL_VERSION = os.getenv("SCENE_MODEL_VERSION", "v2")
+
 # ---------------------------------------------------------------------------
 # Cloudinary Settings
 # ---------------------------------------------------------------------------
