@@ -22,7 +22,7 @@ from pathlib import Path
 from pymongo import MongoClient
 
 import config
-from scripts.export_emotion_eval_set import LABEL_SCHEME, bucket_for
+from scripts.eval_labels import EMOTION_SCHEME as LABEL_SCHEME, emotion_bucket as bucket_for
 
 
 def load_annotations(path: Path) -> dict:

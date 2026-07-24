@@ -147,12 +147,17 @@ class MLClassifier(BaseClassifier):
         start_sec: float,
         end_sec: float,
         thumbnail_path: str,
+        features: dict | None = None,
+        raw_signals: dict | None = None,
     ) -> tuple[str, float, dict]:
 
         # ── No model available ──────────────────────────────────────────
         if self.model is None or not thumbnail_path or not os.path.exists(thumbnail_path):
             logger.debug("ML model unavailable — falling back to RuleBasedClassifier.")
-            label, conf, debug = self.fallback.classify(video_path, start_sec, end_sec, thumbnail_path)
+            label, conf, debug = self.fallback.classify(
+                video_path, start_sec, end_sec, thumbnail_path,
+                features=features, raw_signals=raw_signals,
+            )
             debug["classifier_used"] = "rule_based_no_model"
             return label, conf, debug
 
@@ -165,7 +170,8 @@ class MLClassifier(BaseClassifier):
             # prediction that maps to a class we no longer support.
             if scene_label in RETIRED_LABELS:
                 rb_label, rb_conf, rb_debug = self.fallback.classify(
-                    video_path, start_sec, end_sec, thumbnail_path
+                    video_path, start_sec, end_sec, thumbnail_path,
+                    features=features, raw_signals=raw_signals,
                 )
                 rb_debug["classifier_used"] = "rule_based_retired_label"
                 rb_debug["ml_label"]        = scene_label
@@ -181,7 +187,8 @@ class MLClassifier(BaseClassifier):
 
             if ml_conf < threshold:
                 rb_label, rb_conf, rb_debug = self.fallback.classify(
-                    video_path, start_sec, end_sec, thumbnail_path
+                    video_path, start_sec, end_sec, thumbnail_path,
+                    features=features, raw_signals=raw_signals,
                 )
                 rb_debug["classifier_used"] = "rule_based_low_conf_fallback"
                 rb_debug["ml_label"]        = scene_label
@@ -200,10 +207,24 @@ class MLClassifier(BaseClassifier):
                 "ml_threshold"    : threshold,
                 "all_class_probs" : ml_debug["all_class_probs"],
             }
+            # Carry the scene's feature vector even though the rule-based path did
+            # not run. Without this the retraining fields stay empty for exactly
+            # the scenes the model is most confident about, so a later human
+            # correction on one of them contributes nothing to recalibration.
+            if features:
+                debug["normalised_features"] = {k: round(float(v), 4) for k, v in features.items()}
+                debug["feature_vector_for_training"] = {
+                    k: round(float(v), 6) for k, v in features.items()
+                }
+            if raw_signals:
+                debug["raw_signals"] = raw_signals
             return scene_label, ml_conf, debug
 
         except Exception as exc:
             logger.error("Inference error: %s", exc)
-            label, conf, debug = self.fallback.classify(video_path, start_sec, end_sec, thumbnail_path)
+            label, conf, debug = self.fallback.classify(
+                video_path, start_sec, end_sec, thumbnail_path,
+                features=features, raw_signals=raw_signals,
+            )
             debug["classifier_used"] = "rule_based_error_fallback"
             return label, conf, debug

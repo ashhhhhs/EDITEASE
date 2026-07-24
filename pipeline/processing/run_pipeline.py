@@ -8,7 +8,7 @@ import numpy as np
 import config
 from database.ingest_to_mongo import upsert_scene_docs
 from pipeline.classifiers.rule_based_classifier import RuleBasedClassifier
-from pipeline.processing.scene_type_detect import detect_faces_info
+from pipeline.processing.scene_type_detect import compute_scene_features, detect_faces_info
 from pipeline.processing.detect_scenes import find_scenes
 from pipeline.processing.emotion_detect import detect_emotion
 from services import cloudinary_service
@@ -582,12 +582,23 @@ def process_video(
             else:
                 progress_callback(f"Scene {idx}/{len(scenes)}: No faces detected. Classifying scene type...")
 
+        # ── Scene feature vector ───────────────────────────────────────
+        # Computed once per scene here, not inside whichever classifier happens to
+        # win. Two reasons: every scene then carries a vector for retraining (a
+        # high-confidence ML scene used to record nothing), and the fusion path
+        # below reuses it instead of re-reading the thumbnail and re-sampling motion.
+        scene_features, scene_raw_signals = compute_scene_features(
+            video_path, start, end, thumb_path,
+        )
+
         # ── Classification ─────────────────────────────────────────────
         scene_label, scene_conf, scene_debug = scene_classifier.classify(
             video_path=video_path,
             start_sec=start,
             end_sec=end,
             thumbnail_path=thumb_path,
+            features=scene_features,
+            raw_signals=scene_raw_signals,
         )
         log_pipeline_checkpoint(
             "ml_classification",
@@ -630,6 +641,7 @@ def process_video(
             # Medium confidence — run weighted fusion with rule-based.
             rb_label, rb_conf, rb_debug = RuleBasedClassifier().classify(
                 video_path, start, end, thumb_path,
+                features=scene_features, raw_signals=scene_raw_signals,
             )
             scene_label, scene_conf, uncertain, action = _fuse_predictions(
                 scene_label, scene_conf, rb_label, rb_conf,
@@ -688,7 +700,12 @@ def process_video(
             #   this scene; used by retrain_profiles.py to update Gaussian mu/sigma.
             # used_for_training: set to True after this scene is consumed by retraining.
             "human_label"               : None,
-            "feature_vector_for_training": scene_debug.get("normalised_features", {}),
+            # Taken from scene_features directly, not from scene_debug. Reading it
+            # out of the debug dict silently produced {} whenever the ML model won,
+            # so the scenes most likely to be corrected recorded no features at all.
+            "feature_vector_for_training": {
+                k: round(float(v), 6) for k, v in scene_features.items()
+            },
             "used_for_training"         : False,
         }))
 

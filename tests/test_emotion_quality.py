@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 import config
-from scripts.export_emotion_eval_set import LABEL_SCHEME, bucket_for
+from scripts.eval_labels import EMOTION_SCHEME as LABEL_SCHEME, emotion_bucket as bucket_for
 
 DATASET_DIR = Path(config.BASE_DIR) / "datasets" / "emotion" / "v1"
 
@@ -37,7 +37,7 @@ def _load_pairs():
         )
 
     predictions = {
-        c["scene_ref"]: c.get("_prediction")
+        c["scene_ref"]: c.get("_emotion_prediction")
         for c in json.loads(candidates.read_text(encoding="utf-8"))["candidates"]
     }
 

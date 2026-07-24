@@ -40,17 +40,76 @@ def _write_synthetic_video(path: Path, fps: int = 10, seconds: int = 2) -> None:
     writer.release()
 
 
+EXPECTED_FEATURE_KEYS = {
+    "face_presence", "face_dominance", "face_count_norm", "face_aspect_ratio",
+    "motion_mean", "motion_peak", "motion_burst", "motion_consistency",
+    "edge_density", "sharpness", "text_density", "color_variance",
+    "color_temperature",
+}
+
+
+def _assert_complete_feature_vector(vector):
+    """Every scene must record a full, normalised feature vector for retraining."""
+    assert vector, "feature_vector_for_training is empty — retraining cannot accumulate data"
+    assert set(vector) == EXPECTED_FEATURE_KEYS, (
+        f"feature vector keys differ: missing={EXPECTED_FEATURE_KEYS - set(vector)}, "
+        f"unexpected={set(vector) - EXPECTED_FEATURE_KEYS}"
+    )
+    for key, value in vector.items():
+        assert isinstance(value, (int, float)), f"{key} is not numeric: {value!r}"
+        assert 0.0 <= float(value) <= 1.0, f"{key}={value} is outside the normalised range"
+
+
+def test_ml_classifier_records_features_when_it_wins(tmp_path, monkeypatch):
+    """A confident ML prediction must still carry the scene's feature vector.
+
+    This is the regression guard for the original bug: ml_classifier returned a
+    debug dict with no features, so feature_vector_for_training was {} for every
+    scene the model was sure about — precisely the scenes a reviewer might later
+    correct and feed back into retraining.
+    """
+    from pipeline.classifiers.ml_classifier import MLClassifier
+
+    thumb = tmp_path / "thumb.jpg"
+    thumb.write_bytes(b"not a real jpeg, only existence is checked")
+
+    # Bypass __init__ so the 45 MB checkpoint is never loaded.
+    classifier = object.__new__(MLClassifier)
+    classifier.model = object()      # non-None routes classify() down the ML path
+    classifier.fallback = None       # must not be reached
+    monkeypatch.setattr(
+        MLClassifier,
+        "predict_thumbnail",
+        lambda self, path: ("testimonial", 0.97, {"all_class_probs": {"testimonial": 0.97}}),
+    )
+
+    features = {key: 0.5 for key in EXPECTED_FEATURE_KEYS}
+    label, conf, debug = classifier.classify(
+        "video.mp4", 0.0, 1.0, str(thumb),
+        features=features,
+        raw_signals={"face_count": 1},
+    )
+
+    assert label == "testimonial"
+    assert debug["classifier_used"] == "ml_pytorch"
+    _assert_complete_feature_vector(debug["feature_vector_for_training"])
+    _assert_complete_feature_vector(debug["normalised_features"])
+    assert debug["raw_signals"] == {"face_count": 1}
+
+
 def _patch_pipeline_dependencies(monkeypatch, upsert_fn=None):
     class FakeSceneClassifier:
         def __init__(self):
             self.calls = []
 
-        def classify(self, video_path, start_sec, end_sec, thumbnail_path):
+        def classify(self, video_path, start_sec, end_sec, thumbnail_path,
+                     features=None, raw_signals=None):
             self.calls.append({
                 "video_path": video_path,
                 "start_sec": start_sec,
                 "end_sec": end_sec,
                 "thumbnail_path": thumbnail_path,
+                "features": features,
             })
             return (
                 "testimonial",
@@ -64,7 +123,8 @@ def _patch_pipeline_dependencies(monkeypatch, upsert_fn=None):
     class FakeRuleBasedClassifier:
         calls = []
 
-        def classify(self, video_path, start_sec, end_sec, thumbnail_path):
+        def classify(self, video_path, start_sec, end_sec, thumbnail_path,
+                     features=None, raw_signals=None):
             self.calls.append((video_path, start_sec, end_sec, thumbnail_path))
             return "testimonial", 0.91, {"classifier_used": "rule_based_test"}
 
@@ -144,6 +204,11 @@ def test_process_video_traces_raw_video_through_storage(tmp_path, monkeypatch, c
     assert len(fake_rule_classifier.calls) == 2
     assert progress_messages
 
+    # run_pipeline computes the vector once and hands it to the classifier, so the
+    # fusion path does not re-read the thumbnail or re-sample motion.
+    for call in fake_classifier.calls:
+        _assert_complete_feature_vector(call["features"])
+
     for expected_id, doc in enumerate(scene_docs, start=1):
         assert doc["scene_id"] == expected_id
         assert doc["video"] == "raw_pipeline"
@@ -156,7 +221,11 @@ def test_process_video_traces_raw_video_through_storage(tmp_path, monkeypatch, c
         assert doc["uncertain"] is False
         assert doc["faces"]["face_present_any"] is False
         assert len(doc["emotion_timeline"]) == 2
-        assert doc["feature_vector_for_training"] == {"motion_mean": 0.25}
+        # The feature vector is computed by the pipeline itself, so it is complete
+        # even though the fake classifier reports no features at all. Previously it
+        # was read out of the classifier's debug dict, which meant a confident ML
+        # prediction recorded {} and contributed nothing to retraining.
+        _assert_complete_feature_vector(doc["feature_vector_for_training"])
         assert doc["scene_debug"]["agent_action"] == "auto_organized_agreed"
         assert doc["scene_debug"]["rb_label"] == "testimonial"
 
@@ -197,12 +266,14 @@ def test_process_video_escalates_audience_reaction_without_faces(tmp_path, monke
         upsert_fn=fake_upsert,
     )
 
-    def classify_as_audience(video_path, start_sec, end_sec, thumbnail_path):
+    def classify_as_audience(video_path, start_sec, end_sec, thumbnail_path,
+                             features=None, raw_signals=None):
         fake_classifier.calls.append({
             "video_path": video_path,
             "start_sec": start_sec,
             "end_sec": end_sec,
             "thumbnail_path": thumbnail_path,
+            "features": features,
         })
         return (
             "audience_reaction",
