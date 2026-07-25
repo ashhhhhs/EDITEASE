@@ -507,3 +507,93 @@ Worth stating plainly, because it's the context for everything above:
   to `audit_trail` and `review_history` — the accountability story is stronger than the
   authorization story.
 - **`.env` is correctly gitignored and untracked**, and the `.gitignore` is unusually thorough.
+
+---
+
+## 8. Remediation status — 2026-07-25
+
+Verified against the working tree on branch `improve/scene-type-retraining`, not inferred from
+commit messages. Sections 1–7 above are preserved as the original point-in-time record;
+**this section is authoritative for current status.**
+
+**Verified by execution on 2026-07-25:** `pytest -q` → **100 passed, 1 skipped** (was 68/3 when
+§1 was written). `npm run lint` → 25 errors, 9 warnings. OpenCV 4.13.0 reports
+`FFMPEG: YES (prebuilt binaries)`, avcodec 58.134.100.
+
+### Fixed (17)
+
+| Finding | Fix |
+|---|---|
+| S1 Arbitrary file write via filename | `secure_filename` + path confinement in `_resolve_upload_path`, `media.py:18` |
+| S2 No upload size or type limit | `MAX_CONTENT_LENGTH = config.MAX_UPLOAD_BYTES` (2 GiB), `api_server.py:20` |
+| S4 Wide-open CORS | `CORS(app, origins=config.CORS_ORIGINS, supports_credentials=True)`, `api_server.py:21` |
+| S5 Debug mode defaults on | `API_DEBUG` now defaults to `False`, `config.py:27` |
+| S6 No rate limiting on login | `login_attempts` collection with TTL index and per-email throttle, `auth_service.py:40-84` |
+| S7 `/open_folder` runs `os.startfile` | endpoint removed |
+| S8 Unused endpoints live | `/upload`, `/export`, `/export_batch`, `/update_scene`, `/video_clip` removed; `export_service.py` deleted |
+| A1 Admin scoping contradiction | real `is_admin` threaded through, `media.py:160-168` |
+| A2 Ownership checks without admin bypass | `media.py:186`, `:207`, `:247` all carry the bypass |
+| A4 `/export` not ownership-scoped | moot — endpoints removed |
+| B1 `check_ffmpeg` fails on PATH ffmpeg | `shutil.which` fallback, `health_check.py:70` |
+| B3 `ffprobe` ignores `FFMPEG_PATH` | `_ffprobe_path()`, `celery_worker.py:60-75` |
+| B4 Whole video read for hashing | chunked 1 MiB read, `celery_worker.py:246-248` |
+| P1 `MongoClient` per call | cached `_get_client()` singletons |
+| P2 Haar cascade reloaded per frame | `_FACE_CASCADE` hoisted to import time, `run_pipeline.py:33` |
+| P4 Up to 200 regexes in one `$or` | indexed `safe_name` `$in` query, `organized_video_service.py:52` |
+| Q3 Hardcoded API base URL | `import.meta.env.VITE_API_BASE` fallback, `frontend/src/config.js:3` |
+
+Q1 is half done: `EditorView.jsx` deleted, `VideoAssignments.jsx` still dead.
+
+Additionally, `FFMPEG_PATH` no longer defaults to a machine-specific absolute path, and the
+health check now treats ffmpeg as the optional dependency it actually is — the scene pipeline
+decodes through OpenCV, which bundles its own ffmpeg, and the only `ffprobe` consumer already
+swallows its exceptions.
+
+### Still open (9)
+
+| Finding | Location | Severity |
+|---|---|---|
+| `/thumbnail/<clip_id>` unauthenticated | `api/blueprints/media.py:96` | Medium |
+| Session tokens never expire, stored plaintext | `services/auth_service.py` | Medium |
+| `GET /search` performs writes | `services/clip_service.py:378` | Low |
+| Duplicate IDs miscounted in batch validation | `services/organized_video_service.py:347` | Low |
+| N+1 query in processing logs | `services/organized_video_service.py:411` | Medium |
+| `datetime.utcnow()` deprecated | 9 files | Low |
+| `VideoAssignments.jsx` dead (336 lines) | `frontend/src/VideoAssignments.jsx` | Low |
+| 25 ESLint errors, 9 warnings | frontend | Low |
+| `pyproject.toml` placeholder metadata | `pyproject.toml:10-11` | Low |
+
+These were deliberately deferred past the 2026-07-26 demonstration: seven are invisible during a
+live demo, and the two that are not (`GET /search` writes, duplicate-ID miscount) sit in files
+excluded from pre-demo changes. See
+`docs/superpowers/specs/2026-07-25-demo-readiness-design.md` §10.
+
+### New findings from the 2026-07-25 verification pass
+
+Surfaced by running the real stack rather than reading the code. Neither is in §5.
+
+#### N1 — 73% of scene documents are invisible to every role · **Medium**
+
+**353 of 485 documents in the `scenes` collection have `uploaded_by: None`.**
+`clip_service._apply_review_scope` scopes editors to
+`uploaded_by | assigned_to | review_requested_by | review_resolved_by`, and admins to
+`uploaded_by | review_request_status ∈ {open, assigned} | …`. A document owned by nobody matches
+none of those clauses for any role, so those clips cannot be reached through the review queue at
+all.
+
+The likely origin is `process_video` being called directly — its `user_id` parameter defaults to
+`None`, and only the `auto_organize_task` path threads a real uploader through. Any clip
+produced by a direct pipeline invocation is orphaned on creation.
+
+**Fix direction:** either backfill ownership on existing orphans, or make the admin scope include
+unowned documents so they remain reachable. Worth deciding deliberately rather than by default.
+
+#### P7 — Failed emotion detection costs ~7–8s per sample · **Medium**
+
+On scenes with no detectable face, the Haar pre-gate passes but DeepFace then raises
+"Face could not be detected", and each failed sample takes roughly 7–8 seconds. One 7-scene,
+30-second video spent ~30s of its 126s total on a single scene's four failed samples.
+
+Not an error state — the pipeline handles it correctly and records `dominant_emotion: null` — but
+it dominates wall-clock time on face-free footage. **Fix direction:** trust the Haar gate's
+negative result, or lower DeepFace's retry cost, before adding more sampling.
