@@ -63,10 +63,11 @@ CELERY_BROKER_URL    = os.getenv("CELERY_BROKER_URL",    "redis://localhost:6379
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
 
 # External tools
-FFMPEG_PATH = os.getenv(
-    "FFMPEG_PATH",
-    r"D:\ffmpeg-2026-02-04-git-627da1111c-full_build\bin\ffmpeg.exe",
-)
+# Bare command name by default, resolved via PATH — see SETUP.md. Set
+# FFMPEG_PATH to an absolute path only for a non-PATH install. Note ffmpeg is
+# optional: the scene pipeline decodes via OpenCV (which bundles its own
+# ffmpeg), and only edited-video metadata detection (ffprobe) reads this value.
+FFMPEG_PATH = os.getenv("FFMPEG_PATH", "ffmpeg")
 
 # ---------------------------------------------------------------------------
 # Pipeline settings

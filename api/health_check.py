@@ -69,7 +69,9 @@ def check_ffmpeg():
     if not os.path.exists(ffmpeg_cmd):
         resolved = shutil.which(ffmpeg_cmd)
         if not resolved:
-            print(f"❌ FFmpeg not found at {ffmpeg_cmd} and not on PATH")
+            print(f"⚠️  FFmpeg not found at {ffmpeg_cmd} and not on PATH")
+            print("   Optional: the scene pipeline decodes via OpenCV and is unaffected.")
+            print("   Degraded: edited-video metadata detection will always return False.")
             return False
         ffmpeg_cmd = resolved
 
@@ -85,10 +87,10 @@ def check_ffmpeg():
             print(f"✅ FFmpeg found: {version_line}")
             return True
         else:
-            print("❌ FFmpeg execution failed.")
+            print("⚠️  FFmpeg execution failed (optional — pipeline unaffected).")
             return False
     except Exception as e:
-        print(f"❌ Error running FFmpeg: {e}")
+        print(f"⚠️  Error running FFmpeg (optional — pipeline unaffected): {e}")
         return False
 
 
@@ -103,8 +105,15 @@ if __name__ == "__main__":
     ffmpeg_ok = check_ffmpeg()
     
     print(f"\n{'='*40}")
-    if db_ok and api_ok and redis_ok and ffmpeg_ok:
-        print("🎉 All systems functioning normally!")
+    # ffmpeg is deliberately excluded from the fatal set: the scene pipeline
+    # decodes via OpenCV, and the only ffprobe consumer already swallows its
+    # exceptions. Treating an optional dependency as a hard failure
+    # misrepresented the system state.
+    if db_ok and api_ok and redis_ok:
+        if not ffmpeg_ok:
+            print("⚠️  All required systems OK; optional FFmpeg unavailable.")
+        else:
+            print("🎉 All systems functioning normally!")
         sys.exit(0)
     else:
         print("⚠️ Some systems are failing. Check the logs above.")
