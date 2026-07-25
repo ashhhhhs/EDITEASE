@@ -1194,3 +1194,69 @@ def test_admin_bulk_mark_reviewed_auto_resolves_open_requests(monkeypatch):
     assert fake_col.calls[1][1]["$set"]["review_resolved_by"] == "admin-1"
     assert fake_col.calls[1][1]["$set"]["review_resolution_note"] == "Marked reviewed by admin."
     assert fake_col.calls[1][1]["$set"]["review_resolution_seen_by_requester"] is False
+
+
+# ---------------------------------------------------------------------------
+# Batched frame decode
+# ---------------------------------------------------------------------------
+
+def test_emotion_sampling_uses_pre_decoded_frames(monkeypatch, tmp_path):
+    """When frames are supplied, the video is not reopened per sample."""
+    import numpy as np
+
+    samples = run_pipeline.emotion_sample_timestamps(0, 5)
+    frames = {ts: np.zeros((8, 8, 3), dtype=np.uint8) for _ratio, ts in samples}
+
+    def _fail(*_args, **_kwargs):
+        raise AssertionError("extract_frame must not run when frames are supplied")
+
+    monkeypatch.setattr(run_pipeline, "extract_frame", _fail)
+    monkeypatch.setattr(run_pipeline, "has_face", lambda *_args: True)
+    monkeypatch.setattr(
+        run_pipeline,
+        "detect_emotion",
+        lambda *_args, **_kwargs: ("happy", {"happy": 90.0, "sad": 10.0}, 90.0),
+    )
+
+    timeline, dominant, face_any, _ratio = run_pipeline.sample_emotions_over_scene(
+        "demo.mp4", 0, 5, str(tmp_path), 1, frames=frames,
+    )
+
+    assert dominant == "happy"
+    assert face_any is True
+    assert len(timeline) == len(samples)
+    # The emotion JPEGs are still written — export_dataset.py consumes them.
+    assert (tmp_path / "scene_001_emo_0.jpg").exists()
+
+
+def test_emotion_sampling_falls_back_to_per_frame_decode(monkeypatch, tmp_path):
+    """With no pre-decoded frames the original path still runs."""
+    calls = []
+    monkeypatch.setattr(
+        run_pipeline, "extract_frame", lambda *args: calls.append(args) or True,
+    )
+    monkeypatch.setattr(run_pipeline, "has_face", lambda *_args: True)
+    monkeypatch.setattr(
+        run_pipeline,
+        "detect_emotion",
+        lambda *_args, **_kwargs: ("happy", {"happy": 90.0, "sad": 10.0}, 90.0),
+    )
+
+    _timeline, dominant, _face_any, _ratio = run_pipeline.sample_emotions_over_scene(
+        "demo.mp4", 0, 5, str(tmp_path), 1,
+    )
+
+    assert dominant == "happy"
+    assert len(calls) == len(run_pipeline.emotion_sample_timestamps(0, 5))
+
+
+def test_emotion_sample_timestamps_stay_inside_the_scene():
+    """Timestamps must sit within the scene and avoid its exact edges."""
+    samples = run_pipeline.emotion_sample_timestamps(10.0, 20.0)
+
+    assert samples, "a scene must yield at least one sample"
+    for ratio, timestamp in samples:
+        assert 0.1 <= ratio <= 0.9
+        assert 10.0 < timestamp < 20.0
+    # Ascending, so the batched decoder only ever seeks forward.
+    assert [t for _r, t in samples] == sorted(t for _r, t in samples)

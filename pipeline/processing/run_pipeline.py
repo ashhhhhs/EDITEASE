@@ -1,5 +1,6 @@
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 import cv2
@@ -51,8 +52,13 @@ AUDIENCE_REACTION_MIN_FACES = config.AUDIENCE_REACTION_MIN_FACES
 # Face / emotion helpers
 # ---------------------------------------------------------------------------
 
-def has_face(img_path):
-    img = cv2.imread(img_path)
+def has_face(image):
+    """`image` is either a path or an already-decoded BGR frame.
+
+    The array form lets the scene loop reuse the frame it just decoded instead of
+    re-reading the JPEG it just wrote back off disk.
+    """
+    img = cv2.imread(image) if isinstance(image, str) else image
     if img is None:
         return False
     gray    = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -102,6 +108,15 @@ def log_pipeline_checkpoint(stage: str, video_name: str, status: str, **fields):
 # Frame extraction
 # ---------------------------------------------------------------------------
 
+def _downscale(frame):
+    """Cap width at 1280 — AI models and OpenCV hang on 4K/8K footage."""
+    height, width = frame.shape[:2]
+    if width > 1280:
+        scale = 1280 / width
+        frame = cv2.resize(frame, (1280, int(height * scale)), interpolation=cv2.INTER_AREA)
+    return frame
+
+
 def extract_frame(video_path, timestamp, out_path):
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -119,15 +134,43 @@ def extract_frame(video_path, timestamp, out_path):
     cap.release()
 
     if ret and frame is not None:
-        # Resize to max-width 1280 to prevent AI models and OpenCV hanging on 4K/8K footage
-        height, width = frame.shape[:2]
-        if width > 1280:
-            scale      = 1280 / width
-            frame      = cv2.resize(frame, (1280, int(height * scale)), interpolation=cv2.INTER_AREA)
-
-        cv2.imwrite(out_path, frame)
+        cv2.imwrite(out_path, _downscale(frame))
         return True
     return False
+
+
+def extract_frames_at(video_path, timestamps):
+    """Decode several timestamps from a single VideoCapture.
+
+    extract_frame() opens, seeks, reads and releases per frame, and the scene loop
+    needs a thumbnail plus every emotion sample out of the same file — one full
+    open/seek/decode cycle each. Seeking is ordered ascending so the decoder walks
+    forward through the file instead of jumping backwards between reads.
+
+    Returns {timestamp: BGR frame}, omitting any timestamp that could not be read.
+    """
+    frames: dict[float, np.ndarray] = {}
+    if not timestamps:
+        return frames
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return frames
+
+    fps   = cap.get(cv2.CAP_PROP_FPS)
+    total = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    if fps <= 0 or total <= 0:
+        cap.release()
+        return frames
+
+    for timestamp in sorted(set(timestamps)):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(timestamp * fps))
+        ret, frame = cap.read()
+        if ret and frame is not None:
+            frames[timestamp] = _downscale(frame)
+
+    cap.release()
+    return frames
 
 
 # ---------------------------------------------------------------------------
@@ -159,6 +202,18 @@ def _get_sample_count(duration_seconds: float) -> int:
     if duration_seconds < 30:
         return 8
     return 12   # cap — diminishing returns beyond this
+
+
+def emotion_sample_timestamps(start_sec: float, end_sec: float) -> list[tuple[float, float]]:
+    """The (ratio, timestamp) pairs sample_emotions_over_scene will read.
+
+    Exposed so the caller can batch-decode them alongside the scene thumbnail in a
+    single pass. Ratios keep away from the exact edges (0 / 1) to avoid black frames.
+    """
+    scene_duration = end_sec - start_sec
+    n_samples = _get_sample_count(scene_duration)
+    ratios = np.linspace(0.1, 0.9, n_samples).tolist()
+    return [(ratio, start_sec + scene_duration * ratio) for ratio in ratios]
 
 
 def _sample_weight(i: int, total: int) -> float:
@@ -237,7 +292,7 @@ def detect_emotion_shift(emotion_timeline):
     return result
 
 
-def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene_id):
+def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene_id, frames=None):
     """
     Temporal emotion sampling inside a scene.
     - Sample count adapts to scene duration.
@@ -246,31 +301,42 @@ def sample_emotions_over_scene(video_path, start_sec, end_sec, thumbs_dir, scene
     - Votes accumulate the full per-frame probability distribution, not just the argmax, so a
       weak win contributes proportionally less than a confident one.
     - Enforces: if face evidence is weak => dominant emotion None.
-    """
-    scene_duration = end_sec - start_sec
-    n_samples = _get_sample_count(scene_duration)
 
-    # Evenly spaced ratios; keep away from exact edges (0 / 1) to avoid black frames.
-    sample_ratios = np.linspace(0.1, 0.9, n_samples).tolist()
+    `frames` optionally supplies already-decoded frames keyed by timestamp (see
+    extract_frames_at), so the scene's frames are decoded in one pass rather than
+    reopening the video per sample. When it is None each frame is decoded here, as
+    before.
+    """
+    samples   = emotion_sample_timestamps(start_sec, end_sec)
+    n_samples = len(samples)
 
     emotion_timeline  = []
     emotion_votes: dict[str, float] = {}
     face_hits         = 0
     total_samples     = 0
 
-    for i, ratio in enumerate(sample_ratios):
-        timestamp  = start_sec + scene_duration * ratio
+    for i, (ratio, timestamp) in enumerate(samples):
         thumb_name = f"scene_{scene_id:03d}_emo_{i}.jpg"
         thumb_path = os.path.join(thumbs_dir, thumb_name)
 
-        if not extract_frame(video_path, timestamp, thumb_path):
+        frame = frames.get(timestamp) if frames else None
+        if frame is not None:
+            # These JPEGs are still written: export_dataset.py collects
+            # scene_<id>_emo_*.jpg into the training set.
+            cv2.imwrite(thumb_path, frame)
+            # Hand the Haar pre-filter the frame already in hand rather than
+            # making it read back the JPEG just written.
+            face_input = frame
+        elif extract_frame(video_path, timestamp, thumb_path):
+            face_input = thumb_path
+        else:
             continue
 
         total_samples += 1
         # Cheap Haar pre-filter. Deliberately permissive: its only job is to decide
         # whether the expensive verifier is worth running. It is not trusted on its
         # own — it reports faces on foliage and misses real ones in wide shots.
-        if not has_face(thumb_path):
+        if not has_face(face_input):
             emotion_timeline.append({
                 "time_ratio"   : round(ratio, 3),
                 "face_detected": False,
@@ -433,6 +499,48 @@ def _apply_audience_reaction_face_gate(
 
 
 # ---------------------------------------------------------------------------
+# Deferred Cloudinary uploads
+# ---------------------------------------------------------------------------
+# Uploads are submitted to a pool and resolved after the scene loop, so network
+# waits overlap with local decode/detection work instead of blocking it. The
+# checkpoints and the local-path fallback below are the same ones the sequential
+# version emitted — only the moment they run has moved.
+
+def _resolve_video_upload(future, video_name, progress_callback):
+    try:
+        cloudinary_video_url = future.result()
+    except Exception as exc:
+        logger.error("Cloudinary video upload raised for %s: %s", video_name, exc)
+        cloudinary_video_url = None
+
+    if cloudinary_video_url:
+        logger.info("Video uploaded to Cloudinary: %s", cloudinary_video_url)
+        log_pipeline_checkpoint(
+            "cloud_upload", video_name, "completed", cloudinary_url=cloudinary_video_url,
+        )
+        if progress_callback:
+            progress_callback("Cloud backup complete.")
+    else:
+        logger.warning(
+            "Cloudinary upload failed for %s — continuing with local path.", video_name,
+        )
+        log_pipeline_checkpoint("cloud_upload", video_name, "fallback_local")
+        if progress_callback:
+            progress_callback("Backup failed. Continuing with local analysis.")
+    return cloudinary_video_url
+
+
+def _resolve_thumbnail_upload(future, video_name, scene_id):
+    try:
+        return future.result()
+    except Exception as exc:
+        logger.warning(
+            "Thumbnail upload failed for %s scene %s: %s", video_name, scene_id, exc,
+        )
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
 
@@ -443,6 +551,35 @@ def process_video(
     file_hash: str | None = None,
     user_id: str | None = None,
     progress_callback=None,
+):
+    """Run the pipeline, owning the upload pool for the duration of the run.
+
+    The pool is scoped here so `with` joins every in-flight upload on the way out,
+    error paths included. Callers that need the uploaded asset — auto_organize_task
+    moves it straight after — can rely on this having returned.
+    """
+    with ThreadPoolExecutor(
+        max_workers=config.UPLOAD_WORKERS, thread_name_prefix="ee-upload",
+    ) as upload_pool:
+        return _process_video(
+            video_path,
+            base_dir,
+            threshold=threshold,
+            file_hash=file_hash,
+            user_id=user_id,
+            progress_callback=progress_callback,
+            upload_pool=upload_pool,
+        )
+
+
+def _process_video(
+    video_path,
+    base_dir,
+    threshold=config.SCENE_DETECT_THRESHOLD,
+    file_hash: str | None = None,
+    user_id: str | None = None,
+    progress_callback=None,
+    upload_pool=None,
 ):
     video_name = os.path.splitext(os.path.basename(video_path))[0]
     logger.info("Processing video: %s", video_name)
@@ -474,26 +611,13 @@ def process_video(
         "started",
         public_id=cloudinary_public_id,
     )
-    cloudinary_video_url = cloudinary_service.upload_video(
-        video_path, public_id=cloudinary_public_id,
+    # Uploading the whole file is a network wait; scene detection below reads the
+    # local copy and needs no network at all. Start the upload and get on with the
+    # detection instead of standing still for it. Resolved after the scene loop.
+    video_upload_future = upload_pool.submit(
+        cloudinary_service.upload_video, video_path, public_id=cloudinary_public_id,
     )
-    if cloudinary_video_url:
-        logger.info("Video uploaded to Cloudinary: %s", cloudinary_video_url)
-        log_pipeline_checkpoint(
-            "cloud_upload",
-            video_name,
-            "completed",
-            cloudinary_url=cloudinary_video_url,
-        )
-        if progress_callback:
-            progress_callback("Cloud backup complete. Initiating cut detection...")
-    else:
-        logger.warning(
-            "Cloudinary upload failed for %s — continuing with local path.", video_name,
-        )
-        log_pipeline_checkpoint("cloud_upload", video_name, "fallback_local")
-        if progress_callback:
-            progress_callback("Backup failed. Proceeding with local cut detection...")
+    thumbnail_futures: dict[int, object] = {}
 
     logger.info("DEBUG: [STEP 2] Scene detection for %s", video_name)
     log_pipeline_checkpoint(
@@ -508,6 +632,8 @@ def process_video(
     if not scenes:
         logger.warning("No scenes detected for %s, skipping.", video_name)
         log_pipeline_checkpoint("scene_detection", video_name, "empty")
+        # Still resolve the upload so its outcome is logged before we bail out.
+        _resolve_video_upload(video_upload_future, video_name, None)
         if progress_callback:
             progress_callback("Finished scanning. No distinct scenes found.")
         return
@@ -538,10 +664,19 @@ def process_video(
             end_sec=round(end, 3),
         )
 
+        # ── Frame decode ───────────────────────────────────────────────
+        # The thumbnail and every emotion sample come out of one pass over the
+        # file, rather than reopening and re-seeking the video for each frame.
+        emotion_samples = emotion_sample_timestamps(start, end)
+        scene_frames = extract_frames_at(
+            video_path, [mid] + [timestamp for _ratio, timestamp in emotion_samples],
+        )
+
         # ── Thumbnail ──────────────────────────────────────────────────
         thumb_name = f"{video_name}_scene_{idx:03d}.jpg"
         thumb_path = os.path.join(thumbs_dir, thumb_name)
-        thumb_ok = extract_frame(video_path, mid, thumb_path)
+        mid_frame  = scene_frames.get(mid)
+        thumb_ok   = mid_frame is not None and bool(cv2.imwrite(thumb_path, mid_frame))
         log_pipeline_checkpoint(
             "frame_extraction",
             video_name,
@@ -551,9 +686,9 @@ def process_video(
             thumbnail=thumb_path,
         )
 
-        thumbnail_url = None
         if thumb_ok:
-            thumbnail_url = cloudinary_service.upload_image(
+            thumbnail_futures[idx] = upload_pool.submit(
+                cloudinary_service.upload_image,
                 thumb_path,
                 public_id=f"editease/thumbnails/{video_name}_scene_{idx:03d}",
             )
@@ -568,6 +703,7 @@ def process_video(
             end_sec=end,
             thumbs_dir=thumbs_dir,
             scene_id=idx,
+            frames=scene_frames,
         )
         emotion_shift = detect_emotion_shift(emotion_timeline)
         log_pipeline_checkpoint(
@@ -678,13 +814,15 @@ def process_video(
             "video"              : video_name,
             "uploaded_by"         : user_id,
             "video_path"         : video_path,
-            "cloudinary_url"     : cloudinary_video_url,
+            # Both URLs are still uploading. They are filled in below, before the
+            # scene index is written and before anything reaches MongoDB.
+            "cloudinary_url"     : None,
             "scene_id"           : idx,
             "start_sec"          : round(start, 3),
             "end_sec"            : round(end, 3),
             "duration_sec"       : round(end - start, 3),
             "thumbnail"          : thumb_path,
-            "thumbnail_url"      : thumbnail_url,
+            "thumbnail_url"      : None,
             "scene_label_auto"   : scene_label,
             "dominant_emotion_auto" : dominant_overall,
             "scene_label"        : scene_label,
@@ -728,6 +866,23 @@ def process_video(
             emo_str    = f"Emotion: {dominant_overall}." if dominant_overall else "No prominent emotions."
             label_disp = scene_label.replace("_", " ").title()
             progress_callback(f"Classified Scene {idx}/{len(scenes)} as '{label_disp}'. {emo_str}")
+
+    # ── Resolve deferred uploads ───────────────────────────────────────
+    # Must happen before the JSON write and the MongoDB upsert, so neither ever
+    # sees a record with a pending URL.
+    if progress_callback:
+        progress_callback("Waiting for cloud uploads to finish...")
+
+    cloudinary_video_url = _resolve_video_upload(
+        video_upload_future, video_name, progress_callback,
+    )
+    for record in merged:
+        record["cloudinary_url"] = cloudinary_video_url
+        future = thumbnail_futures.get(record["scene_id"])
+        if future is not None:
+            record["thumbnail_url"] = _resolve_thumbnail_upload(
+                future, video_name, record["scene_id"],
+            )
 
     # ── Write scene index JSON ─────────────────────────────────────────
     out_dir  = os.path.join(base_dir, "scene_indexes")

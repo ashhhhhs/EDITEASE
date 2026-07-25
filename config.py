@@ -62,6 +62,12 @@ GOOGLE_CLIENT_ID    = os.environ.get("GOOGLE_CLIENT_ID",   "")
 CELERY_BROKER_URL    = os.getenv("CELERY_BROKER_URL",    "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
 
+# Concurrent Cloudinary uploads per video. The pipeline uploads the full video
+# plus one thumbnail per scene; these are network waits that do not depend on
+# each other, so they overlap with local decode and detection work. Set to 1 to
+# restore fully sequential uploads.
+UPLOAD_WORKERS = max(1, int(os.getenv("UPLOAD_WORKERS", "4")))
+
 # External tools
 # Bare command name by default, resolved via PATH — see SETUP.md. Set
 # FFMPEG_PATH to an absolute path only for a non-PATH install. Note ffmpeg is
@@ -99,8 +105,18 @@ AUDIENCE_REACTION_MIN_FACES = int(os.getenv("AUDIENCE_REACTION_MIN_FACES", "3"))
 # enforce_detection=True could never catch what the pre-filter got wrong. Measured
 # against 120 human-labelled clips, opencv reported faces on foliage (a hanging
 # flower pot scored "sad") and simultaneously missed real faces in wide shots.
-# retinaface and mtcnn both got every checked case right; retinaface costs about
-# 2.3s per frame against opencv's 0.2s, which is the price of the correctness.
+# retinaface and mtcnn both got every checked case right, so retinaface was chosen.
+#
+# Re-measured on this machine (RTX 3060 laptop, CPU-only torch build, 30 face-bearing
+# thumbnails): retinaface 7.9s/frame, mtcnn 1.1s/frame, opencv 0.13s/frame. The
+# earlier "2.3s per frame" note here understated retinaface by ~3.4x. This stage is
+# the pipeline's dominant cost by a wide margin — the ResNet classifier is 39ms and
+# the Haar pre-filter 58ms per frame.
+#
+# mtcnn is ~7x faster but is NOT a drop-in: on those same 30 frames it agreed with
+# retinaface on only 23 (77%) and found no face at all on 2 that retinaface resolved.
+# Switching is a quality decision, not a free speedup — validate against the
+# 120-clip labelled set before changing this default.
 EMOTION_DETECTOR_BACKEND = os.getenv("EMOTION_DETECTOR_BACKEND", "retinaface")
 
 # Which trained scene-classifier version the pipeline serves. Training writes a
