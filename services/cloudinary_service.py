@@ -2,6 +2,7 @@
 
 import cloudinary
 import cloudinary.uploader
+import cloudinary.utils
 
 import config
 from utils.logger import setup_logger
@@ -14,6 +15,21 @@ cloudinary.config(
     api_secret=config.CLOUDINARY_API_SECRET,
     secure=True,
 )
+
+# The SDK builds its HTTP pool with urllib3's default maxsize=1, so the
+# UPLOAD_WORKERS threads that upload thumbnails concurrently (see run_pipeline)
+# serialize on a single connection and re-handshake TLS each time — the
+# "Connection pool is full, discarding connection. Connection pool size: 1"
+# warning. Rebuild the pool with a maxsize matching the worker count so those
+# uploads run in parallel and reuse connections. Uses the SDK's own connector
+# factory so TCP keep-alive behaviour is preserved.
+try:
+    _pool_opts = {**cloudinary.CERT_KWARGS, "maxsize": max(config.UPLOAD_WORKERS, 8)}
+    cloudinary.uploader._http = cloudinary.utils.get_http_connector(
+        cloudinary.config(), _pool_opts,
+    )
+except Exception as exc:  # a pool tweak must never break uploads
+    logger.warning("Could not enlarge Cloudinary connection pool: %s", exc)
 
 
 def is_configured() -> bool:
