@@ -55,6 +55,12 @@ pip install --upgrade pip
 pip install -r requirements.txt
 pip install deepface tf-keras          # tf-keras is required by DeepFace on TF 2.21 (keras 3)
 
+# requirements.txt does not pin OpenCV, so Linux pulls opencv-python 5.0, whose
+# wheel drops cv2.CascadeClassifier (the pipeline needs it). Pin the same 4.x the
+# Windows side uses, headless build (no GUI/libGL deps — right for a worker):
+pip uninstall -y opencv-python opencv-contrib-python
+pip install 'opencv-python-headless==4.13.0.92'
+
 # TensorFlow with GPU (Linux only) — this is the 90% bottleneck, so it gets the GPU:
 pip install 'tensorflow[and-cuda]'                      # bundles matching CUDA 12 libs
 
