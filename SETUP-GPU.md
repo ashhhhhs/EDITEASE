@@ -53,7 +53,7 @@ python3 -m venv .venv-linux
 source .venv-linux/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
-pip install deepface
+pip install deepface tf-keras          # tf-keras is required by DeepFace on TF 2.21 (keras 3)
 
 # TensorFlow with GPU (Linux only) — this is the 90% bottleneck, so it gets the GPU:
 pip install 'tensorflow[and-cuda]'                      # bundles matching CUDA 12 libs
