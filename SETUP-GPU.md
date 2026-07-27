@@ -55,19 +55,30 @@ pip install --upgrade pip
 pip install -r requirements.txt
 pip install deepface
 
-# GPU builds (Linux only):
+# TensorFlow with GPU (Linux only) — this is the 90% bottleneck, so it gets the GPU:
 pip install 'tensorflow[and-cuda]'                      # bundles matching CUDA 12 libs
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+
+# torch is the ~39 ms scene classifier — negligible next to TF. Install the CPU
+# build: a GPU torch wheel drags in a DIFFERENT CUDA version that shadows TF's
+# libraries and breaks TF's GPU detection. CPU torch keeps the venv CUDA-12-clean.
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 ```
 
-### 4. Verify the GPU is visible to both stacks
+> **Why CPU torch?** Mixing a GPU torch (which may pull CUDA 13 libs) with
+> `tensorflow[and-cuda]` (CUDA 12) leaves two CUDA versions in one venv; TF then
+> can't load its libraries and reports no GPU. TF is the stage that matters, so we
+> keep it clean and let torch run on CPU.
+
+### 4. Verify the GPU is visible to TensorFlow
 ```bash
 python -c "import tensorflow as tf; print('TF GPUs:', tf.config.list_physical_devices('GPU'))"
-python -c "import torch; print('torch CUDA:', torch.cuda.is_available())"
 ```
 
-Both must report the GPU. The first pipeline run also re-downloads the DeepFace model weights
-into `~/.deepface` (needs internet once).
+This must print a non-empty list with `GPU:0`. **If it prints `[]`**, TF can't find
+its CUDA libraries — see *Troubleshooting* below. The launcher script
+(`run_worker_wsl.sh`) sets the required `LD_LIBRARY_PATH` automatically, so this only
+bites you when running `python` by hand. The first pipeline run also downloads the
+DeepFace model weights into `~/.deepface` (needs internet once).
 
 ---
 
@@ -118,3 +129,29 @@ launcher sets it), so the native-Windows worker is completely unaffected.
 stores don't matter to the Windows API. But if a Cloudinary upload *fails*, the worker records a
 `/mnt/...` local-path fallback that the Windows API can't resolve — that one asset renders broken
 until reprocessed. Cloudinary is the normal path, so this is a rare degradation.
+
+---
+
+## Troubleshooting
+
+**`pip install` fails with `externally-managed-environment`.** Your `.venv-linux` was created
+without its own pip (the `python3-venv` package wasn't installed yet), so `pip` fell back to the
+locked system one. Fix: `sudo apt install -y python3-venv`, then rebuild the venv —
+`rm -rf .venv-linux && python3 -m venv .venv-linux` — and re-activate. Confirm with
+`which pip` → it must point inside `.venv-linux`, not `/usr/bin/pip`.
+
+**`tf.config.list_physical_devices('GPU')` returns `[]`.** Two causes, both seen on this machine:
+- *TF can't find its CUDA libraries.* TF 2.21 does not auto-add the pip `nvidia/*/lib` dirs to the
+  loader path on WSL. `run_worker_wsl.sh` exports the correct `LD_LIBRARY_PATH` for you; when
+  testing by hand, set it first:
+  ```bash
+  NV="$PWD/.venv-linux/lib/python3.12/site-packages/nvidia"
+  export LD_LIBRARY_PATH="$(ls -d $NV/*/lib | tr '\n' ':')/usr/lib/wsl/lib"
+  ```
+- *Incomplete cuDNN install.* If an earlier `pip install` was interrupted, `nvidia-cudnn-cu12`
+  can be present but missing most of its `.so` files (check
+  `ls .venv-linux/lib/python3.12/site-packages/nvidia/cudnn/lib` — you should see ~10 files
+  including `libcudnn.so.9`). Fix: `pip install --force-reinstall --no-deps nvidia-cudnn-cu12`.
+
+**PyTorch shows the GPU but TensorFlow doesn't.** Expected here — torch runs on CPU by design (see
+step 3). Only TensorFlow needs the GPU.

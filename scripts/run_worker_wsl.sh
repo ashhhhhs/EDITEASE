@@ -36,6 +36,15 @@ export EE_WSL_PATHS=1
 # 6 GB VRAM is tight; let TensorFlow grow its allocation instead of grabbing all.
 export TF_FORCE_GPU_ALLOW_GROWTH=true
 
+# TensorFlow 2.21 does NOT auto-discover the pip-installed CUDA libraries on WSL,
+# so without this it silently falls back to CPU (tf.config.list_physical_devices
+# ("GPU") == []). Point the dynamic loader at the nvidia/*/lib dirs in the venv,
+# plus the WSL driver stub at /usr/lib/wsl/lib.
+NV_LIBS="$(python -c 'import os,glob,nvidia; b=os.path.dirname(nvidia.__file__); print(":".join(sorted(glob.glob(b+"/*/lib"))))' 2>/dev/null || true)"
+if [[ -n "$NV_LIBS" ]]; then
+  export LD_LIBRARY_PATH="$NV_LIBS:/usr/lib/wsl/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+
 # --- Networking (uncomment only if WSL2 mirrored networking is NOT enabled) ---
 # Without mirrored networking, localhost inside WSL does not reach the Windows
 # Redis/MongoDB. Point these at the Windows host IP instead:
