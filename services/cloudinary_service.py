@@ -1,5 +1,9 @@
 """Thin wrapper around the Cloudinary SDK for EDITEASE uploads."""
 
+import os
+import subprocess
+import tempfile
+
 import cloudinary
 import cloudinary.uploader
 import cloudinary.utils
@@ -40,6 +44,61 @@ def is_configured() -> bool:
     ])
 
 
+def _compress_video_for_upload(local_path: str) -> tuple[str, bool]:
+    """Return (path_to_upload, is_temp).
+
+    Large videos are transcoded to a smaller H.264 file before upload, so the
+    upload is faster and fits under Cloudinary's per-file limit. The encode
+    prefers the GPU (h264_nvenc) and falls back to CPU (libx264); on any failure,
+    or when the result is not smaller, the original path is returned unchanged.
+    When `is_temp` is True the caller must delete `path_to_upload` after use.
+    """
+    if not getattr(config, "CLOUDINARY_COMPRESS_ENABLED", False):
+        return local_path, False
+    try:
+        original_size = os.path.getsize(local_path)
+    except OSError:
+        return local_path, False
+    if original_size <= config.CLOUDINARY_COMPRESS_THRESHOLD_BYTES:
+        return local_path, False  # small enough already — don't waste an encode
+
+    cq = str(config.CLOUDINARY_COMPRESS_CQ)
+    fd, tmp = tempfile.mkstemp(suffix=".mp4", prefix="ee_compress_")
+    os.close(fd)
+
+    common_out = ["-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmp]
+    attempts = (
+        ("h264_nvenc", [config.FFMPEG_PATH, "-y", "-hide_banner", "-loglevel", "error",
+                        "-i", local_path, "-c:v", "h264_nvenc", "-cq", cq, "-preset", "p5",
+                        *common_out]),
+        ("libx264", [config.FFMPEG_PATH, "-y", "-hide_banner", "-loglevel", "error",
+                     "-i", local_path, "-c:v", "libx264", "-preset", "veryfast", "-crf", cq,
+                     *common_out]),
+    )
+    for label, cmd in attempts:
+        try:
+            subprocess.run(cmd, check=True, timeout=1800,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        except Exception as exc:
+            logger.warning("Video compression via %s failed: %s", label, exc)
+            continue
+        new_size = os.path.getsize(tmp) if os.path.exists(tmp) else 0
+        if 0 < new_size < original_size:
+            logger.info(
+                "Compressed video for upload via %s: %.1f MB -> %.1f MB",
+                label, original_size / 1024 ** 2, new_size / 1024 ** 2,
+            )
+            return tmp, True
+        logger.info("Compression via %s did not shrink the file — uploading original.", label)
+        break  # encoder ran but didn't help; larger encoder won't either
+
+    try:
+        os.remove(tmp)
+    except OSError:
+        pass
+    return local_path, False
+
+
 def _upload(local_path: str, resource_type: str, public_id: str | None = None) -> str | None:
     if not is_configured():
         logger.warning(
@@ -55,11 +114,20 @@ def _upload(local_path: str, resource_type: str, public_id: str | None = None) -
             opts["public_id"] = public_id
             
         if resource_type == "video":
-            # upload_large chunks the file, preventing SSLEOFError hangs on large files
-            result = cloudinary.uploader.upload_large(local_path, **opts)
+            # Compress large videos first, then upload_large (chunked, prevents
+            # SSLEOFError hangs). Temp compressed file is always cleaned up.
+            upload_path, is_temp = _compress_video_for_upload(local_path)
+            try:
+                result = cloudinary.uploader.upload_large(upload_path, **opts)
+            finally:
+                if is_temp:
+                    try:
+                        os.remove(upload_path)
+                    except OSError:
+                        pass
         else:
             result = cloudinary.uploader.upload(local_path, **opts)
-            
+
         url = result.get("secure_url") # type: ignore
         logger.info("Uploaded %s to Cloudinary: %s", resource_type, url)
         return url
@@ -115,10 +183,11 @@ def upload_video_returning_id(local_path: str, public_id: str) -> tuple[str, str
     if not is_configured():
         logger.warning("Cloudinary credentials not configured; skipping upload.")
         return None, None
+    upload_path, is_temp = _compress_video_for_upload(local_path)
     try:
         # upload_large chunks the file, preventing network hangs on large files
         result = cloudinary.uploader.upload_large(
-            local_path,
+            upload_path,
             resource_type="video",
             public_id=public_id,
         )
@@ -129,6 +198,12 @@ def upload_video_returning_id(local_path: str, public_id: str) -> tuple[str, str
     except Exception as exc:
         logger.error("Cloudinary upload_video_returning_id failed: %s", exc)
         return None, None
+    finally:
+        if is_temp:
+            try:
+                os.remove(upload_path)
+            except OSError:
+                pass
 
 
 def move_video_returning_id(old_public_id: str, new_public_id: str) -> tuple[str, str] | tuple[None, None]:

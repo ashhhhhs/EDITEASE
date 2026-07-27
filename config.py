@@ -68,6 +68,22 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:63
 # restore fully sequential uploads.
 UPLOAD_WORKERS = max(1, int(os.getenv("UPLOAD_WORKERS", "4")))
 
+# Pre-upload video compression. Videos larger than the threshold are transcoded
+# (H.264, visually near-lossless) before upload, so the upload is smaller/faster
+# and fits under Cloudinary's per-file limit. Smaller files skip encoding. The
+# compressor prefers GPU (h264_nvenc), falls back to CPU (libx264), then to the
+# original file — it can never block an upload. Requires ffmpeg on PATH; without
+# it the original is uploaded unchanged. Set CLOUDINARY_COMPRESS_ENABLED=False to
+# disable entirely.
+CLOUDINARY_COMPRESS_ENABLED = os.getenv("CLOUDINARY_COMPRESS_ENABLED", "True").lower() == "true"
+# Default threshold 80 MiB — safely under the common 100 MB free-tier limit.
+CLOUDINARY_COMPRESS_THRESHOLD_BYTES = int(
+    os.getenv("CLOUDINARY_COMPRESS_THRESHOLD_BYTES", str(80 * 1024 ** 2))
+)
+# Constant-quality level for the transcode (lower = better quality/larger). 23 is
+# a near-transparent default for both nvenc -cq and libx264 -crf.
+CLOUDINARY_COMPRESS_CQ = int(os.getenv("CLOUDINARY_COMPRESS_CQ", "23"))
+
 # External tools
 # Bare command name by default, resolved via PATH — see SETUP.md. Set
 # FFMPEG_PATH to an absolute path only for a non-PATH install. Note ffmpeg is

@@ -461,13 +461,22 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
     col.insert_one(doc)
     logger.info(f"Wrote organized_videos record for {video_name} ({dominant_label})")
 
-    # ── Step 8: Clean up local file ───────────────────────────────────────────
-    try:
-        if os.path.exists(video_path_str):
-            os.remove(video_path_str)
-            logger.info("Removed original video from local storage: %s", video_path_str)
-    except Exception as e:
-        logger.warning("Failed to remove original video %s: %s", video_path_str, e)
+    # ── Step 8: Clean up local file — only if it is safely in the cloud ───────
+    # Deleting unconditionally means a failed upload (e.g. a file over the
+    # Cloudinary size limit) destroys the only copy. Keep the local file when the
+    # cloud copy was not confirmed, so nothing is lost.
+    if cloudinary_url:
+        try:
+            if os.path.exists(video_path_str):
+                os.remove(video_path_str)
+                logger.info("Removed original video from local storage: %s", video_path_str)
+        except Exception as e:
+            logger.warning("Failed to remove original video %s: %s", video_path_str, e)
+    else:
+        logger.warning(
+            "Keeping local video %s — Cloudinary upload did not succeed; not deleting the only copy.",
+            video_path_str,
+        )
 
     _update_task(self.request.id, status="SUCCESS", progress_step="done", output_path=actual_pub_id)
     return {
