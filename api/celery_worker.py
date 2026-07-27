@@ -1,4 +1,5 @@
 import os
+import re
 from collections import Counter
 from celery import Celery
 from pymongo import MongoClient
@@ -8,6 +9,43 @@ import config
 from utils.logger import setup_logger
 
 logger = setup_logger("celery_worker")
+
+# ---------------------------------------------------------------------------
+# WSL2 path translation
+# ---------------------------------------------------------------------------
+# Tasks are enqueued on Windows with absolute Windows path strings
+# (see services/task_service.py: `str(config.BASE_DIR)` = "D:\\EDITEASE" and a
+# "D:\\..." video path). When the GPU worker runs inside WSL2 those strings are
+# unopenable — the same files live under "/mnt/d/EDITEASE" there.
+#
+# This shim rewrites drive-letter paths to their /mnt mount at the task
+# boundary. It is a deliberate no-op unless BOTH conditions hold:
+#   * running on a POSIX host (os.name == "posix"), and
+#   * EE_WSL_PATHS is set to a truthy value (the WSL launcher sets it).
+# So the native-Windows worker — the demo fallback — is completely unaffected.
+_DRIVE_RE = re.compile(r"^([A-Za-z]):[\\/](.*)$")
+
+
+def _wsl_paths_enabled() -> bool:
+    return os.name == "posix" and os.getenv("EE_WSL_PATHS", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
+def _localize_path(path: str | None) -> str | None:
+    """Map a Windows drive-letter path to its WSL /mnt mount when enabled.
+
+    "D:\\EDITEASE\\data\\x.mp4" -> "/mnt/d/EDITEASE/data/x.mp4". Paths that are
+    not drive-letter absolute (already-POSIX paths, None, "") are returned
+    unchanged, as is everything when the shim is disabled.
+    """
+    if not path or not _wsl_paths_enabled():
+        return path
+    match = _DRIVE_RE.match(path)
+    if not match:
+        return path
+    drive, remainder = match.group(1).lower(), match.group(2).replace("\\", "/")
+    return f"/mnt/{drive}/{remainder}"
 
 db_client = MongoClient(config.MONGO_URI)
 tasks_col = db_client[config.DB_NAME]["tasks"]
@@ -39,6 +77,10 @@ def process_video_task(self, video_path_str: str, base_dir_str: str, user_id: st
     Background task to run the EditEase video processing pipeline.
     """
     from pipeline.processing.run_pipeline import process_video
+    # Translate Windows paths to their WSL /mnt mount when the GPU worker runs
+    # under WSL2 (no-op on the native-Windows worker).
+    video_path_str = _localize_path(video_path_str)
+    base_dir_str = _localize_path(base_dir_str)
     logger.info(f"Starting Celery task for video: {video_path_str}")
     _update_task(self.request.id, status="STARTED", progress_step="Preparing pipeline...")
     
@@ -234,6 +276,11 @@ def auto_organize_task(self, video_path_str: str, base_dir_str: str, user_id: st
     import hashlib
     from pathlib import Path
     from database.organized_videos_schema import _get_col, build_doc, slugify
+
+    # Translate Windows paths to their WSL /mnt mount when the GPU worker runs
+    # under WSL2 (no-op on the native-Windows worker).
+    video_path_str = _localize_path(video_path_str)
+    base_dir_str = _localize_path(base_dir_str)
 
     video_name = os.path.splitext(os.path.basename(video_path_str))[0]
     original_filename = os.path.basename(video_path_str)
