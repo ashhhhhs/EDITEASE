@@ -1,10 +1,14 @@
 # GPU acceleration (WSL2 + TensorFlow-GPU)
 
-The pipeline's dominant cost is **DeepFace emotion + retinaface detection at ~7.9 s/frame
-(~90% of compute)**, and that stage runs on **TensorFlow**. TensorFlow dropped native-Windows
-GPU support after 2.10, so the only supported way to give it this machine's **RTX 3060** is to
-run the Celery worker inside **WSL2** with a Linux CUDA TensorFlow build and GPU passthrough.
-The PyTorch scene classifier rides along on the same GPU for free.
+The pipeline's dominant cost is **DeepFace emotion + retinaface detection (~90% of compute)**,
+and that stage runs on **TensorFlow**. TensorFlow dropped native-Windows GPU support after 2.10,
+so the only supported way to give it this machine's **RTX 3060** is to run the Celery worker
+inside **WSL2** with a Linux CUDA TensorFlow build and GPU passthrough. The PyTorch scene
+classifier stays on CPU by design (see step 3) — it's only ~39 ms/frame, and a GPU torch wheel
+conflicts with TF's CUDA libraries.
+
+**Measured speedup on this machine** (retinaface via DeepFace, same 1280px frame, RTX 3060 vs a
+forced-CPU run in the same venv): **~1.86 s/frame → ~0.19 s/frame, ≈ 10×** on the emotion stage.
 
 Everything else — the Flask API, the React SPA, MongoDB, and Redis — stays on Windows,
 unchanged. **Only the Celery worker moves.**
